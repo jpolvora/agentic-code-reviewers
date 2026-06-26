@@ -1,6 +1,13 @@
-# Cursor Reviewer — Code Review Agêntico (Review-Only)
+# Agentic Code Reviewers — Multi Agent Code Reviewer
 
-O **Cursor Reviewer** é um revisor de Pull Requests automatizado e portável para **Azure DevOps** e **GitHub**. Ele orquestra um agente em modo **somente leitura** sobre o diff do repositório, guiado pelo harness do projeto (`.cursor/rules/`, `AGENTS.md`, skills de code-review).
+**Agentic Code Reviewers** é um revisor de Pull Requests **multi-agente**, **plugável**, **extensível**, **customizável** e **resiliente** para pipelines de CI/CD. Orquestra agentes LLM em modo **somente leitura** sobre o diff do repositório, guiado pelo harness do projeto (`.cursor/rules/`, `AGENTS.md`, skills de code-review).
+
+| Dimensão | Suporte atual | Extensível |
+| :--- | :--- | :--- |
+| **Engines agênticas** | `cursor-sdk`, `opencode` | Sim — implemente `ExecutionEngine` e registre em `getEngine()` |
+| **Plataformas Git/CI** | Azure DevOps, GitHub | Sim — implemente `PlatformProvider` |
+| **Stacks tecnológicas** | ABP/Angular, PHP/Laravel, Next.js/React, TypeScript, Custom | Sim — adicione em `STACKS` + `skills/stacks/` |
+| **Providers LLM** | Cursor nativo, OpenCode (Zen, Go, LM Studio, …) | Via engine custom ou OpenCode |
 
 A execução do LLM é **plugável** via `CURSOR_REVIEWER_ENGINE`:
 
@@ -8,6 +15,9 @@ A execução do LLM é **plugável** via `CURSOR_REVIEWER_ENGINE`:
 | :--- | :--- | :--- |
 | **`cursor-sdk`** (padrão) | [`@cursor/sdk`](https://cursor.com/docs/sdk/typescript) | CI/CD, pipelines, modelos Cursor nativos |
 | **`opencode`** | [`@opencode-ai/sdk`](https://opencode.ai/docs/sdk/) | Dev local com [OpenCode](https://opencode.ai/) — Zen, Go, LM Studio, etc. |
+| **Custom** | Seu adapter | Fork, implemente `ExecutionEngine`, abra PR |
+
+> **Contribua:** fork o repositório, adicione sua engine agêntica ou provedor de plataforma, revise localmente com `npm test` e `npm run test:seed`, e abra um PR. Novas engines e providers são bem-vindas.
 
 O revisor publica threads acionáveis nas linhas afetadas da PR. **Não altera arquivos** no repositório; aplicar correções ou encerrar threads é decisão do desenvolvedor.
 
@@ -29,7 +39,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
 
 ## 🚀 Recursos Principais
 
-*   **🔌 Engines plugáveis (`cursor-sdk` | `opencode`):** Mesmo orquestrador (`src/index.ts`), prompt e gate; troca só a camada de execução LLM via `CURSOR_REVIEWER_ENGINE`. Métricas de tokens normalizadas para ambos os adapters.
+*   **🔌 Multi-engine agêntico (`cursor-sdk` | `opencode` | custom):** Mesmo orquestrador (`src/index.ts`), prompt e gate; troca só a camada de execução LLM via `CURSOR_REVIEWER_ENGINE`. Qualquer harness pode implementar `ExecutionEngine`. Métricas de tokens normalizadas entre adapters.
 *   **🔌 Integração multiprovedor (Azure DevOps & GitHub):** Provedor inferido pelo CI ou forçado com `--ado` / `--gh`.
 *   **🧠 Memória Intra-PR e Agrupamento de Ocorrências (Anti Whack-a-mole):** O agente retém os padrões de erros passados da PR em seu contexto para caçar ativamente falhas recorrentes. Ao encontrar o mesmo erro espalhado pelo diff, ele agrupa as ocorrências (`relatedOccurrences`), sendo desdobradas pela pipeline em múltiplas threads sincronizadas publicadas de uma única vez.
 *   **🗂️ Seleção e Autodetecção de Stacks Tecnológicas:** Permite executar a revisão focando nas extensões de arquivos e com recomendações de boas práticas específicas da stack selecionada (via `--stack` ou env `CURSOR_REVIEWER_STACK`). Caso nenhuma stack seja configurada, o runner tenta autodetectar a tecnologia analisando os arquivos da raiz do projeto (ex.: presença de `artisan`, `next.config.js`, `tsconfig.json` ou arquivos `.sln`/`.csproj`), caindo para `ABP/Angular` como fallback. O log indica explicitamente de onde a definição da stack foi carregada.
@@ -42,7 +52,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
     *   **Azure DevOps:** Emite logging commands (`##vso[task.logissue]`) e anexa um resumo markdown rico na tela de build (`##vso[task.uploadsummary]`).
     *   **GitHub:** Anexa um resumo markdown completo da revisão diretamente na página do workflow via `GITHUB_STEP_SUMMARY`.
 *   **📦 Execução Remota via cURL:** Permite rodar o reviewer remotamente baixando apenas o script `run.sh` da branch `release`, dispensando o clone completo do repositório ou a presença de dependências de desenvolvimento.
-*   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o `cursor-reviewer`:
+*   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
     *   **`megabrain`** — Revisão com threads persistentes (`[Thread #1]`, `[Thread #2]`, …); em rodadas seguintes avalia se cada thread foi `RESOLVED` ou permanece `UNRESOLVED`.
     *   **`solve-pr`** — Automatiza o ciclo de correção: busca threads do bot no GitHub, aplica fixes, commit/push e aguarda nova rodada do reviewer.
@@ -51,7 +61,16 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
 
 ## ⚙️ Engines de execução
 
-O runner resolve a engine em `getEngine(config)` (`src/engine/index.ts`). O contrato é `ExecutionEngine.run()` → `EngineRunResult` (`fullText` JSON, `sessionId`, métricas).
+O runner resolve a engine em `getEngine(config)` (`src/engine/index.ts`). O contrato é `ExecutionEngine.run()` → `EngineRunResult` (`fullText` JSON, `sessionId`, métricas). Qualquer harness ou SDK agêntico pode ser integrado implementando essa interface — o pipeline (diff, gate, rodadas, publicação) permanece o mesmo.
+
+### Como adicionar uma engine customizada
+
+1. Crie `src/engine/<sua-engine>/engine.ts` implementando `ExecutionEngine` (`src/engine/types.ts`).
+2. Registre o nome em `ReviewerEngineName` e no `switch` de `getEngine()` (`src/engine/index.ts`).
+3. Documente variáveis de ambiente e modelos suportados.
+4. Adicione testes e abra PR.
+
+O mesmo padrão se aplica a **novos provedores de plataforma** (`PlatformProvider` em `src/provider/`) — GitLab, Bitbucket e outros estão a caminho; contribuições são encorajadas.
 
 ### `cursor-sdk` (padrão)
 
@@ -196,7 +215,7 @@ npm run review -- [argumentos]
 
 ## 🗂️ Seleção e Autodetecção de Stacks
 
-O Cursor Reviewer permite focar a análise em arquivos elegíveis específicos e injetar recomendações de boas práticas direcionadas para cada ecossistema tecnológico.
+O **Agentic Code Reviewers** permite focar a análise em arquivos elegíveis específicos e injetar recomendações de boas práticas direcionadas para cada ecossistema tecnológico.
 
 ### ⚙️ Como Definir a Stack
 Você pode definir a stack de três formas (em ordem de prioridade):
@@ -208,7 +227,7 @@ Você pode definir a stack de três formas (em ordem de prioridade):
 
 Se você precisa rodar o revisor em um projeto cuja tecnologia/stack não está pré-definida nas opções padrão, ou se deseja ter total controle das diretrizes de revisão da stack, você pode utilizar a stack `Custom`.
 
-Quando a stack `Custom` é selecionada, o Cursor Reviewer:
+Quando a stack `Custom` é selecionada, o runner:
 1. **Requer** que você informe um prompt customizado via `--custom-prompt` (ou pela variável `CURSOR_REVIEWER_CUSTOM_PROMPT`).
 2. Adota, por padrão, a inclusão de todos os arquivos (`**/*`) no diff de revisão, a menos que seja definido o parâmetro `--include-patterns` (ou a variável `CURSOR_REVIEWER_INCLUDE_PATTERNS`).
 
@@ -261,7 +280,7 @@ A arquitetura é modular e extensível. Para adicionar suporte a uma nova stack 
 
 ---
 
-### Skills locais do `cursor-reviewer`
+### Skills locais do `agentic-code-reviewers`
 
 As skills em `.agents/skills/` deste repositório são locais ao runner. Invocáveis no Cursor com `/code-review-self`, `/megabrain` ou `/solve-pr` quando anexadas à conversa:
 
@@ -283,7 +302,7 @@ As skills em `.agents/skills/` deste repositório são locais ao runner. Invocá
 Utilize o template pronto do projeto: [`azure-pipelines-cursor-code-review.yml`](azure-pipelines-cursor-code-review.yml). 
 
 1. Copie o arquivo para a raiz do seu repositório Git alvo.
-2. Certifique-se de criar um **Variable Group** (ex: `vg-cursor-reviewer`) no Azure DevOps contendo a variável secreta `CURSOR_API_KEY`.
+2. Certifique-se de criar um **Variable Group** (ex: `vg-agentic-code-reviewers`) no Azure DevOps contendo a variável secreta `CURSOR_API_KEY`.
 3. Garanta que o **Build Service** da sua pipeline tenha permissão de **Contribute to pull requests** nas configurações do repositório.
 4. Habilite a opção **Allow scripts to access the OAuth token** nas configurações de execução do job da pipeline.
 5. Configure uma branch policy de **Build Validation** apontando para esta pipeline.
@@ -318,7 +337,7 @@ Para desativar o check de referência OpenCode, remova o job `review-opencode` o
 Para revisar **outro** repositório via script remoto (engine `cursor-sdk` apenas):
 
 ```yaml
-name: Cursor Code Review
+name: Agentic Code Review
 
 on:
   pull_request:
@@ -346,7 +365,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURSOR_REVIEWER_ENGINE: cursor-sdk
         run: |
-          curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- \
+          curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- \
             --gh --pr-id ${{ github.event.pull_request.number }}
 ```
 
@@ -356,10 +375,10 @@ Para **OpenCode** em repositórios externos, replique o job `review-opencode` de
 
 ## 📦 Execução Remota via cURL (`run.sh`)
 
-O script `run.sh` permite executar o **Cursor Reviewer** em qualquer repositório sem a necessidade de clonar o projeto do runner manualmente ou instalar dependências de desenvolvimento locais de forma permanente. 
+O script `run.sh` permite executar o **Agentic Code Reviewers** em qualquer repositório sem a necessidade de clonar o projeto do runner manualmente ou instalar dependências de desenvolvimento locais de forma permanente. 
 
 O script realiza as seguintes etapas de forma silenciosa:
-1. Clona a branch `release` (contendo exclusivamente os artefatos compilados em JS do runner) em um diretório temporário local (`.tmp-cursor-reviewer`).
+1. Clona a branch `release` (contendo exclusivamente os artefatos compilados em JS do runner) em um diretório temporário local (`.tmp-agentic-code-reviewers`).
 2. Instala apenas as dependências de produção necessárias de runtime (`npm ci --omit=dev`).
 3. Executa o agente direcionando o escopo de análise para a pasta atual e repassa todos os argumentos CLI.
 4. Remove o diretório temporário automaticamente ao concluir ou interromper o processo.
@@ -369,7 +388,7 @@ O script realiza as seguintes etapas de forma silenciosa:
 Você pode invocar o runner passando opções CLI usando o operador `--` após a chamada do bash:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- [OPÇÕES]
+curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- [OPÇÕES]
 ```
 
 > [!IMPORTANT]
@@ -377,7 +396,7 @@ curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.s
 
 ### 📋 Principais opções de linha de comando (forwarded arguments)
 
-Todos os argumentos passados após `--` são repassados ao indexador do Cursor Reviewer. A lista completa de opções suportadas inclui:
+Todos os argumentos passados após `--` são repassados ao indexador do Agentic Code Reviewers. A lista completa de opções suportadas inclui:
 
 | Parâmetro | Descrição |
 | :--- | :--- |
@@ -402,7 +421,7 @@ Todos os argumentos passados após `--` são repassados ao indexador do Cursor R
 Analisa o diff local contra a branch `master` usando boas práticas de TypeScript sem publicar nada:
 ```bash
 export CURSOR_API_KEY="sua_chave_aqui"
-curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- --dry-run --stack typescript
+curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --dry-run --stack typescript
 ```
 
 #### 2. Dry-run com OpenCode Go (servidor local)
@@ -421,7 +440,7 @@ npm run review:local
 #### 3. Diff local vs `develop` + uncommitted
 ```bash
 export CURSOR_API_KEY="sua_chave_aqui"
-curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- --dry-run --target-branch refs/heads/develop --include-uncommitted
+curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --dry-run --target-branch refs/heads/develop --include-uncommitted
 ```
 
 #### 4. GitHub Actions (repositório consumidor via cURL)
@@ -432,18 +451,18 @@ Para executar remotamente na pipeline do GitHub Actions enviando os dados da PR:
     CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   run: |
-    curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- --gh --pr-id ${{ github.event.pull_request.number }}
+    curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --gh --pr-id ${{ github.event.pull_request.number }}
 ```
 
 #### 5. Azure Pipelines
 Executa remotamente especificando a organização e projeto:
 ```yaml
 - script: |
-    curl -fsSL https://raw.githubusercontent.com/jpolvora/cursor-reviewer/main/run.sh | bash -s -- --ado --org "MinhaOrg" --project "MeuProjeto" --repo "MeuRepo" --pr-id $(System.PullRequest.PullRequestId)
+    curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --ado --org "MinhaOrg" --project "MeuProjeto" --repo "MeuRepo" --pr-id $(System.PullRequest.PullRequestId)
   env:
     CURSOR_API_KEY: $(CURSOR_API_KEY)
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-  displayName: 'Executar Cursor Reviewer via cURL'
+  displayName: 'Executar Agentic Code Reviewers via cURL'
 ```
 
 ---
@@ -479,3 +498,17 @@ Executa remotamente especificando a organização e projeto:
 *   `skills/` : Contratos de prompts estáticos do agente (`SYSTEM_PROMPT.md` e `CODE_REVIEW.md`) e subpasta `skills/stacks/` contendo os prompts complementares com as recomendações de cada stack.
 *   `.agents/skills/` : Skills agênticas do ecossistema do runner (`code-review-self`, `megabrain`, `solve-pr` e scripts auxiliares).
 *   `demo-project/` : Projeto de demonstração contendo erros intencionais para fins de testes locais.
+
+---
+
+## 🤝 Contribuir
+
+O **agentic-code-reviewers** foi desenhado para crescer por extensão, não por fork silencioso:
+
+1. **Fork** o repositório.
+2. **Escolha o ponto de extensão:** engine agêntica (`ExecutionEngine`), provedor de plataforma (`PlatformProvider`) ou stack (`STACKS` + `skills/stacks/`).
+3. **Implemente** seguindo os contratos em `src/engine/types.ts` e `src/provider/types.ts`.
+4. **Valide** com `npm test` e `npm run test:seed`.
+5. **Abra PR** com documentação das variáveis de ambiente e exemplos de uso.
+
+Novas engines (outros SDKs agênticos, harness locais, modelos self-hosted) e providers (GitLab, Bitbucket, Gitea, …) são encorajadas. O pipeline central (diff, gate, rodadas, publicação) permanece estável enquanto você pluga sua camada de execução.

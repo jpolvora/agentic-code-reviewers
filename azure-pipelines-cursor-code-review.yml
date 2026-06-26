@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────
-# Pipeline Template — Cursor Reviewer (Code Review Agêntico)
+# Pipeline Template — Agentic Code Reviewers (Multi Agent Code Review)
 # ──────────────────────────────────────────────────────────────────────
 #
 # Review-only: publica threads na PR; exit 0 mesmo com issues.
@@ -10,7 +10,7 @@
 # │ 2. Ajuste as variáveis marcadas com "# ← CONFIGURE" abaixo.
 # │ 3. Crie o variable group no ADO com CURSOR_API_KEY (secret).
 # │ 4. Registre a pipeline no ADO e configure Build Validation.
-# │ 5. Detalhes completos: scripts/cursor-reviewer/README.md
+# │ 5. Detalhes completos: scripts/agentic-code-reviewers/README.md (ou legado scripts/cursor-reviewer/)
 # └──────────────────────────────────────────────────────────────────
 #
 # Pré-requisitos:

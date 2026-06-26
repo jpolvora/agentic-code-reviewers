@@ -1,13 +1,13 @@
-# Fluxo de análise e decisão — Cursor Reviewer
+# Fluxo de análise e decisão — Agentic Code Reviewers
 
-> **Artefato de referência** — descreve o fluxo completo do `cursor-reviewer` desde a preparação do diff até a decisão do que vira thread real na PR.  
+> **Artefato de referência** — descreve o fluxo completo do **agentic-code-reviewers** desde a preparação do diff até a decisão do que vira thread real na PR.  
 > **Última revisão:** jun/2026 (sandbox read-only do SDK, cancelamento real no timeout, resultado canônico via `run.wait()`, logging commands ADO, remoção do campo `urgency`, fence por linguagem em vez de ```suggestion).
 
 ---
 
 ## Visão geral
 
-O Cursor Reviewer é **review-only**: analisa o diff da PR, publica threads acionáveis no Azure DevOps e **não corrige código**. Correções ficam com o desenvolvedor, que trata as threads diretamente na PR.
+O **Agentic Code Reviewers** é **review-only**: analisa o diff da PR, publica threads acionáveis (Azure DevOps, GitHub) e **não corrige código**. Correções ficam com o desenvolvedor, que trata as threads diretamente na PR.
 
 ```mermaid
 flowchart TD
@@ -74,7 +74,7 @@ As stacks disponíveis e seus padrões de inclusão padrão são:
 | **Next.js/React** | `**/*.ts`, `**/*.tsx`, `**/*.js`, `**/*.jsx`, `**/*.html`, `**/*.css`, `**/*.json`, `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.html`, `*.css`, `*.json` |
 | **TypeScript** | `**/*.ts`, `**/*.json`, `*.ts`, `*.json` |
 
-O filtro de exclusão (`excludePatterns`) padrão remove proxies, bin/obj, `.md`, `.csproj` e, por padrão, o próprio diretório do runner (`scripts/cursor-reviewer/**`) para evitar self-review indesejado.
+O filtro de exclusão (`excludePatterns`) padrão remove proxies, bin/obj, `.md`, `.csproj` e, por padrão, o próprio diretório do runner (legado: `scripts/cursor-reviewer/**`) para evitar self-review indesejado.
 
 Variáveis associadas: `CURSOR_REVIEWER_STACK`, `CURSOR_REVIEWER_REVIEW_SELF`, `CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS`.
 

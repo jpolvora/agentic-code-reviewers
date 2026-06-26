@@ -1,10 +1,10 @@
-# Seed issues — validação do Cursor Reviewer
+# Seed issues — validação do Agentic Code Reviewers
 
 > **Artefatos seed não vão para produção.** Fonte canônica: `fixtures/seed/`. O workspace recebe cópias temporárias só durante o teste.
 
 ## Objetivo
 
-Validar que o `cursor-reviewer` detecta **6 cenários intencionais** (3 backend, 3 frontend), publica `suggestedFix` e reporta issues na PR — sem self-review do próprio runner e **sem commits artificiais**.
+Validar que o **agentic-code-reviewers** detecta **6 cenários intencionais** (3 backend, 3 frontend), publica `suggestedFix` e reporta issues na PR — sem self-review do próprio runner e **sem commits artificiais**.
 
 | ID | Camada | Problema | Obrigatório no teste |
 |----|--------|----------|----------------------|
@@ -20,7 +20,7 @@ Validar que o `cursor-reviewer` detecta **6 cenários intencionais** (3 backend,
 ## Estrutura
 
 ```
-scripts/cursor-reviewer/
+# Repositório standalone (este repo) ou submódulo em scripts/agentic-code-reviewers/ (legado: scripts/cursor-reviewer/)
 ├── fixtures/seed/                    # Fonte canônica (versionada)
 │   ├── expected-scenarios.json       # Critérios de aceite do teste
 │   ├── sample-evaluate-output.txt    # Amostra mínima p/ testes unitários (sem agente)
@@ -40,7 +40,11 @@ scripts/cursor-reviewer/
 ### Teste E2E (recomendado — exige `CURSOR_API_KEY`)
 
 ```bash
-cd scripts/cursor-reviewer
+# Na raiz do repositório (standalone)
+npm run test:seed
+
+# Ou, se instalado como submódulo em scripts/agentic-code-reviewers/ (legado: scripts/cursor-reviewer/)
+cd scripts/agentic-code-reviewers
 npm run test:seed
 ```
 
@@ -86,7 +90,7 @@ npm run seed:verify-clean
 |--------|-----------|
 | **Backend** | `src/*Application/*.csproj` → `<Compile Remove="CursorReviewerSeed\**\*.cs" />` — nunca compila nem expõe Auto API |
 | **Frontend** | Componente **não** registrado em rotas/módulos — código morto |
-| **Runner** | `scripts/cursor-reviewer/**` excluído do diff por padrão |
+| **Runner** | Diretório do runner excluído do diff por padrão (legado: `scripts/cursor-reviewer/**`) |
 | **CI** | `npm run seed:verify-clean` falha se pastas seed existirem no workspace |
 
 > No modo `--seed-test`, o prompt instrui o agente a avaliar **padrões de código** nos arquivos seed, ignorando `Compile Remove`/rotas como desculpa para omitir achados.
@@ -96,4 +100,4 @@ npm run seed:verify-clean
 - [ ] `npm run seed:uninstall` executado
 - [ ] `npm run seed:verify-clean` passa
 - [ ] `rg "CURSOR-REVIEWER-SEED" src/ angular/` sem resultados
-- [ ] `npm test` passa na pasta `scripts/cursor-reviewer`
+- [ ] `npm test` passa na raiz do repositório (ou na pasta do submódulo, se aplicável)

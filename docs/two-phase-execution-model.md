@@ -1,6 +1,6 @@
 # Modelo de execução — análise em duas fases (chamada única)
 
-> **Artefato de referência** — explica como o cursor-reviewer implementa as duas fases de review (triagem → investigação) e por que optamos por **uma única chamada ao agente** em vez de múltiplos agentes ou steps separados.  
+> **Artefato de referência** — explica como o **agentic-code-reviewers** implementa as duas fases de review (triagem → investigação) e por que optamos por **uma única chamada ao agente** em vez de múltiplos agentes ou steps separados.  
 > **Complementa:** [`flow-analysis.md`](flow-analysis.md) (fluxo operacional completo).  
 > **Última revisão:** jun/2026.
 

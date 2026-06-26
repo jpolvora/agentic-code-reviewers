@@ -1,4 +1,4 @@
-# FAQ — Cursor Reviewer
+# FAQ — Agentic Code Reviewers
 
 > **Formato:** cada item usa **pergunta** (`### …?`) + **Resposta** + *Evidência* quando aplicável.  
 > **Ordem:** sequência de execução do runner (`src/index.ts`).  
@@ -33,9 +33,9 @@
 
 ## 1. Visão geral
 
-### O que é o Cursor Reviewer?
+### O que é o Agentic Code Reviewers?
 
-**Resposta:** Revisor automatizado de Pull Requests para Azure DevOps via [**Cursor SDK**](https://cursor.com/docs/sdk/typescript) em modo **agêntico**. Aplica regras do projeto (`AGENTS.md`, `.cursor/rules/`, skill `code-review`) e **publica threads** na PR. **Não altera código.**
+**Resposta:** **Multi Agent Code Reviewer** plugável e extensível para Pull Requests em **Azure DevOps** e **GitHub**. Orquestra engines agênticas (`cursor-sdk`, `opencode`, extensível via `ExecutionEngine`) sobre o diff, aplica regras do projeto (`AGENTS.md`, `.cursor/rules/`, skill `code-review`) e **publica threads** na PR. **Não altera código.** Fork, adicione sua engine ou provider, revise e abra PR.
 
 *Evidência:* `README.md`; `src/index.ts`.
 
@@ -203,7 +203,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Quais arquivos entram no review?
 
-**Resposta:** Include: `**/*.cs`, `**/*.ts`, `**/*.html`. Exclude: proxies, bin/obj, `.md`, `.csproj`, `scripts/cursor-reviewer/**` (anti self-review). Só arquivos **AMR** no diff.
+**Resposta:** Include: `**/*.cs`, `**/*.ts`, `**/*.html`. Exclude: proxies, bin/obj, `.md`, `.csproj`, diretório do runner (legado: `scripts/cursor-reviewer/**`) — anti self-review. Só arquivos **AMR** no diff.
 
 *Evidência:* `src/config.ts`; `src/git/diff.ts`.
 
@@ -514,7 +514,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 *Evidência:* `review-validation.ts`, `post-comments.ts`, `README.md` § “Pré-requisitos no Azure DevOps”.
 
-### Reviewer aponta o próprio código (`scripts/cursor-reviewer/`) — por quê?
+### Reviewer aponta o próprio código (diretório do runner) — por quê?
 
 **Resposta:** Exclude ativo por padrão (anti self-review). `CURSOR_REVIEWER_REVIEW_SELF=true` só para desenvolver o runner.
 
@@ -578,7 +578,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 | O que vira thread? | Review com score ≥ `SCORE_MIN` (default 6), campos OK, linha não duplicada. |
 | Como abaixar o limiar de threads? | `SCORE_MIN=4` ou `--score-min 4` (opt-in; omitir = default 6). |
 | Por que sumiu um warning na rodada 4? | Escalonamento `MAX_ROUNDS` — só `critical` segue sendo publicado. |
-| Posso testar localmente? | `npm run review -- --dry-run` em `scripts/cursor-reviewer`. |
+| Posso testar localmente? | `npm run review -- --dry-run` na raiz do repositório (ou no submódulo, se instalado em `scripts/agentic-code-reviewers/`). |
 | Onde customizar critérios? | Repo alvo: `.agents/skills/code-review/`; runner: `skills/SYSTEM_PROMPT.md`. |
 | Work items no review? | Se vinculados à PR + token ADO — etapa [§7](#7-user-story-task-e-contexto-ado), **não** no `SYSTEM_PROMPT.md`. |
 | US/Task faz parte do system prompt? | **Não** — conteúdo dinâmico da API ADO, append no prompt composto ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)). |

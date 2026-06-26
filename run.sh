@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# Cursor Reviewer Remote Runner
+# Agentic Code Reviewers — Remote Runner
 # ──────────────────────────────────────────────────────────────────────
-# Este script clona a branch 'release' do cursor-reviewer, instala as
+# Este script clona a branch 'release' do agentic-code-reviewers, instala as
 # dependências de runtime e executa o reviewer no contexto do projeto atual.
 # ──────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 # Configurações padrão
-CURSOR_REVIEWER_REPO_URL="${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/cursor-reviewer.git}"
-TEMP_DIR=".tmp-cursor-reviewer"
+CURSOR_REVIEWER_REPO_URL="${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}"
+TEMP_DIR=".tmp-agentic-code-reviewers"
 CALLER_DIR="$(pwd)"
 
-echo "=== [Runner] Iniciando execução remota do Cursor Reviewer ==="
+echo "=== [Runner] Iniciando execução remota do Agentic Code Reviewers ==="
 echo "Repositório do Reviewer: $CURSOR_REVIEWER_REPO_URL"
 echo "Diretório Alvo da Análise: $CALLER_DIR"
 
@@ -40,6 +40,6 @@ cd "$CALLER_DIR/$TEMP_DIR"
 npm ci --omit=dev
 
 VERSION=$(node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); console.log(pkg.version);")
-echo "=== [Runner] Executando Cursor Reviewer Agent (v$VERSION) ==="
+echo "=== [Runner] Executando Agentic Code Reviewers (v$VERSION) ==="
 # Executa o reviewer passando o diretório original do chamador como repo-root e encaminhando os argumentos
 node dist/index.js --repo-root "$CALLER_DIR" "$@"
