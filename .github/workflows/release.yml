@@ -1,0 +1,77 @@
+name: CI and Release Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm test
+
+      - name: Bump Version
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Bump version in package.json and package-lock.json
+          npm version patch -m "chore(release): bump version to %s [skip ci]"
+          
+          # Push commit and tag back to main branch
+          git push origin HEAD:main --follow-tags
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Deploy Compiled Code to Release Branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Limpar diretório temporário anterior
+          rm -rf .release-tmp
+          mkdir -p .release-tmp
+          
+          # Copiar os arquivos de runtime necessários para a pasta temporária
+          cp -r dist .release-tmp/dist
+          cp -r skills .release-tmp/skills
+          cp package.json .release-tmp/package.json
+          cp package-lock.json .release-tmp/package-lock.json
+          cp README.md .release-tmp/README.md
+          cp LICENSE .release-tmp/LICENSE 2>/dev/null || true
+          cp AGENTS.md .release-tmp/AGENTS.md 2>/dev/null || true
+          cp run.sh .release-tmp/run.sh
+          
+          # Criar o .gitignore para a branch de release
+          echo "node_modules/" > .release-tmp/.gitignore
+          echo ".release-tmp/" >> .release-tmp/.gitignore
+          
+          cd .release-tmp
+          git init -b release
+          git add -A
+          
+          NEW_VERSION=$(node -e "console.log(require('./package.json').version)")
+          git commit -m "chore: release build v$NEW_VERSION from GitHub Actions ($GITHUB_SHA)"
+          
+          echo "Publicando artefatos compilados para a branch release..."
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release --force

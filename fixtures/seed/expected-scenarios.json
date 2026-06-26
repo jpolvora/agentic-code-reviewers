@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "description": "Cenários intencionais para validar detecção do cursor-reviewer (ver SEED-ISSUES.md).",
+  "minimumRequired": 5,
+  "scenarios": [
+    {
+      "id": "SEED-B1",
+      "required": true,
+      "layer": "backend",
+      "filePathSuffix": "CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "minScore": 6,
+      "commentKeywords": ["Authorize", "Delete", "permiss"],
+      "requiresSuggestedFix": true
+    },
+    {
+      "id": "SEED-B2",
+      "required": true,
+      "layer": "backend",
+      "filePathSuffix": "CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "minScore": 6,
+      "commentKeywords": [".Result", "deadlock", "bloque", "async"],
+      "requiresSuggestedFix": true
+    },
+    {
+      "id": "SEED-B3",
+      "required": true,
+      "layer": "backend",
+      "filePathSuffix": "CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "minScore": 6,
+      "commentKeywords": ["Guid.Empty", "Empty", "inválid"],
+      "requiresSuggestedFix": true
+    },
+    {
+      "id": "SEED-F1",
+      "required": false,
+      "layer": "frontend",
+      "filePathSuffix": "cursor-reviewer-seed/cursor-reviewer-seed.component.html",
+      "minScore": 6,
+      "commentKeywords": ["innerHTML", "XSS", "sanitiz"],
+      "requiresSuggestedFix": true,
+      "skipReason": "Anti-falso-positivo pode descartar quando o componente não está em rotas/módulos."
+    },
+    {
+      "id": "SEED-F2",
+      "required": true,
+      "layer": "frontend",
+      "filePathSuffix": "cursor-reviewer-seed/cursor-reviewer-seed.component.html",
+      "minScore": 6,
+      "commentKeywords": ["abpPermission", "permiss", "destrut"],
+      "requiresSuggestedFix": true
+    },
+    {
+      "id": "SEED-F3",
+      "required": true,
+      "layer": "frontend",
+      "filePathSuffix": "cursor-reviewer-seed/cursor-reviewer-seed.component.ts",
+      "minScore": 6,
+      "commentKeywords": ["atob", "base64", "valid"],
+      "requiresSuggestedFix": true
+    }
+  ]
+}

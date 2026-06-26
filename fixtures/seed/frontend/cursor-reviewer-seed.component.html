@@ -1,0 +1,19 @@
+<!--
+  CURSOR-REVIEWER-SEED — REMOVER ANTES DO PUSH (ver scripts/cursor-reviewer/SEED-ISSUES.md)
+-->
+
+<!-- SEED-F1: XSS — innerHTML com conteúdo dinâmico não sanitizado -->
+<div [innerHTML]="userGeneratedHtml"></div>
+
+<!-- SEED-F2: botão destrutivo sem *abpPermission -->
+<button type="button" class="btn btn-danger" (click)="excluirTodosRegistros()">
+  Excluir todos
+</button>
+
+<button
+  type="button"
+  class="btn btn-outline-primary"
+  (click)="downloadRelatorioPdf('', 'relatorio.pdf')"
+>
+  Baixar PDF
+</button>

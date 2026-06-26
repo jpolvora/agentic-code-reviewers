@@ -1,0 +1,101 @@
+# ──────────────────────────────────────────────────────────────────────
+# Pipeline Template — Cursor Reviewer (Code Review Agêntico)
+# ──────────────────────────────────────────────────────────────────────
+#
+# Review-only: publica threads na PR; exit 0 mesmo com issues.
+# Exit 1 somente em erro fatal (config, agente, ADO).
+#
+# ┌─ Como usar ──────────────────────────────────────────────────────
+# │ 1. Copie este arquivo para a RAIZ do seu repositório.
+# │ 2. Ajuste as variáveis marcadas com "# ← CONFIGURE" abaixo.
+# │ 3. Crie o variable group no ADO com CURSOR_API_KEY (secret).
+# │ 4. Registre a pipeline no ADO e configure Build Validation.
+# │ 5. Detalhes completos: scripts/cursor-reviewer/README.md
+# └──────────────────────────────────────────────────────────────────
+#
+# Pré-requisitos:
+#   - Node.js 22.13+ (instalado via NodeTool@0)
+#   - Variable group com CURSOR_API_KEY (secret obrigatório)
+#   - Build Service com permissão "Contribute to pull requests"
+#   - OAuth token habilitado na pipeline (Allow scripts to access...)
+#
+# Variáveis opcionais (variable group ou pipeline variables):
+#   - CURSOR_REVIEWER_TARGET_BRANCH  (default: refs/heads/master)
+#   - CURSOR_REVIEWER_MODEL          (default: composer-2.5)
+#   - SCORE_MIN                      (default: 6 — omitir mantém pipelines existentes)
+
+trigger: none   # Dispara apenas via Build Validation em PR
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+# ── OBRIGATÓRIO ────────────────────────────────────────────────────
+# Variable group contendo CURSOR_API_KEY (secret).
+# Crie em Pipelines → Library → + Variable group.
+- group: vg-cursor-reviewer                    # ← CONFIGURE: nome do seu variable group
+
+# ── Path do cursor-reviewer no repositório ─────────────────────────
+# Ajuste se o subprojeto estiver em outro diretório.
+- name: REVIEWER_DIR
+  value: scripts/cursor-reviewer               # ← CONFIGURE: caminho relativo ao repo
+
+# ── Cache npm (não alterar) ────────────────────────────────────────
+- name: npm_config_cache
+  value: $(Pipeline.Workspace)/.npm
+
+jobs:
+- job: CursorCodeReview
+  displayName: 'Cursor Agent Code Review'
+  steps:
+  # ── Checkout com histórico completo ──────────────────────────────
+  # fetchDepth: 0 garante merge-base correto no diff three-dot.
+  # persistCredentials: true permite git fetch das refs no step npm.
+  - checkout: self
+    fetchDepth: 0
+    persistCredentials: true
+
+  # ── Node.js (exigido pelo @cursor/sdk) ──────────────────────────
+  - task: NodeTool@0
+    displayName: 'Install Node.js 22.13+'
+    inputs:
+      versionSpec: '22.13.x'
+
+  # ── Cache npm ───────────────────────────────────────────────────
+  - task: Cache@2
+    displayName: 'Cache npm'
+    inputs:
+      key: 'npm | "$(Agent.OS)" | $(REVIEWER_DIR)/package-lock.json'
+      restoreKeys: |
+         npm | "$(Agent.OS)"
+      path: $(npm_config_cache)
+
+  # ── Verify runtime ─────────────────────────────────────────────
+  - script: |
+      set -euo pipefail
+      echo "Node: $(node -v)"
+      echo "npm:  $(npm -v)"
+    displayName: 'Verify Node.js / npm'
+
+  # ── Install dependencies ────────────────────────────────────────
+  - script: |
+      set -euo pipefail
+      cd $(REVIEWER_DIR)
+      npm ci
+    displayName: 'npm ci (cursor-reviewer)'
+
+  # ── Run Cursor Reviewer ─────────────────────────────────────────
+  # O runner detecta automaticamente as variáveis ADO da pipeline:
+  #   SYSTEM_PULLREQUEST_SOURCEBRANCH, SYSTEM_PULLREQUEST_TARGETBRANCH,
+  #   SYSTEM_PULLREQUEST_PULLREQUESTID, SYSTEM_COLLECTIONURI,
+  #   SYSTEM_TEAMPROJECT, BUILD_REPOSITORY_NAME
+  - script: |
+      set -euo pipefail
+      cd $(REVIEWER_DIR)
+      npm run review
+    displayName: 'Run Cursor Reviewer Agent'
+    env:
+      CURSOR_API_KEY: $(CURSOR_API_KEY)
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      CURSOR_REVIEWER_TARGET_BRANCH: $(CURSOR_REVIEWER_TARGET_BRANCH)
+      CURSOR_REVIEWER_MODEL: $(CURSOR_REVIEWER_MODEL)

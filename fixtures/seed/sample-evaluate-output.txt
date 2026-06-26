@@ -1,0 +1,71 @@
+# Amostra mínima para testes unitários de evaluateSeedResponse (sem agente/API).
+# O E2E real usa npm run test:seed com fixtures temporárias em disco (--include-uncommitted --seed-test).
+
+```json
+{
+  "reviews": [
+    {
+      "fileName": "/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "lineNumber": 22,
+      "score": 9,
+      "severity": "critical",
+      "urgency": "high",
+      "developerAction": "fix",
+      "comment": "DELETE sem Authorize nem permissão ABP",
+      "analysis": "DeleteClienteSeedAsync expõe exclusão sem Authorize Delete permissão",
+      "impactPaths": ["/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs"],
+      "suggestedFix": "Aplicar [Authorize(SampleAppPermissions.Clients.Delete)] no método."
+    },
+    {
+      "fileName": "/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "lineNumber": 30,
+      "score": 8,
+      "severity": "warning",
+      "urgency": "medium",
+      "developerAction": "fix",
+      "comment": "Uso de .Result bloqueia thread em async",
+      "analysis": "GetClienteNomeBloqueante usa .Result causando deadlock sync-over-async",
+      "impactPaths": ["/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs"],
+      "suggestedFix": "Substituir por await _clienteRepository.GetAsync(id)."
+    },
+    {
+      "fileName": "/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs",
+      "lineNumber": 37,
+      "score": 8,
+      "severity": "warning",
+      "urgency": "medium",
+      "developerAction": "fix",
+      "comment": "Guid.Empty não rejeitado antes do repositório",
+      "analysis": "GetClienteDocumentoPermissivoAsync não valida Guid.Empty inválido",
+      "impactPaths": ["/src/SampleApp.Application/CursorReviewerSeed/CursorReviewerSeedAppService.cs"],
+      "suggestedFix": "Rejeitar Guid.Empty com BusinessException ou validação explícita."
+    },
+    {
+      "fileName": "/angular/src/app/cursor-reviewer-seed/cursor-reviewer-seed.component.html",
+      "lineNumber": 9,
+      "score": 8,
+      "severity": "warning",
+      "urgency": "medium",
+      "developerAction": "fix",
+      "comment": "Botão destrutivo sem abpPermission",
+      "analysis": "Ação destrutiva sem verificação de permissão abpPermission destrut",
+      "impactPaths": ["/angular/src/app/cursor-reviewer-seed/cursor-reviewer-seed.component.html"],
+      "suggestedFix": "Adicionar *abpPermission na ação sensível."
+    },
+    {
+      "fileName": "/angular/src/app/cursor-reviewer-seed/cursor-reviewer-seed.component.ts",
+      "lineNumber": 20,
+      "score": 8,
+      "severity": "warning",
+      "urgency": "medium",
+      "developerAction": "fix",
+      "comment": "atob sem validar base64",
+      "analysis": "downloadRelatorioPdf chama atob sem validar payload base64",
+      "impactPaths": ["/angular/src/app/cursor-reviewer-seed/cursor-reviewer-seed.component.ts"],
+      "suggestedFix": "Validar regex base64 antes de atob, como relatorio-download.ts."
+    }
+  ],
+  "resolvedThreads": [],
+  "reviewSummary": ""
+}
+```

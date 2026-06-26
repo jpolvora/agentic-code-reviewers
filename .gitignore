@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / IDE
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+ehthumbs.db
+
+# Testing / Coverage
+coverage/
+.nyc_output/
+
+# Misc
+output*.txt
+.tmp-*
+output.seed-test.tmp.txt
