@@ -27,20 +27,10 @@ permissions:
 
 jobs:
   auto-fix:
-    name: Auto Fix (${{ matrix.engine }})
+    name: Auto Fix (Sequential)
     # Executa apenas se o workflow de Code Review foi bem-sucedido, ou se foi executado manualmente
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request') }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - engine: cursor-sdk
-            model: composer-2.5
-            bot_tag: '[Cursor Reviewer]'
-          - engine: opencode
-            model: opencode-go/deepseek-v4-flash
-            bot_tag: '[Cursor Reviewer · OpenCode]'
 
     steps:
       - name: Get PR Info
@@ -88,28 +78,48 @@ jobs:
 
       - run: npm ci
 
-      - name: Validate engine secret
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      - name: Check Cursor SDK configuration
         run: |
-          if [ "${{ matrix.engine }}" = "cursor-sdk" ] && [ -z "$CURSOR_API_KEY" ]; then
-            echo "::error::Configure secret CURSOR_API_KEY em Settings → Secrets (engine cursor-sdk)."
-            exit 1
-          fi
-          if [ "${{ matrix.engine }}" = "opencode" ] && [ -z "$OPENCODE_API_KEY" ]; then
-            echo "::error::Configure secret OPENCODE_API_KEY em Settings → Secrets (engine opencode)."
-            exit 1
+          if [ -z "${{ secrets.CURSOR_API_KEY }}" ]; then
+            echo "::warning::CURSOR_API_KEY não configurada. O passo do Auto-Fix com cursor-sdk será ignorado."
           fi
 
-      - name: Run Auto-Fix (${{ matrix.engine }})
+      - name: Run Auto-Fix (cursor-sdk)
+        if: ${{ secrets.CURSOR_API_KEY != '' }}
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
-          AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
-          AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
-          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
-          CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
-          OPENCODE_API_KEY: ${{ matrix.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
+          AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: '[Cursor Reviewer]'
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          bash run.sh --local --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --auto-fix
+        continue-on-error: true
+
+      - name: Sync Git Repository (Fetch and Hard Reset)
+        # Sincroniza o workspace com a branch remota para incluir qualquer commit que o passo anterior tenha feito e enviado.
+        run: |
+          git fetch origin ${{ steps.pr-info.outputs.source_branch }}
+          git reset --hard origin/${{ steps.pr-info.outputs.source_branch }}
+
+      - name: Check OpenCode configuration
+        run: |
+          if [ -z "${{ secrets.OPENCODE_API_KEY }}" ]; then
+            echo "::warning::OPENCODE_API_KEY não configurada. O passo do Auto-Fix com opencode será ignorado."
+          fi
+
+      - name: Run Auto-Fix (opencode)
+        if: ${{ secrets.OPENCODE_API_KEY != '' }}
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: opencode
+          AGENTIC_CODE_REVIEWERS_MODEL: opencode-go/deepseek-v4-flash
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: '[Cursor Reviewer · OpenCode]'
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           bash run.sh --local --gh \
             --pr-id "${{ steps.pr-info.outputs.pr_number }}" \

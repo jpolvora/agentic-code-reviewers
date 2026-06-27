@@ -30,12 +30,12 @@ O revisor controla quantas rodadas de revisão/correção já ocorreram utilizan
 ### 2. Detecção de Mudanças (No-op)
 Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudanças concretas no código, o script de validação de Git (`git status --porcelain`) detectará que a *working tree* está limpa. Neste caso, o agente termina silenciosamente sem fazer o commit e push. **Sem o push, o loop se encerra automaticamente.**
 
-### 3. Concorrência e Matrix (Primeiro a chegar, vence)
-Como a pipeline de Auto-Fix pode utilizar uma *matrix* de execução (ex: instanciando `cursor-sdk` e `opencode` simultaneamente), múltiplos agentes podem tentar corrigir o código ao mesmo tempo.
-- Ambos os agentes aplicarão as alterações e tentarão um `git push`.
-- O primeiro a terminar fará o push com sucesso (atualizando a HEAD da branch) e acionará a próxima revisão.
-- O segundo vai falhar com um erro padrão do Git de *non-fast-forward* por não estar sincronizado com a origem.
-- Isso atua como um *lock* otimista perfeito: a correção mais rápida vence e reinicia o loop, impedindo que o código fique instável.
+### 3. Concorrência e Execução Sequencial (Sem sobreposição)
+Para evitar que múltiplos agentes corram em paralelo sobre a mesma branch (causando falhas de push *non-fast-forward* ou re-resolvendo as mesmas threads indevidamente), a pipeline de Auto-Fix executa as ferramentas sequencialmente em um único job:
+1. **Primeiro**: Executa o agente `cursor-sdk`.
+2. **Sincronização**: Realiza um reset rígido (`git fetch` + `git reset --hard`) trazendo os commits e as correções eventualmente aplicadas pelo Cursor SDK para o workspace local.
+3. **Segundo**: Executa o agente `opencode` a partir do estado atualizado.
+Isso garante a ordem correta, evita conflitos de concorrência e assegura que as threads resolvidas em etapas anteriores não sejam reprocessadas.
 
 ## Configuração Necessária (GitHub Actions)
 
