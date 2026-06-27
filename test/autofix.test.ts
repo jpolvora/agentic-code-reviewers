@@ -109,7 +109,7 @@ describe('runAutoFixFlow', () => {
     const tmpDir = setupTempWorkspace();
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
     const reviewContext = {
-      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+      activeThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
     } as any;
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 0),
@@ -127,7 +127,7 @@ describe('runAutoFixFlow', () => {
     const tmpDir = setupTempWorkspace();
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: true, autoFix: true } as any;
     const reviewContext = {
-      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+      activeThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
     } as any;
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 0),
@@ -147,7 +147,7 @@ describe('runAutoFixFlow', () => {
     const tmpDir = setupTempWorkspace();
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
     const reviewContext = {
-      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+      activeThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
     } as any;
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 0),
@@ -170,8 +170,8 @@ describe('runAutoFixFlow', () => {
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
     const reviewContext = {
       activeThreads: [
-        { filePath: 'file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
-        { filePath: 'file2.txt', lineNumber: 1, summary: 'test issue 2', threadId: '2' },
+        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
+        { filePath: '/file2.txt', lineNumber: 1, summary: 'test issue 2', threadId: '2' },
       ],
     } as any;
     const provider = {
@@ -197,6 +197,35 @@ describe('runAutoFixFlow', () => {
     const resolvedItemsArg = calls[0].arguments[2];
     assert.equal(resolvedItemsArg.length, 1);
     assert.equal(resolvedItemsArg[0].threadId, 1);
-    assert.equal(resolvedItemsArg[0].fileName, 'file.txt');
+    assert.equal(resolvedItemsArg[0].fileName, '/file.txt');
+  });
+
+  it('resolve apenas as threads cujos números de linha foram modificados pelas substituições', async () => {
+    const tmpDir = setupTempWorkspace();
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [
+        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
+        { filePath: '/file.txt', lineNumber: 3, summary: 'test issue 2', threadId: '2' },
+      ],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText: '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":1,"replacementContent":"linha 1 alterada"}]}\n```',
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    // Apenas a thread 1 (linha 1) foi modificada. A thread 2 (linha 3) não foi modificada e não deve ser resolvida.
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+    const calls = provider.resolvePullRequestReviewThreads.mock.calls;
+    const resolvedItemsArg = calls[0].arguments[2];
+    assert.equal(resolvedItemsArg.length, 1);
+    assert.equal(resolvedItemsArg[0].threadId, 1);
+    assert.equal(resolvedItemsArg[0].lineNumber, 1);
   });
 });

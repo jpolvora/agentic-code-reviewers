@@ -92,10 +92,18 @@ export async function runAutoFixFlow(
   await Promise.all(
     filePaths.map(async (filePath) => {
       const threads = threadsByFile.get(filePath)!;
-      const fullFilePath = path.resolve(config.repoRoot, filePath);
+      const relativePath = filePath.replace(/^\/+/,'');
+      const fullFilePath = path.resolve(config.repoRoot, relativePath);
+
+      // Validação de segurança contra Directory Traversal
+      const rel = path.relative(path.resolve(config.repoRoot), fullFilePath);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) {
+        logger.error(`Acesso fora do repositório bloqueado: ${filePath}`);
+        return;
+      }
 
       if (!fs.existsSync(fullFilePath)) {
-        logger.error(`Arquivo não encontrado para correção: ${filePath}`);
+        logger.error(`Arquivo não encontrado para correção: ${filePath} (caminho resolvido: ${fullFilePath})`);
         return;
       }
 
@@ -176,16 +184,26 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
-        modifiedFiles.push(filePath);
+        modifiedFiles.push(relativePath);
 
-        // Cria os itens resolvidos para marcar na PR
+        // Cria os itens resolvidos para marcar na PR apenas se a thread tiver sido de fato alterada pelos replacements
         for (const thread of threads) {
-          resolvedItems.push({
-            threadId: (Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId)) as any,
-            fileName: thread.filePath,
-            lineNumber: thread.lineNumber,
-            note: config.dryRun ? `${explanation} (simulado)` : explanation,
-          });
+          const isModified = parsed.replacements.some(
+            (rep) => thread.lineNumber >= rep.startLine && thread.lineNumber <= rep.endLine,
+          );
+
+          if (isModified) {
+            resolvedItems.push({
+              threadId: (Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId)) as any,
+              fileName: thread.filePath,
+              lineNumber: thread.lineNumber,
+              note: config.dryRun ? `${explanation} (simulado)` : explanation,
+            });
+          } else {
+            logger.warn(
+              `Thread ${thread.threadId} na linha ${thread.lineNumber} de ${filePath} não foi afetada pelas substituições e continuará aberta.`,
+            );
+          }
         }
       } catch (err: any) {
         logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err.message}`);
