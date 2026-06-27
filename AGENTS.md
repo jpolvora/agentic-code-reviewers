@@ -207,12 +207,20 @@ Corrigir threads do bot   → solve-pr (GitHub) ou dev manual
 3. Cubra autodetecção em `test/config.test.ts`.
 4. **Sincronize** `README.md`, `AGENTS.md`, `docs/` e `.env.example` quando alterar env, workflows, stacks ou engines.
 
-### Comandos de validação (obrigatórios antes de finalizar)
+### Comandos de validação e execução local
+
+Ao desenvolver ou depurar a infraestrutura do runner, utilize os seguintes comandos:
 
 ```bash
-npm test                  # typecheck + testes unitários
-npm run test:seed         # E2E: instala fixtures, roda dry-run, valida detecção dos defeitos em SEED-ISSUES.md
-npm run seed:verify-clean # garante que fixtures foram desinstaladas e workspace está limpo
+# Execução manual e simulações (dry-run)
+npm run review:local      # Roda o runner local (via tsx) contra a branch atual (dry-run)
+bash run.sh --local ...   # Testa o script de wrapper de CI executando o código TypeScript nativamente
+
+# Build e Testes (Obrigatórios antes de abrir PR)
+npm run build             # Compila o projeto (dist/index.js) — valida a tipagem e empacotamento
+npm test                  # Typecheck estrito + bateria de testes unitários (Vitest)
+npm run test:seed         # E2E: instala fixtures localmente, roda dry-run com o agente, valida cobertura contra SEED-ISSUES.md e desaloca as fixtures
+npm run seed:verify-clean # Utilitário para garantir que a suite E2E não deixou lixo de fixtures rastreadas no working tree
 ```
 
 ### Boas práticas

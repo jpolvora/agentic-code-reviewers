@@ -17,7 +17,7 @@ flowchart TD
     C -->|Não + sem ADO| D[Encerra]
     C -->|Não + com ADO| E[Pula agente; avalia gate]
     C -->|Sim| F[Coleta ADO: work items + threads]
-    F --> G[Agente SDK: Fases 1–2]
+    F --> G[Engine LLM: cursor-sdk / opencode (Fases 1–2)]
     G --> H[Parser JSON]
     H --> I[Filtro score < AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) + política summary]
     I --> J[Dedup arquivo+linha]
@@ -27,7 +27,7 @@ flowchart TD
     M -->|Sim| N[exit 0 + log COM ISSUES]
     M -->|Não| O[exit 0 + log SEM ISSUES]
     B -->|Erro| P[exit 1]
-    G -->|Erro agente| P
+    G -->|Erro engine| P
 ```
 
 ---
@@ -42,7 +42,7 @@ Ordem exata em `src/index.ts`:
 | 2 | Preparar workspace git (local ou CI) | `git/diff.ts` | Antes do diff |
 | 3 | Listar e filtrar arquivos elegíveis | `git/diff.ts` | Antes do agente |
 | 4 | Coletar work items + threads ADO | `ado/work-items.ts`, `ado/review-context.ts` | Paralelo, se token + PR |
-| 5 | Montar prompt e executar agente | `agent/prompt.ts`, `agent/runner.ts` | Se `fileCount > 0` |
+| 5 | Resolver engine, montar prompt e executar | `engine/`, `agent/prompt.ts`, `agent/runner.ts` | Se `fileCount > 0` |
 | 6 | Parsear JSON da resposta | `parser/review-response.ts` | Após agente |
 | 7 | Aplicar plano de publicação (score, summary) | `ado/post-comments.ts` | Antes de postar |
 | 8 | Resolver threads confirmadas → postar novas → summary | `ado/post-comments.ts` | Pipeline (não dry-run) |

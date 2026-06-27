@@ -16,7 +16,7 @@
 | 6 | [Rules pré-mapeadas](#6-rules-pré-mapeadas) | `buildRulesMap` |
 | 7 | [**User Story, Task e contexto ADO**](#7-user-story-task-e-contexto-ado) | `getPullRequestWorkItemContext` + PR + threads |
 | 8 | [Montagem do prompt](#8-montagem-do-prompt-system_prompt-vs-runtime) | `buildAgentPrompt` |
-| 9 | [Agente Cursor SDK](#9-agente-cursor-sdk) | `runCodeReviewAgent` |
+| 9 | [Engine de Execução](#9-engine-de-execução) | `runCodeReviewAgent` |
 | 10 | [Análise em duas fases](#10-análise-em-duas-fases) | Dentro do agente |
 | 11 | [Score e severidade](#11-score-severidade-e-o-que-vira-thread) | Classificação no agente |
 | 12 | [JSON e parser](#12-resposta-json-e-parser) | `parseCodeReviewResponse` |
@@ -100,7 +100,7 @@ flowchart TD
 | 4 | [§6](#6-rules-pré-mapeadas) | Pré-mapeia `.cursor/rules/*.mdc` | `src/project/rules-map.ts` |
 | 5 | [**§7**](#7-user-story-task-e-contexto-ado) | **Work items (US/Task), descrição PR, threads** | `work-items.ts`, `pull-request.ts`, `review-context.ts` |
 | 6 | [§8](#8-montagem-do-prompt-system_prompt-vs-runtime) | Monta prompt único e chama agente | `src/agent/prompt.ts` |
-| 7 | [§9–§10](#9-agente-cursor-sdk) | Agente executa Fase 1 + Fase 2 | `runner.ts`, `stream.ts` |
+| 7 | [§9–§10](#9-engine-de-execução) | Engine de Execução (cursor-sdk / opencode) roda as fases | `runner.ts`, `engine/` |
 | 8 | [§12](#12-resposta-json-e-parser) | Extrai JSON; filtra score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) | `parser/`, `post-comments.ts` |
 | 9 | [§13](#13-orçamento-de-rodadas-e-escalonamento) | Escalonamento (opcional) | `round-state.ts` |
 | 10 | [§14](#14-publicação-no-azure-devops) | Resolve threads → posta novas → summary | `post-comments.ts` |
@@ -322,7 +322,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ---
 
-## 9. Agente Cursor SDK
+## 9. Engine de Execução
 
 ### Como o agente é executado tecnicamente?
 
