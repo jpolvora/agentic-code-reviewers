@@ -27,9 +27,12 @@ permissions:
 
 jobs:
   auto-fix:
+    concurrency:
+      group: auto-fix-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.run_id }}
+      cancel-in-progress: false
     name: Auto Fix (Sequential)
-    # Executa apenas se o workflow de Code Review foi bem-sucedido, ou se foi executado manualmente
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request') }}
+    # Executa se disparado manualmente ou após code review bem-sucedido (PR ou workflow_dispatch)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -85,6 +88,7 @@ jobs:
           fi
 
       - name: Run Auto-Fix (cursor-sdk)
+        id: autofix-cursor
         if: ${{ secrets.CURSOR_API_KEY != '' }}
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
@@ -113,6 +117,7 @@ jobs:
           fi
 
       - name: Run Auto-Fix (opencode)
+        id: autofix-opencode
         if: ${{ secrets.OPENCODE_API_KEY != '' }}
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
@@ -127,3 +132,23 @@ jobs:
             --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
             --auto-fix
         continue-on-error: true
+
+      - name: Fail if all configured auto-fix engines failed
+        if: always()
+        run: |
+          CURSOR_EXPECTED=false
+          OPENCODE_EXPECTED=false
+          if [ -n "${{ secrets.CURSOR_API_KEY }}" ]; then CURSOR_EXPECTED=true; fi
+          if [ -n "${{ secrets.OPENCODE_API_KEY }}" ]; then OPENCODE_EXPECTED=true; fi
+
+          if [ "$CURSOR_EXPECTED" = "false" ] && [ "$OPENCODE_EXPECTED" = "false" ]; then
+            echo "::warning::Nenhum engine de auto-fix configurado."
+            exit 0
+          fi
+
+          if [ "${{ steps.autofix-cursor.outcome }}" = "success" ] || [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
+            exit 0
+          fi
+
+          echo "::error::Nenhum engine de auto-fix configurado concluiu com sucesso."
+          exit 1

@@ -80,7 +80,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 
 | Critério | Regra |
 |----------|--------|
-| `score` | **scoreMin–10** entram em `reviews` (default **6–10**; env `AGENTIC_CODE_REVIEWERS_SCORE_MIN`); abaixo do mínimo → omita. O runner injeta o limiar efetivo em `prompt.ts`. |
+| `score` | **scoreMin–10** entram em `reviews`. O limiar efetivo (**scoreMin**) aparece em **Contexto da execução** (default **6**; env `AGENTIC_CODE_REVIEWERS_SCORE_MIN` ou `--score-min` — precedência CLI > env > default). **Abaixo de scoreMin → omita**; o gate TypeScript descarta antes de criar threads. |
 | `developerAction` | `fix-code` ou `escalate` — nunca `resolve-comment` em reviews novos |
 | `lineNumber` | Inteiro **> 0**, na linha alterada mais responsável |
 | `comment` | Objetivo, causal e profundo; sem prefixos de severidade nem blocos de código |
@@ -99,7 +99,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 
 | Score | `developerAction` | Thread na PR? |
 |-------|-------------------|---------------|
-| 0–5 | `resolve-comment` | **Não** |
-| 6–8 | `fix-code` | Sim |
+| `< scoreMin` | — | **Não** (omitir do JSON) |
+| scoreMin–8 | `fix-code` | Sim (se ≥ scoreMin da execução) |
 | 9–10 | `fix-code` | Sim |
-| ≥ 6 + conflito de produto | `escalate` | Sim |
+| ≥ scoreMin + conflito de produto | `escalate` | Sim |

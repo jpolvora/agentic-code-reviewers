@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync } from 'node:child_process';
-import { applyReplacements, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
+import { applyReplacements, computeUpdatedLineNumber, isThreadLineModified, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
 
 describe('applyReplacements', () => {
   it('aplica substituição simples em arquivo', () => {
@@ -88,6 +88,30 @@ describe('applyReplacements', () => {
     assert.throws(() => {
       applyReplacements(original, replacements);
     }, /Replacements sobrepostos/);
+  });
+});
+
+describe('isThreadLineModified', () => {
+  it('retorna false quando a linha da thread está no intervalo mas o conteúdo não mudou', () => {
+    const original = Array.from({ length: 5 }, (_, i) => `linha ${i + 1}`).join('\n');
+    const replacements = [
+      {
+        startLine: 1,
+        endLine: 5,
+        replacementContent: 'linha 1 corrigida\nlinha 2\nlinha 3\nlinha 4\nlinha 5',
+      },
+    ];
+    const updated = applyReplacements(original, replacements);
+
+    assert.equal(isThreadLineModified(original, updated, 1, replacements), true);
+    assert.equal(isThreadLineModified(original, updated, 5, replacements), false);
+  });
+});
+
+describe('computeUpdatedLineNumber', () => {
+  it('mapeia linha original para posição equivalente após replacement amplo', () => {
+    const replacements = [{ startLine: 1, endLine: 10, replacementContent: 'a\nb\nc' }];
+    assert.equal(computeUpdatedLineNumber(5, replacements), 3);
   });
 });
 
@@ -248,6 +272,38 @@ describe('runAutoFixFlow', () => {
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
     const calls = provider.resolvePullRequestReviewThreads.mock.calls;
     const resolvedItemsArg = calls[0].arguments[2];
+    assert.equal(resolvedItemsArg.length, 1);
+    assert.equal(resolvedItemsArg[0].threadId, 1);
+    assert.equal(resolvedItemsArg[0].lineNumber, 1);
+  });
+
+  it('não resolve threads dentro de intervalo amplo quando só outra linha foi corrigida', async () => {
+    const tmpDir = setupTempWorkspace();
+    const lines = ['linha 1', 'linha 2', 'linha 3', 'linha 4', 'linha 5'];
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), lines.join('\n'));
+    execSync('git add file.txt && git commit -m "reset file" --amend --no-edit', { cwd: tmpDir, stdio: 'ignore' });
+
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [
+        { filePath: '/file.txt', lineNumber: 1, summary: 'issue linha 1', threadId: '1' },
+        { filePath: '/file.txt', lineNumber: 5, summary: 'issue linha 5', threadId: '2' },
+      ],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText:
+          '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":5,"replacementContent":"linha 1 corrigida\\nlinha 2\\nlinha 3\\nlinha 4\\nlinha 5"}]}\n```',
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+    const resolvedItemsArg = provider.resolvePullRequestReviewThreads.mock.calls[0].arguments[2];
     assert.equal(resolvedItemsArg.length, 1);
     assert.equal(resolvedItemsArg[0].threadId, 1);
     assert.equal(resolvedItemsArg[0].lineNumber, 1);

@@ -68,6 +68,56 @@ export function applyReplacements(content: string, replacements: Replacement[]):
   return lines.join(separator);
 }
 
+export function computeUpdatedLineNumber(originalLine: number, replacements: Replacement[]): number {
+  const sorted = [...replacements].sort((a, b) => a.startLine - b.startLine);
+  let mapped = originalLine;
+
+  for (const rep of sorted) {
+    if (originalLine < rep.startLine) break;
+
+    if (originalLine <= rep.endLine) {
+      const offset = originalLine - rep.startLine;
+      const repStartMapped =
+        rep.startLine +
+        sorted
+          .filter((r) => r.startLine < rep.startLine)
+          .reduce(
+            (acc, r) => acc + r.replacementContent.split(/\r?\n/).length - (r.endLine - r.startLine + 1),
+            0,
+          );
+      const newSpan = rep.replacementContent.split(/\r?\n/).length;
+      return repStartMapped + Math.min(offset, Math.max(newSpan - 1, 0));
+    }
+
+    mapped += rep.replacementContent.split(/\r?\n/).length - (rep.endLine - rep.startLine + 1);
+  }
+
+  return mapped;
+}
+
+export function isThreadLineModified(
+  fileContent: string,
+  updatedContent: string,
+  threadLineNumber: number,
+  replacements: Replacement[],
+): boolean {
+  const inRange = replacements.some(
+    (rep) => threadLineNumber >= rep.startLine && threadLineNumber <= rep.endLine,
+  );
+  if (!inRange) return false;
+
+  const origLines = fileContent.split(/\r?\n/);
+  const updatedLines = updatedContent.split(/\r?\n/);
+  const origLine = origLines[threadLineNumber - 1];
+  if (origLine === undefined) return false;
+
+  const mappedLine = computeUpdatedLineNumber(threadLineNumber, replacements);
+  const updatedLine = updatedLines[mappedLine - 1];
+  if (updatedLine === undefined) return true;
+
+  return origLine !== updatedLine;
+}
+
 async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   const queue = [...items];
   await Promise.all(
@@ -213,10 +263,13 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
 
         modifiedFiles.push(relativePath);
 
-        // Cria os itens resolvidos para marcar na PR apenas se a thread tiver sido de fato alterada pelos replacements
+        // Resolve apenas threads cuja linha teve conteúdo alterado pelos replacements
         for (const thread of threads) {
-          const isModified = parsed.replacements.some(
-            (rep) => thread.lineNumber >= rep.startLine && thread.lineNumber <= rep.endLine,
+          const isModified = isThreadLineModified(
+            fileContent,
+            updatedContent,
+            thread.lineNumber,
+            parsed.replacements,
           );
 
           if (isModified) {
