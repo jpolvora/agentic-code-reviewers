@@ -1,54 +1,81 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 
-// Carrega .env se existir
-if (fs.existsSync('.env')) {
+const RESOLUTION_MARKER = '<!-- resolution-reply -->';
+
+function loadDotEnv() {
+  if (!fs.existsSync('.env')) return;
   const envContent = fs.readFileSync('.env', 'utf8');
   for (const line of envContent.split('\n')) {
     const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-    if (match) {
-      const key = match[1];
-      let value = match[2] || '';
-      if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-      if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-      process.env[key] = value.trim();
-    }
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2] || '';
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+    process.env[key] = value.trim();
   }
 }
 
+function resolveToken() {
+  return (
+    process.env.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN ||
+    process.env.GITHUB_TOKEN ||
+    process.env.GH_TOKEN
+  );
+}
+
+function commentHasBotTag(body, botTag) {
+  return body && body.includes(botTag);
+}
+
+function summarizeThread(comments, botTag) {
+  const botComment = comments.find((c) => commentHasBotTag(c.body, botTag)) || comments[0];
+  if (!botComment) return '';
+  const body = botComment.body.replace(/\s+/g, ' ').trim();
+  return body.length > 240 ? `${body.slice(0, 237)}...` : body;
+}
+
 async function main() {
-  const prIdStr = process.argv[2];
+  loadDotEnv();
+
+  const args = process.argv.slice(2);
+  const jsonMode = args.includes('--json');
+  const prIdStr = args.find((a) => a !== '--json');
+  const botTag = process.env.AGENTIC_CODE_REVIEWERS_BOT_TAG || '[Cursor Reviewer]';
+
   if (!prIdStr) {
-    console.error('Error: Please specify the pull request ID as an argument.');
+    console.error('Usage: node fetch_threads.cjs <PR_ID> [--json]');
     process.exit(1);
   }
+
   const prId = parseInt(prIdStr, 10);
-  if (isNaN(prId)) {
+  if (Number.isNaN(prId)) {
     console.error('Error: Pull request ID must be an integer.');
     process.exit(1);
   }
 
-  // Get git remote info
   let remoteUrl;
   try {
     remoteUrl = execSync('git remote get-url origin', { encoding: 'utf8' }).trim();
-  } catch (err) {
-    console.error('Error: Could not retrieve git remote URL. Make sure you are in a git repository.');
+  } catch {
+    console.error('Error: Could not retrieve git remote URL.');
     process.exit(1);
   }
 
   const match = remoteUrl.match(/github\.com[/:]([^/]+)\/([^.]+)/);
   if (!match) {
-    console.error(`Error: Could not parse owner and repo from remote URL: "${remoteUrl}". Only GitHub repositories are supported.`);
+    console.error(`Error: Only GitHub repositories are supported (${remoteUrl}).`);
     process.exit(1);
   }
   const owner = match[1];
   const repo = match[2];
 
-  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const token = resolveToken();
   if (!token) {
-    console.error('Error: GITHUB_TOKEN or GH_TOKEN environment variable is not defined.');
+    console.error(
+      'Error: Set AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN.',
+    );
     process.exit(1);
   }
 
@@ -65,9 +92,7 @@ async function main() {
               comments(first: 50) {
                 nodes {
                   body
-                  author {
-                    login
-                  }
+                  author { login }
                   createdAt
                 }
               }
@@ -78,61 +103,92 @@ async function main() {
     }
   `;
 
-  const url = 'https://api.github.com/graphql';
-  const response = await fetch(url, {
+  const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'solve-pr-helper'
+      'User-Agent': 'solve-pr-cooperative',
     },
-    body: JSON.stringify({
-      query,
-      variables: { owner, name: repo, number: prId }
-    })
+    body: JSON.stringify({ query, variables: { owner, name: repo, number: prId } }),
   });
 
   if (!response.ok) {
-    console.error(`GitHub API Request failed: ${response.status} ${await response.text()}`);
+    console.error(`GitHub API failed: ${response.status} ${await response.text()}`);
     process.exit(1);
   }
 
   const result = await response.json();
   if (result.errors) {
-    console.error('GitHub API returned errors:', JSON.stringify(result.errors, null, 2));
+    console.error('GraphQL errors:', JSON.stringify(result.errors, null, 2));
     process.exit(1);
   }
 
-  const repository = result.data?.repository;
-  if (!repository || !repository.pullRequest) {
-    console.error(`Error: Pull request #${prId} not found in repository ${owner}/${repo}.`);
+  const pr = result.data?.repository?.pullRequest;
+  if (!pr) {
+    console.error(`PR #${prId} not found in ${owner}/${repo}.`);
     process.exit(1);
   }
 
-  const threads = repository.pullRequest.reviewThreads.nodes;
-  const activeThreads = threads.filter(t => !t.isResolved);
+  const threads = pr.reviewThreads.nodes.filter((t) => !t.isResolved);
+  const botThreads = threads.filter((t) =>
+    t.comments.nodes.some((c) => commentHasBotTag(c.body, botTag)),
+  );
 
-  console.log(`=== ACTIVE THREADS FOR PR #${prId} IN ${owner}/${repo} ===\n`);
-  if (activeThreads.length === 0) {
-    console.log('No active/unresolved review threads found.');
+  const normalized = botThreads.map((t, idx) => ({
+    index: idx + 1,
+    threadId: t.id,
+    filePath: t.path.startsWith('/') ? t.path : `/${t.path}`,
+    lineNumber: t.line ?? 0,
+    summary: summarizeThread(t.comments.nodes, botTag),
+    comments: t.comments.nodes.map((c) => ({
+      author: c.author?.login ?? 'unknown',
+      createdAt: c.createdAt,
+      body: c.body,
+    })),
+  }));
+
+  if (jsonMode) {
+    console.log(
+      JSON.stringify(
+        {
+          prNumber: prId,
+          owner,
+          repo,
+          botTag,
+          cooperativeContract: 'skills/COOPERATIVE_FIX.md',
+          activeBotThreads: normalized,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
-  activeThreads.forEach((thread, idx) => {
-    console.log(`--- Thread #${idx + 1} ---`);
-    console.log(`Thread ID: ${thread.id}`);
-    console.log(`File Path: ${thread.path}`);
-    console.log(`Line: ${thread.line !== null ? thread.line : 'N/A'}`);
+  console.log(`=== ACTIVE BOT THREADS (cooperative-fix) PR #${prId} ${owner}/${repo} ===`);
+  console.log(`Bot tag filter: ${botTag}\n`);
+
+  if (normalized.length === 0) {
+    console.log('No active unresolved bot threads found.');
+    return;
+  }
+
+  for (const t of normalized) {
+    console.log(`--- Thread #${t.index} ---`);
+    console.log(`Thread ID: ${t.threadId}`);
+    console.log(`File Path: ${t.filePath}`);
+    console.log(`Line: ${t.lineNumber || 'N/A'}`);
+    console.log(`Summary: ${t.summary}`);
     console.log('Comments:');
-    thread.comments.nodes.forEach(comment => {
-      const author = comment.author ? comment.author.login : 'unknown';
-      console.log(`  [${comment.createdAt}] @${author}: ${comment.body}`);
-    });
+    for (const c of t.comments) {
+      console.log(`  [${c.createdAt}] @${c.author}: ${c.body.split('\n')[0]}`);
+    }
     console.log('');
-  });
+  }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

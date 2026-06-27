@@ -1,0 +1,154 @@
+name: Agentic Auto Fix
+
+on:
+  workflow_run:
+    workflows: ["Agentic Code Review"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Número da PR (obrigatório em execução manual)
+        required: true
+        type: string
+      source_branch:
+        description: Branch de origem (head ref)
+        required: true
+        type: string
+      target_branch:
+        description: Branch de destino (base ref)
+        required: false
+        default: main
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-fix:
+    concurrency:
+      group: auto-fix-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.run_id }}
+      cancel-in-progress: false
+    name: Auto Fix (Sequential)
+    # Executa se disparado manualmente ou após code review bem-sucedido (PR ou workflow_dispatch)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get PR Info
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+            echo "source_branch=${{ github.event.inputs.source_branch }}" >> $GITHUB_OUTPUT
+            echo "target_branch=${{ github.event.inputs.target_branch }}" >> $GITHUB_OUTPUT
+          else
+            PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+            HEAD_BRANCH="${{ github.event.workflow_run.pull_requests[0].head.ref }}"
+            BASE_BRANCH="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
+            
+            if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+              HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+              echo "Buscando PR para o commit $HEAD_SHA..."
+              PR_DATA=$(gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/pulls" -H "Accept: application/vnd.github.groot-preview+json" --jq '.[0]')
+              
+              PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+              HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.head.ref')
+              BASE_BRANCH=$(echo "$PR_DATA" | jq -r '.base.ref')
+            fi
+            
+            if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+              echo "::error::Não foi possível determinar o número da PR para Auto-Fix."
+              exit 1
+            fi
+            
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "source_branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+            echo "target_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-info.outputs.source_branch }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Check Cursor SDK configuration
+        run: |
+          if [ -z "${{ secrets.CURSOR_API_KEY }}" ]; then
+            echo "::warning::CURSOR_API_KEY não configurada. O passo do Auto-Fix com cursor-sdk será ignorado."
+          fi
+
+      - name: Run Auto-Fix (cursor-sdk)
+        id: autofix-cursor
+        if: ${{ secrets.CURSOR_API_KEY != '' }}
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
+          AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: '[Cursor Reviewer]'
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+        run: |
+          bash run.sh --local --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --auto-fix
+        continue-on-error: true
+
+      - name: Sync Git Repository (Fetch and Hard Reset)
+        # Sincroniza o workspace com a branch remota para incluir qualquer commit que o passo anterior tenha feito e enviado.
+        run: |
+          git fetch origin ${{ steps.pr-info.outputs.source_branch }}
+          git reset --hard origin/${{ steps.pr-info.outputs.source_branch }}
+
+      - name: Check OpenCode configuration
+        run: |
+          if [ -z "${{ secrets.OPENCODE_API_KEY }}" ]; then
+            echo "::warning::OPENCODE_API_KEY não configurada. O passo do Auto-Fix com opencode será ignorado."
+          fi
+
+      - name: Run Auto-Fix (opencode)
+        id: autofix-opencode
+        if: ${{ secrets.OPENCODE_API_KEY != '' }}
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: opencode
+          AGENTIC_CODE_REVIEWERS_MODEL: opencode-go/deepseek-v4-flash
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: '[Cursor Reviewer · OpenCode]'
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          bash run.sh --local --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --auto-fix
+        continue-on-error: true
+
+      - name: Fail if all configured auto-fix engines failed
+        if: always()
+        run: |
+          CURSOR_EXPECTED=false
+          OPENCODE_EXPECTED=false
+          if [ -n "${{ secrets.CURSOR_API_KEY }}" ]; then CURSOR_EXPECTED=true; fi
+          if [ -n "${{ secrets.OPENCODE_API_KEY }}" ]; then OPENCODE_EXPECTED=true; fi
+
+          if [ "$CURSOR_EXPECTED" = "false" ] && [ "$OPENCODE_EXPECTED" = "false" ]; then
+            echo "::warning::Nenhum engine de auto-fix configurado."
+            exit 0
+          fi
+
+          if [ "${{ steps.autofix-cursor.outcome }}" = "success" ] || [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
+            exit 0
+          fi
+
+          echo "::error::Nenhum engine de auto-fix configurado concluiu com sucesso."
+          exit 1

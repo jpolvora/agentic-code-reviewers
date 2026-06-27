@@ -40,6 +40,7 @@ function baseOptions(overrides: Partial<SafeOutputOptions> = {}): SafeOutputOpti
     maxCommentChars: 8000,
     protectedPatterns: ['.github/workflows/**'],
     changedLines: parseChangedLinesFromDiff(SAMPLE_DIFF),
+    scoreMin: 6,
     ...overrides,
   };
 }
@@ -57,6 +58,23 @@ describe('checkSafeReview', () => {
 
   it('rejects severity/score mismatch', () => {
     const result = checkSafeReview(validReview({ severity: 'warning', score: 9 }), baseOptions());
+    assert.equal(result.safe, false);
+    assert.equal(result.reason, 'severity-score');
+  });
+
+  it('aceita warning com score abaixo de 6 quando scoreMin customizado é 4', () => {
+    const result = checkSafeReview(
+      validReview({ severity: 'warning', score: 5 }),
+      baseOptions({ scoreMin: 4, requireDiffLine: false }),
+    );
+    assert.equal(result.safe, true);
+  });
+
+  it('rejeita warning abaixo do scoreMin customizado', () => {
+    const result = checkSafeReview(
+      validReview({ severity: 'warning', score: 3 }),
+      baseOptions({ scoreMin: 4, requireDiffLine: false }),
+    );
     assert.equal(result.safe, false);
     assert.equal(result.reason, 'severity-score');
   });

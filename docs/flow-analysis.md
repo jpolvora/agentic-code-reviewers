@@ -8,7 +8,7 @@
 
 ## Visão geral
 
-O **Agentic Code Reviewers** é **review-only**: analisa o diff da PR, publica threads acionáveis (Azure DevOps, GitHub) e **não corrige código**. Correções ficam com o desenvolvedor, que trata as threads diretamente na PR.
+O **Agentic Code Reviewers** é **review-only por padrão**: analisa o diff da PR, publica threads acionáveis (Azure DevOps, GitHub) e **não corrige código** no fluxo `npm run review`. Correções ficam com o desenvolvedor ou com o modo opcional **`--auto-fix`** / workflow [`auto-fix.yml`](../.github/workflows/auto-fix.yml) — ver [`auto-fix.md`](auto-fix.md).
 
 ```mermaid
 flowchart TD
@@ -276,7 +276,7 @@ Após resolução, `index.ts` **refresh** das threads pendentes antes de postar 
 
 ## Convergência — orçamento de rodadas (`ado/round-state.ts`)
 
-Garante a terminação do loop `fix-pr ↔ reviewer`:
+Garante a terminação do loop **correção ↔ reviewer** (manual, `solve-pr`, ou auto-fix CI):
 
 - **Estado persistido:** thread geral (sem `filePath`) com marcador `<!-- reviewer-round-state -->` e `Rodada: N`. Lida via `parseRoundStateFromThreads` (a partir de `allThreads`), atualizada via PATCH (uma única thread, sem spam).
 - **Rodada atual** = rodadas anteriores + 1 (só com contexto ADO).

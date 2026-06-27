@@ -79,8 +79,8 @@ Durante o run aparecem eventos `thinking`, `tool_call` e `assistant` — tudo na
 
 A doc operacional fala em **decisão em duas camadas**:
 
-1. **Agente (LLM)** — triagem + prova + filtro score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no prompt (valor injetado de `config.scoreMin`; default 6).
-2. **TypeScript** — `isPublishableReview(review, scoreMin)` descarta o que não passa no contrato antes de postar no ADO.
+1. **Agente (LLM)** — triagem + prova + filtro score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no prompt (valor em **Contexto da execução** e Fase 2.4; default 6).
+2. **TypeScript** — `isPublishableReview(review, scoreMin)` + Safe Outputs (`severity-score` com mesmo `scoreMin`) descartam o que não passa antes de postar.
 
 Isso é pós-processamento determinístico do JSON, **não** uma segunda rodada do LLM. Ver [`flow-analysis.md`](flow-analysis.md) e `src/ado/review-validation.ts`.
 

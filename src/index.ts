@@ -33,6 +33,7 @@ import { buildRulesMap } from './project/rules-map.js';
 import { formatCommentForPosting } from './ado/format-thread.js';
 import { getProvider } from './provider/index.js';
 import { runParallelReview } from './orchestrator/parallel-runner.js';
+import { runAutoFixFlow } from './orchestrator/autofix-runner.js';
 
 function logDiffFileSummaries(
   logger: Logger,
@@ -203,6 +204,12 @@ async function main(): Promise<void> {
   }
 
   const engine = getEngine(config);
+
+  if (config.autoFix) {
+    logger.section('Iniciando fluxo Auto-Fix');
+    await runAutoFixFlow(config, reviewContext, provider, engine, logger);
+    return;
+  }
 
   if (config.generateCommitMessage || config.generatePrDescription) {
     await runReviewArtifacts(config, {

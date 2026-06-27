@@ -37,7 +37,7 @@ flowchart TD
 
 **Compatibilidade:** pipelines e invocações existentes que **não** definem `AGENTIC_CODE_REVIEWERS_SCORE_MIN` nem `--score-min` mantêm o limiar histórico **6** — sem breaking change. Só defina `AGENTIC_CODE_REVIEWERS_SCORE_MIN` quando quiser abaixar (ex.: `4`) ou subir o rigor do que vira thread acionável.
 
-O prompt do agente (`src/agent/prompt.ts`) e o gate TypeScript (`review-validation.ts`) usam o mesmo valor carregado em `config.scoreMin`.
+O prompt do agente (`src/agent/prompt.ts`) e os gates TypeScript (`review-validation.ts`, `safe-outputs.ts`) usam o mesmo valor carregado em `config.scoreMin`.
 
 ---
 
@@ -48,7 +48,8 @@ O prompt do agente (`src/agent/prompt.ts`) e o gate TypeScript (`review-validati
 | Contrato da pipeline | `skills/SYSTEM_PROMPT.md` | Tabelas score × severity × `developerAction`; filtro orientativo (gate efetivo: `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6) |
 | Orquestração do prompt | `src/agent/prompt.ts` | Fases 1–2; instrução de classificar conforme System Prompt; injeta `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no filtro |
 | Critérios do projeto | `.agents/skills/code-review/SKILL.md` | Brechas, checklist ABP/Angular, calibração 6–8 vs 9–10 |
-| Modelo compartilhado | `.agents/skills/fix-pr/SKILL.md` | Escala 0–10 e eixos de julgamento (fix-pr ↔ reviewer) |
+| Modelo compartilhado | `.agents/skills/code-review/SKILL.md`, `skills/SYSTEM_PROMPT.md` | Escala 0–10 e eixos de julgamento |
+| Safe Outputs | `src/ado/safe-outputs.ts` | `severity-score` usa o mesmo `scoreMin` de `config` |
 | Configuração | `src/config.ts` | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (env) / `--score-min` (CLI); `AGENTIC_CODE_REVIEWERS_ENGINE`; default `6` / `cursor-sdk` |
 | Execução LLM | `src/engine/` | `getEngine(config)` — `cursor-sdk` (`@cursor/sdk`) ou `opencode` (`@opencode-ai/sdk`) |
 | Gate programático | `src/ado/review-validation.ts` | `DEFAULT_SCORE_MIN = 6`, `MAX_PUBLISHABLE_SCORE = 10`; `isPublishableReview(review, scoreMin)` |
@@ -97,7 +98,7 @@ Incluir em `reviews` só se **todas** forem verdadeiras:
 
 ### Eixos de julgamento (5 perguntas)
 
-Alinhados à skill `fix-pr` e `code-review`:
+Alinhados à skill `code-review` e ao System Prompt:
 
 | # | Pergunta | Efeito típico na nota |
 |---|----------|------------------------|
@@ -125,7 +126,7 @@ O agente usa uma escala **ordinal**. Não há pesos numéricos por dimensão —
 | **9** | Publicável | Crítica | Falha grave com alto impacto operacional | Regra de negócio invariante violada, perda/corrupção de dados, critério de aceite evidente não implementado | **Sim** |
 | **10** | Publicável | Crítica máxima | Exploitável ou bloqueador de merge | DELETE sem auth, XSS (`[innerHTML]`), secrets em código, defaults perigosos em fluxo de escrita (`Guid.Empty`, `DateTime.MinValue`) | **Sim** |
 
-### Referência rápida (fix-pr / code-review)
+### Referência rápida (code-review / System Prompt)
 
 | Score | Resumo |
 |-------|--------|

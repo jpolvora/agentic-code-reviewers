@@ -30,6 +30,8 @@ export interface SafeOutputOptions {
   maxCommentChars: number;
   protectedPatterns: string[];
   changedLines: ChangedLinesMap;
+  /** Limiar mínimo (inclusive) alinhado a config.scoreMin / AGENTIC_CODE_REVIEWERS_SCORE_MIN. */
+  scoreMin: number;
 }
 
 export type SafeOutputRejectReason =
@@ -74,16 +76,16 @@ function hasAnalysisStructure(analysis: string): boolean {
   return hasEvidence && hasScenario && hasProtection && hasDiscard;
 }
 
-function severityScoreRange(severity: ReviewSeverity): { min: number; max: number } {
+function severityScoreRange(severity: ReviewSeverity, scoreMin: number): { min: number; max: number } {
   switch (severity) {
     case 'critical':
-      return { min: 9, max: 10 };
+      return { min: Math.max(9, scoreMin), max: 10 };
     case 'warning':
-      return { min: 6, max: 8 };
+      return { min: scoreMin, max: 8 };
     case 'suggestion':
-      return { min: 6, max: 7 };
+      return { min: scoreMin, max: 7 };
     default:
-      return { min: 6, max: 10 };
+      return { min: scoreMin, max: 10 };
   }
 }
 
@@ -165,7 +167,7 @@ export function checkSafeReview(
     };
   }
 
-  const range = severityScoreRange(review.severity);
+  const range = severityScoreRange(review.severity, options.scoreMin);
   if (
     typeof review.score === 'number' &&
     (review.score < range.min || review.score > range.max)
@@ -251,6 +253,7 @@ export function buildSafeOutputOptions(
     maxCommentChars: config.maxCommentChars,
     protectedPatterns: config.protectedPatterns,
     changedLines: parseChangedLinesFromDiff(diffText),
+    scoreMin: config.scoreMin,
   };
 }
 

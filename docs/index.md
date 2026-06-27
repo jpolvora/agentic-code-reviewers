@@ -13,6 +13,7 @@
 - [Resumo do review](#resumo-do-review)
 - [Configuração (.env)](#configuração-env)
 - [AGENTIC_CODE_REVIEWERS_SCORE_MIN (limiar de threads)](#agentic_code_reviewers_score_min-limiar-de-threads)
+- [Auto-Fix e self-healing](#auto-fix-e-self-healing)
 - [Alterar o modelo LLM](#alterar-o-modelo-llm)
 - [Engine OpenCode (`opencode`)](#engine-opencode-opencode)
 - [Runner (`run.sh`)](#runner-runsh)
@@ -137,19 +138,52 @@ Carregamento: `tsx --env-file-if-exists=.env`.
 
 Controla quais issues do agente viram threads na PR (`score >= scoreMin`). **Opt-in:** omitir env e `--score-min` mantém limiar **6**.
 
+**Fluxo end-to-end (mesmo valor em `cursor-sdk` e `opencode`):**
+
+| Etapa | Onde |
+|-------|------|
+| Config | `loadConfig()` — precedência `--score-min` > env > default `6` |
+| Log | `index.ts`, `runner.ts` — `Score mínimo para threads: N` |
+| Prompt | `prompt.ts` — contexto da execução + Fase 2.4 + veredito final |
+| Gate | `isPublishableReview(review, scoreMin)` em `review-validation.ts` |
+| Safe Outputs | `severity-score` usa `options.scoreMin` em `safe-outputs.ts` |
+| Publicação | `parseCodeReviewResponse`, providers ADO/GitHub |
+
 ```bash
 # .env — publicar também scores 4 e 5
 AGENTIC_CODE_REVIEWERS_SCORE_MIN=4
 
 # pontual na CLI (precedência sobre env)
 npm run review -- --dry-run --score-min 4
+
+# reusable workflow GitHub (input score_min)
+with:
+  score_min: '6'
 ```
+
+Detalhes: [`score_calc.md`](score_calc.md) · [`faq.md`](faq.md) § 11.
+
+---
+
+### Auto-Fix e self-healing
+
+Modo **`--auto-fix`** / `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true` — correção automática de threads ativas (commit + push + resolução parcial). **Review padrão permanece read-only**; auto-fix é ramo separado em `src/index.ts`.
+
+| Componente | Arquivo |
+|------------|---------|
+| Orquestrador | `src/orchestrator/autofix-runner.ts` |
+| Commit/push | `src/git/autofix-commit.ts` |
+| Prompt subagente | `skills/AUTO_FIX.md` |
+| CI GitHub | `.github/workflows/auto-fix.yml` |
+| Skill IDE (manual) | `.agents/skills/solve-pr/` |
+
+Ciclo completo: [`auto-fix.md`](auto-fix.md).
 
 ---
 
 ### Safe Outputs e paralelismo
 
-Gate determinístico pós-LLM (`src/ado/safe-outputs.ts`). Default: `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS=true`.
+Gate determinístico pós-LLM (`src/ado/safe-outputs.ts`). Default: `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS=true`. Usa o mesmo `config.scoreMin` do gate de publicação para consistência `severity` ↔ `score`.
 
 | Variável | Default | Uso |
 |----------|---------|-----|
@@ -598,6 +632,7 @@ Para suportar novos ambientes de CI/CD e provedores Git:
 | Recurso | Caminho |
 |---------|---------|
 | Fluxo de análise e decisão | [`docs/flow-analysis.md`](docs/flow-analysis.md) |
+| Fluxo de Auto-Fix e Self-Healing | [`docs/auto-fix.md`](docs/auto-fix.md) |
 | FAQ | [`docs/faq.md`](docs/faq.md) |
 | Score e severidade | [`docs/score_calc.md`](docs/score_calc.md) |
 | Modelo de execução | [`docs/two-phase-execution-model.md`](docs/two-phase-execution-model.md) |

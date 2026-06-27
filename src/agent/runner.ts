@@ -13,6 +13,8 @@ export async function runCodeReviewAgent(
 ): Promise<EngineRunResult> {
   const prompt = buildAgentPrompt(config, context);
 
+  logger.info(`Score mínimo para threads (prompt + gate): ${config.scoreMin}`);
+
   if (config.engine === 'opencode') {
     logger.info('Harness do repositório: prompt do runner + instructions OpenCode (servidor embutido)');
   } else {

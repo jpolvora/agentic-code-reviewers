@@ -1,88 +1,106 @@
-const { execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
 
-// Carrega .env se existir
-if (fs.existsSync('.env')) {
+const RESOLUTION_MARKER = '<!-- resolution-reply -->';
+const DEFAULT_BOT_TAG = '[Cursor Reviewer]';
+
+function loadDotEnv() {
+  if (!fs.existsSync('.env')) return;
   const envContent = fs.readFileSync('.env', 'utf8');
   for (const line of envContent.split('\n')) {
     const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-    if (match) {
-      const key = match[1];
-      let value = match[2] || '';
-      if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-      if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-      process.env[key] = value.trim();
-    }
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2] || '';
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+    process.env[key] = value.trim();
   }
 }
 
+function resolveToken() {
+  return (
+    process.env.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN ||
+    process.env.GITHUB_TOKEN ||
+    process.env.GH_TOKEN
+  );
+}
+
+function buildResolutionBody(note, botTag) {
+  const explanation = note?.trim() || 'Issue corrigida na iteração atual.';
+  return [
+    botTag,
+    RESOLUTION_MARKER,
+    '',
+    'Issue addressed in the current iteration. Marking as resolved.',
+    '',
+    explanation,
+  ].join('\n');
+}
+
 async function main() {
+  loadDotEnv();
+
   const threadId = process.argv[2];
-  const commentBody = process.argv[3] || 'Resolvendo a thread via automação (corrigido)';
+  const note = process.argv[3];
+  const botTag = process.env.AGENTIC_CODE_REVIEWERS_BOT_TAG || DEFAULT_BOT_TAG;
 
   if (!threadId) {
-    console.error('Error: Please specify the thread ID as the first argument.');
+    console.error('Usage: node resolve_thread.cjs <THREAD_ID> "<resolution note>"');
     process.exit(1);
   }
 
-  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const token = resolveToken();
   if (!token) {
-    console.error('Error: GITHUB_TOKEN or GH_TOKEN environment variable is not defined.');
+    console.error(
+      'Error: Set AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN, GITHUB_TOKEN, or GH_TOKEN.',
+    );
     process.exit(1);
   }
+
+  const body = buildResolutionBody(note, botTag);
 
   const query = `
     mutation ResolveAndReply($threadId: ID!, $body: String!) {
       addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: $threadId, body: $body }) {
-        comment {
-          id
-        }
+        comment { id }
       }
       resolveReviewThread(input: { threadId: $threadId }) {
-        thread {
-          id
-          isResolved
-        }
+        thread { id isResolved }
       }
     }
   `;
 
-  const url = 'https://api.github.com/graphql';
-  const response = await fetch(url, {
+  const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'solve-pr-helper'
+      'User-Agent': 'solve-pr-cooperative',
     },
-    body: JSON.stringify({
-      query,
-      variables: { threadId, body: commentBody }
-    })
+    body: JSON.stringify({ query, variables: { threadId, body } }),
   });
 
   if (!response.ok) {
-    console.error(`GitHub API Request failed: ${response.status} ${await response.text()}`);
+    console.error(`GitHub API failed: ${response.status} ${await response.text()}`);
     process.exit(1);
   }
 
   const result = await response.json();
   if (result.errors) {
-    console.error('GitHub API returned errors:', JSON.stringify(result.errors, null, 2));
+    console.error('GraphQL errors:', JSON.stringify(result.errors, null, 2));
     process.exit(1);
   }
 
   const isResolved = result.data?.resolveReviewThread?.thread?.isResolved;
   if (isResolved) {
-    console.log(`Successfully replied and resolved thread: ${threadId}`);
+    console.log(`Resolved thread ${threadId} (cooperative resolution-reply posted).`);
   } else {
-    console.log(`Failed to resolve thread: ${threadId}. Response:`, JSON.stringify(result.data, null, 2));
+    console.error('Failed to resolve thread:', JSON.stringify(result.data, null, 2));
     process.exit(1);
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

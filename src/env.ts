@@ -66,6 +66,7 @@ export const ENV = {
   ADO_PROJECT: primaryKey('ADO_PROJECT'),
   ADO_REPO: primaryKey('ADO_REPO'),
   PROMPT_COLOR: primaryKey('PROMPT_COLOR'),
+  AUTO_FIX: primaryKey('AUTO_FIX'),
 } as const;
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
@@ -119,4 +120,5 @@ export const env = {
   adoProject: () => readEnv('ADO_PROJECT'),
   adoRepo: () => readEnv('ADO_REPO'),
   promptColor: () => readEnv('PROMPT_COLOR'),
+  autoFix: () => readEnv('AUTO_FIX'),
 } as const;

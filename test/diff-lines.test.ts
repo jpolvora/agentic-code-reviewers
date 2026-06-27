@@ -48,7 +48,7 @@ index abc..def 100644
 -  removed line 3
 `;
     const map = parseChangedLinesFromDiff(deletionOnlyDiff);
-    const barLines = map.get('src/Bar.cs');
+    const barLines = map.get('/src/bar.cs');
     assert.ok(barLines, 'file should be in the map');
     assert.ok(barLines.size > 0, 'deletion-only hunks should produce at least one anchor line');
     // The anchor line should be the right-side position (line 10)

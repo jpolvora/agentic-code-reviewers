@@ -155,4 +155,19 @@ describe('buildAgentPrompt', () => {
     assert.ok(prompt.includes('# Recomendações Específicas da Stack (PHP/Laravel)'));
     assert.ok(prompt.includes('Problema de Query N+1'));
   });
+
+  it('injeta scoreMin no contexto da execução e nas fases do workflow', () => {
+    const config = {
+      ...minimalConfig(`${runnerRoot}/skills/CODE_REVIEW.md`, `${runnerRoot}/skills/SYSTEM_PROMPT.md`),
+      scoreMin: 4,
+    };
+
+    const prompt = buildAgentPrompt(config, promptContext);
+
+    assert.ok(prompt.includes('**Score mínimo para threads'));
+    assert.ok(prompt.includes('**4**'));
+    assert.ok(prompt.includes('scoreMin = 4'));
+    assert.ok(prompt.includes('score < 4 → omita'));
+    assert.ok(prompt.includes('score ≥ 4'));
+  });
 });

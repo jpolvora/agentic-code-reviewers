@@ -14,6 +14,14 @@ Operational guide for AI agents in this repository (**Multi Agent Code Reviewer*
 - **Think more, write less.** Prefer elegant solutions over verbose ones. Less code is better: eliminate redundancy, abstract only when two or more real cases exist.
 - **No token maxxing.** Responses and diffs must be concise. Avoid comments that merely paraphrase code, unnecessary explanatory prose, and mechanically generated boilerplate.
 - **Tests are a contract, not optional.** Every feature or fix must ship with tests covering the happy path and relevant edge cases. Never delete existing tests unless they are dead code or unreachable.
+- **Documentation stays in sync with code.** After every implementation (feature, fix, or behavior change), update **all affected documentation** in the same change set — do not merge code that drifts from docs. Minimum checklist when touching runner behavior:
+  - **`AGENTS.md`** — architecture, env vars, gate rules, skills routing
+  - **`README.md`** — user-facing features, CLI, workflows, env tables
+  - **`docs/`** — `index.md`, `faq.md`, and topic docs (`flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `two-phase-execution-model.md`) as applicable
+  - **`skills/`** — when prompts, JSON contract, or gate policy change (`SYSTEM_PROMPT.md`, `AUTO_FIX.md`, stacks)
+  - **`.env.example`** — when env vars are added, renamed, or defaults change
+  - **Workflow examples** — `examples/`, `.github/workflows/` when CI inputs or behavior change
+  - Run **`npm test`** (and `npm run test:seed` when review/detection behavior changes) before considering the task done.
 - **Decompose before executing.** Break large tasks into independent subtasks. When possible, parallelize with subagents sharing only the minimum necessary context — keep context windows small.
 
 ---
@@ -90,7 +98,7 @@ After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_
 |---|---|
 | Diff-line anchoring | `lineNumber` must be on a changed line in the diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
 | Protected paths | Blocks reviews referencing CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
-| Severity ↔ score | Consistency required (`critical` 9–10, `warning` 6–8, `suggestion` 6–7) |
+| Severity ↔ score | Consistency required (`critical` 9–10; `warning`/`suggestion` floors respect **`config.scoreMin`** in `safe-outputs.ts`) |
 | Analysis structure | Four numbered sections (Evidence, Scenario, Protection, Discards) |
 | Size limits | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` (default 8000) |
 | Secrets / markdown | Blocks credential patterns and dangerous HTML/script |
@@ -156,7 +164,13 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `.github/workflows/code-review.yml` | CI of this repo — `run.sh --local`, engine matrix. |
 | `.github/rulesets/agentic-main.json` | Branch ruleset on **`main`**: PR required, all review threads resolved before merge. Apply via `scripts/apply-rulesets.sh`. |
 | `.github/workflows/review-remote.yml` | Reusable workflow for consumer repositories. |
+| `.github/workflows/auto-fix.yml` | CI self-healing loop — triggers after successful code review (`workflow_run`) |
 | `examples/consumer-github-workflow.yml` | Copy-paste template for GitHub consumers. |
+| `src/orchestrator/autofix-runner.ts` | Auto-fix flow: subagents per file, replacements, partial thread resolution |
+| `src/git/autofix-commit.ts` | Consolidated commit and push after auto-fix |
+| `skills/AUTO_FIX.md` | Auto-fix subagent prompt (surgical fixes, JSON replacements) |
+| `skills/COOPERATIVE_FIX.md` | Shared fix contract (Auto-Fix CI ↔ solve-pr IDE, no code coupling) |
+| `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |
 | `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
 | `src/provider/` | `PlatformProvider` interface + `AdoProvider` and `GithubProvider` implementations. |
 | `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`). |
@@ -209,7 +223,8 @@ Fix bot-published threads  → solve-pr (GitHub) or manual dev
 |---|---|
 | Validate gate and prompt before merge | `code-review-self` + `npm test` |
 | Conversational review with stable IDs | `megabrain` |
-| Bot published threads; want auto-fix | `solve-pr` (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` or `GITHUB_TOKEN` / `GH_TOKEN`) |
+| Bot published threads; want auto-fix in CI | `auto-fix.yml` + `--auto-fix` (see `skills/COOPERATIVE_FIX.md`) |
+| Bot published threads; want auto-fix locally | `/solve-pr` (same cooperative contract as Auto-Fix CI) |
 | Production / pipeline | No IDE skill — runner + `skills/` only |
 
 #### Adding or Modifying an IDE Skill
@@ -247,7 +262,16 @@ npm run seed:verify-clean # Utility to ensure the E2E suite left no tracked fixt
 
 - **Providers:** every new feature must work on both Azure DevOps **and** GitHub. Markdown, GraphQL/REST, and interactive suggestions differ between platforms.
 - **Stacks:** when adding/modifying stacks, maintain compatibility with the `ABP/Angular` fallback and cover auto-detection in `test/config.test.ts`.
-- **Doc sync:** when changing `review-validation.ts`, `round-state.ts`, diff logic, stacks, prompts, env vars (`src/env.ts`), or skills, update this `AGENTS.md`, `README.md`, and `docs/` together.
+- **Doc sync (mandatory):** when changing `review-validation.ts`, `safe-outputs.ts`, `round-state.ts`, diff logic, stacks, prompts, env vars (`src/env.ts`), workflows, or skills, update **`AGENTS.md`**, **`README.md`**, and **`docs/`** in the same PR. The Definition of Done for the Developer Agent requires tests **and** synced documentation — code without updated docs is incomplete.
+
+### Definition of Done (Developer Agent)
+
+Before marking any runner change complete:
+
+1. **Behavior proved by tests** — `npm test` passes; new logic has unit/integration coverage for happy path and material edge cases.
+2. **Documentation updated** — every user- or agent-visible change reflected in the doc checklist under *Invariant Behavior* (README, AGENTS.md, docs/, skills/, `.env.example`, workflow examples as applicable).
+3. **No stale references** — remove or update mentions of removed flags, env vars, or workflows; do not document features that no longer exist.
+4. **Cross-engine parity** — `cursor-sdk` and `opencode` share the same prompt, gate, and `config.scoreMin`; verify both paths when changing orchestration or validation.
 
 ### Local Skills — Quick Reference
 

@@ -19,6 +19,16 @@ O runner **pré-mapeia** `.cursor/rules/*.mdc` por glob dos arquivos alterados �
 
 Se uma skill estiver ausente, documente a lacuna em `analysis` e aplique senso crítico mínimo (segurança, autorização, integridade de dados).
 
+---
+
+## Validação de Pipeline e Ambiente
+Como parte do rigor investigativo, se o diff envolver arquivos de orquestração de ambiente ou CI/CD (GitHub Actions, pipelines Azure DevOps `.yml`, ou scripts de build):
+- Assuma a postura de um **Engenheiro DevSecOps**.
+- Investigue vulnerabilidades (e.g., permissões abertas demais, injeção de comandos, falta de pin de dependências).
+- Garanta que a estrutura da pipeline esteja correta e atualizada com práticas modernas. Proponha arquiteturas mais elegantes se a configuração estiver frágil.
+
+---
+
 **Formato de saída:** prevalece o System Prompt (JSON desta pipeline), não o markdown de relatório das skills do projeto.
 
 Quando `AGENTIC_CODE_REVIEWERS_MCP_ENABLED=true`, o runner pode pré-coletar saída de lint/testes configurados — **observação somente leitura**; não execute comandos destrutivos nem modifique arquivos.

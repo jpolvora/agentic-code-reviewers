@@ -1,68 +1,98 @@
 ---
 name: solve-pr
-description: Skill agêntica para buscar as threads ativas de uma PR do GitHub, analisar os problemas, propor correções, implementar soluções, fazer commit, push e aguardar a próxima rodada de code review.
+description: Skill agêntica para buscar threads ativas do bot na PR (GitHub), corrigir issues de code review com o mesmo gate cooperativo do Auto-Fix CI, validar, commit, resolver threads e push — modo IDE independente do runner --auto-fix.
 ---
 
-# Instruções de Uso da Skill `solve-pr`
+# Skill `solve-pr` — correção cooperativa de PR (IDE)
 
-Esta skill orienta o agente no fluxo completo de resolução automática de issues levantadas por rodadas de code review em Pull Requests do GitHub.
+Runtime **IDE** complementar ao **Auto-Fix CI** (`--auto-fix` / `auto-fix.yml`). Ambos seguem o contrato compartilhado [`skills/COOPERATIVE_FIX.md`](../../skills/COOPERATIVE_FIX.md) — mesmos gates e formato de resposta, **sem acoplamento de código**.
+
+| | Auto-Fix CI | solve-pr (IDE) |
+|---|-------------|----------------|
+| Gatilho | `workflow_run` / `--auto-fix` | `/solve-pr` manual |
+| Correção | Subagente JSON + replacements | Agente IDE (edição direta) |
+| Threads | `PlatformProvider` | Scripts GraphQL |
+| Push | Após resolução OK | Após resolução OK |
 
 ---
 
-## Fluxo de Execução Passo a Passo
+## Pré-requisitos
 
-### Passo 1: Recuperação de Threads Ativas
-Execute o script utilitário de busca de threads passando o ID da Pull Request correspondente. Esse script utiliza a API GraphQL do GitHub para coletar threads de revisão de código que continuam abertas/não resolvidas.
+- Repositório GitHub; branch da PR checked out.
+- Token com escrita: `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (preferido) ou `GITHUB_TOKEN` / `GH_TOKEN`.
+- Opcional: `AGENTIC_CODE_REVIEWERS_BOT_TAG` (default `[Cursor Reviewer]`) para filtrar threads do bot.
+
+---
+
+## Fluxo (gate cooperativo)
+
+### 1. Recuperar threads ativas do bot
 
 ```bash
 node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID>
+# JSON para parsing:
+node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID> --json
 ```
-> [!IMPORTANT]
-> Certifique-se de que `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` está definida com permissões de leitura/escrita no repositório.
 
-### Passo 2: Investigação e Análise das Issues
-Para cada thread ativa listada na saída do script:
-1. Localize o arquivo e a linha afetada (ex: `src/config.ts:773`).
-2. Utilize as ferramentas de leitura (`view_file`, `grep_search`) para examinar o contexto completo em torno do trecho reportado.
-3. Consulte testes unitários, dependências ou documentação de arquitetura associada para entender as implicações do bug e evitar regressões.
+Saída inclui `threadId`, `filePath`, `lineNumber`, `summary` — mesmo contexto que o Auto-Fix injeta no subagente.
 
-### Passo 3: Elaboração do Plano de Correção
-Crie ou atualize o artefato `implementation_plan.md` no workspace contendo:
-*   As causas raiz de cada falha.
-*   A solução técnica precisa que será aplicada.
-*   O plano de testes e validação automática.
+### 2. Investigar e corrigir (paridade com Auto-Fix)
 
-### Passo 4: Implementação das Soluções
-*   Escreva as correções cirúrgicas necessárias nos arquivos afetados.
-*   Adicione ou atualize os testes correspondentes (por exemplo, em `test/` ou na stack correspondente) para garantir a cobertura contra a regressão do problema.
+Para **cada thread** listada:
 
-### Passo 5: Validação e Testes Locais
-Execute a suíte de testes locais para certificar-se de que todo o código compila e que nenhum comportamento existente foi quebrado:
+1. Leia arquivo completo + testes/callers relacionados (`read`, `grep`).
+2. Aplique correção **cirúrgica** (ver [`skills/AUTO_FIX.md`](../../skills/AUTO_FIX.md) e Karpathy guidelines).
+3. **Não** resolva thread sem alteração comprovada na linha ancorada.
+4. Opcional: use mentalmente o contrato JSON (`replacements` + `explanation`) mesmo editando direto.
+
+### 3. Validar
+
 ```bash
 npm test
 ```
 
-### Passo 6: Responder e Resolver as Threads no GitHub
-Após comprovar que a solução funciona e os testes passam, responda com uma nota explicativa da correção e marque as threads afetadas como resolvidas (fechadas) no GitHub. Use o script utilitário `resolve_thread.cjs`:
+### 4. Commit local (sem push)
+
 ```bash
-node .agents/skills/solve-pr/scripts/resolve_thread.cjs <THREAD_ID> "Nota explicando como a issue foi resolvida"
+git add <arquivos>
+git commit -m "fix(review): resolve issues from review threads of PR #<PR_ID>"
 ```
-Isso evita que o revisor analise novamente e alerte sobre um problema que já foi corrigido.
 
-### Passo 7: Commit, Push e Disparo de Nova Rodada
-Com as threads resolvidas e o código validado:
-1. Adicione os arquivos modificados ao stage do Git:
-   ```bash
-   git add <arquivos-modificados>
-   ```
-2. Realize o commit local seguindo as convenções do repositório (ex: Conventional Commits):
-   ```bash
-   git commit -m "fix(config): resolve issues identified in review threads of PR #<PR_ID>"
-   ```
-3. Envie as modificações para a branch remota para disparar a nova rodada do pipeline automatizado:
-   ```bash
-   git push origin <sua-branch>
-   ```
+### 5. Resolver threads (gate obrigatório)
 
-### Passo 8: Aguardar a Próxima Rodada
-Acompanhe os logs da execução e aguarde até que o bot de code review publique os resultados da nova rodada. Se novos problemas forem levantados ou persistirem, reinicie o ciclo a partir do **Passo 1**.
+Para **cada thread corrigida**, reply + resolve com marcador canônico:
+
+```bash
+node .agents/skills/solve-pr/scripts/resolve_thread.cjs <THREAD_ID> "Causa raiz e o que foi corrigido."
+```
+
+O script inclui `<!-- resolution-reply -->` (paridade com `src/provider/github.ts`).
+
+> **Gate:** se **qualquer** resolução tentada falhar → **não** faça push. Informe o usuário quais `threadId` falharam.
+
+### 6. Push (somente após resoluções OK)
+
+```bash
+git push origin HEAD
+```
+
+### 7. Aguardar próxima rodada de code review
+
+Se novas threads aparecerem, reinicie do passo 1.
+
+---
+
+## Comportamento cooperativo com code review
+
+- Threads publicadas pelo reviewer usam score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, severity e `analysis` estruturado — use o **comentário da thread** como spec da correção.
+- Respostas de resolução usam o mesmo marcador que o runner (`<!-- resolution-reply -->`) para a próxima rodada reconhecer histórico.
+- Não re-levante issues já resolvidas sem nova evidência (mesma política do reviewer).
+
+---
+
+## O que não fazer
+
+- Não resolver threads de humanos/outros bots.
+- Não push antes de resolver threads tentadas.
+- Não refatorar código adjacente à issue.
+- Não criar `implementation_plan.md` obrigatório — plano mental ou notas curtas bastam.

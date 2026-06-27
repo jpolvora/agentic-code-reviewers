@@ -423,8 +423,12 @@ These issues were reported in a previous round and already resolved/closed. Do *
           review,
         });
       } catch (error) {
-        const failure = `${review.fileName}:${review.lineNumber} — ${String(error)}`;
-        log(`Error: failed to post comment on '${review.fileName}' line ${review.lineNumber}: ${String(error)}`);
+        let failureMsg = String(error);
+        if (isGithubIntegrationAccessError(error)) {
+          failureMsg += ' (Hint: Configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN secret with a Personal Access Token that has pull_requests:write permission)';
+        }
+        const failure = `${review.fileName}:${review.lineNumber} — ${failureMsg}`;
+        log(`Error: failed to post comment on '${review.fileName}' line ${review.lineNumber}: ${failureMsg}`);
         failures.push(failure);
       }
     }

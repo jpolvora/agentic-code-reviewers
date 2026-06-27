@@ -31,6 +31,7 @@ O revisor publica threads acionáveis nas linhas afetadas da PR. **Não altera a
 Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](docs/):
 
 *   **[Fluxo de Análise e Decisão](docs/flow-analysis.md):** Guia completo de ciclo de vida, do carregamento de contexto ao gate final.
+*   **[Fluxo de Auto-Fix e Self-Healing](docs/auto-fix.md):** Como configurar pipelines para corrigir código automaticamente e revalidar o review em um loop seguro.
 *   **[Perguntas Frequentes (FAQ)](docs/faq.md):** Dúvidas comuns de configuração, comportamento do bot e regras.
 *   **[Cálculo de Score e Severidade](docs/score_calc.md):** Rubrica detalhada do score (0–10) e severidades (`critical`, `warning`, `suggestion`).
 *   **[Modelo de Execução em Duas Fases](docs/two-phase-execution-model.md):** Detalhes sobre a arquitetura de triagem e investigação profunda em um único agente.
@@ -52,6 +53,8 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
     *   **Azure DevOps:** Emite logging commands (`##vso[task.logissue]`) e anexa um resumo markdown rico na tela de build (`##vso[task.uploadsummary]`).
     *   **GitHub:** Anexa um resumo markdown completo da revisão diretamente na página do workflow via `GITHUB_STEP_SUMMARY`.
 *   **📦 Execução Remota via cURL:** Permite rodar o reviewer remotamente baixando apenas o script `run.sh` da branch `release`, dispensando o clone completo do repositório ou a presença de dependências de desenvolvimento.
+*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit/push na branch da PR e re-dispara code review. Proteções: resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
+*   **📏 Limiar de publicação (`score_min`) end-to-end:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min` (precedência CLI > env > default **6**) controla quais achados viram threads — injetado no prompt, gate TypeScript (`isPublishableReview`) e Safe Outputs (`severity-score`). Mesmo valor para `cursor-sdk` e `opencode`.
 *   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
     *   **`megabrain`** — Revisão com threads persistentes (`[Thread #1]`, `[Thread #2]`, …); em rodadas seguintes avalia se cada thread foi `RESOLVED` ou permanece `UNRESOLVED`.
@@ -173,7 +176,8 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
 | `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
-| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread. |
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread (prompt + gate + Safe Outputs). |
+| `AGENTIC_CODE_REVIEWERS_AUTO_FIX` | `false` | Ativa modo auto-fix (`--auto-fix`). |
 | `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-LLM (diff-line, protected paths, secrets). |
 | `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process por chunk de arquivos. |
 | `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Segunda passagem LLM para filtrar candidatos paralelos. |
@@ -223,7 +227,8 @@ npm run review -- [argumentos]
 *   `--model <id>` : Modelo LLM — ID Cursor no engine `cursor-sdk` (`composer-2.5`) ou `provider/model` no `opencode` (`opencode-go/deepseek-v4-flash`). Sobrescreve `AGENTIC_CODE_REVIEWERS_MODEL`.
 *   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `AGENTIC_CODE_REVIEWERS_ENGINE`.
 *   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
-*   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6.
+*   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6. Injetado no prompt e aplicado pelo gate TypeScript + Safe Outputs (mesmo valor em `cursor-sdk` e `opencode`).
+*   `--auto-fix` : Modo correção automática — lê threads ativas do bot, aplica fixes via subagentes, commit/push e resolve threads (requer contexto de PR e token com escrita). Equivalente a `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`. **Mutuamente exclusivo** com o fluxo de review padrão na mesma invocação.
 *   `--bot-tag <VAL>` : Tag inserida no comentário do bot (default: `[Cursor Reviewer]`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_BOT_TAG`.
 
 > Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência.
@@ -256,7 +261,7 @@ npm run review -- [argumentos]
 [Inicialização da Engine] ──► `cursor-sdk`: Inicia cliente | `opencode`: Sobe servidor embutido e assina stream SSE
         │
         ▼
-[Montagem do Prompt] ──► Injeta SYSTEM_PROMPT, regras da stack, rules locais (.cursor/rules/) e diff
+[Montagem do Prompt] ──► Injeta SYSTEM_PROMPT, scoreMin, regras da stack, rules locais (.cursor/rules/) e diff
         │
         ▼
 [Execução do Agente (2 Fases)] ──► (Timeout e stream de raciocínio gerenciados pela engine)
@@ -264,12 +269,15 @@ npm run review -- [argumentos]
    └─ Fase 2: Investigação ──► O agente prova/refuta vulnerabilidades usando tools (read, grep) no sandbox
         │
         ▼
-[Gate de Validação e Formatação] ──► Descarta issues com score < AGENTIC_CODE_REVIEWERS_SCORE_MIN (default: 6)
+[Gate de Validação e Formatação] ──► isPublishableReview(scoreMin) + Safe Outputs
         │
         ▼
 [Publicação na PR]
    ├─ Azure DevOps: Normaliza cercas, publica threads, fecha threads antigas e atualiza Estado da Rodada
    └─ GitHub: Publica threads com ```suggestion, fecha antigas e injeta resumo no GITHUB_STEP_SUMMARY
+        │
+        ▼
+[Auto-Fix opcional — GitHub CI] ──► workflow_run → auto-fix.yml → --auto-fix → push → novo code review
         │
         ▼
 [Teardown e Fim da Execução] ──► Encerra processos (kill opencode), Exit 0 (sucesso) ou 1 (falhas de sistema)
@@ -376,7 +384,8 @@ Utilize o template pronto do projeto: [`azure-pipelines-cursor-code-review.yml`]
 
 | Workflow | Gatilho | Função |
 | :--- | :--- | :--- |
-| [`.github/workflows/code-review.yml`](.github/workflows/code-review.yml) | PR → **`main`** | Review deste repo via `run.sh --local` (matrix por engine) |
+| [`.github/workflows/code-review.yml`](.github/workflows/code-review.yml) | PR → **`main`**; `workflow_dispatch` | Review deste repo via `run.sh --local` (matrix por engine) |
+| [`.github/workflows/auto-fix.yml`](.github/workflows/auto-fix.yml) | `workflow_run` após code review; `workflow_dispatch` | Auto-fix sequencial (cursor-sdk → opencode) após review bem-sucedido |
 | [`.github/workflows/review-remote.yml`](.github/workflows/review-remote.yml) | `workflow_call` | Reusable workflow para **outros repositórios** (modo remoto) |
 | [`.github/workflows/release.yml`](.github/workflows/release.yml) | Push/merge → **`main`** | Testes, build de todas as engines, bump e deploy na branch `release` |
 
@@ -415,9 +424,13 @@ Dispara **somente** em PRs com destino **`main`**. Um check por engine via matri
 
 Em modo **sequential**, a matrix usa `max-parallel: 1`: as engines rodam uma após a outra no mesmo workflow (ordem da matrix: `cursor-sdk` → `opencode`).
 
-Cada job executa `bash run.sh --local --gh ...` no checkout da PR. Com engine `opencode`, `run.sh` instala o CLI (`curl opencode.ai/install`), exporta `~/.opencode/bin` no PATH (mesmo step) e grava `auth.json` quando `OPENCODE_API_KEY` está definido.
+Cada job executa `bash run.sh --local --gh ...` no checkout da PR. Neste repositório, `AGENTIC_CODE_REVIEWERS_SCORE_MIN: '1'` no workflow permite publicar threads de validação do runner em CI self-review (consumidores mantêm default **6** se omitirem a variável).
 
 Cada job tem `concurrency` próprio (`review-<engine>-#N`), então re-runs de uma engine não cancelam a outra. Todos usam `continue-on-error: true` (falhas do agente não bloqueiam o merge por padrão).
+
+##### Auto-Fix (`auto-fix.yml`)
+
+Dispara após conclusão bem-sucedida do workflow **Agentic Code Review** (inclui re-runs manuais via `workflow_dispatch`). Um único job executa **sequencialmente** cursor-sdk e opencode (`--auto-fix`), com `git reset --hard` entre engines, `concurrency` por PR e step final que falha se **todos** os engines configurados falharem. Ver [`docs/auto-fix.md`](docs/auto-fix.md).
 
 Para adicionar uma nova engine ao CI, inclua uma entrada em `strategy.matrix.include` no workflow (modelo, bot tag e steps condicionais de setup).
 
@@ -476,6 +489,8 @@ permissions:
 jobs:
   review:
     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+    with:
+      score_min: '6'   # opcional; omitir = default 6
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
       # opcional — resolve threads fechadas pelo agente (resolvedThreads):
@@ -656,10 +671,13 @@ npm run review -- --dry-run --engine opencode --model opencode-go/deepseek-v4-fl
 *   `src/config.ts` : Tratamento de argumentos da CLI e resolução de parâmetros de ambiente.
 *   `src/provider/` : Abstrações e integrações de APIs de plataformas (`github.ts` e `azuredevops.ts`).
 *   `src/engine/` : `ExecutionEngine`, `getEngine()` e adapters `cursor-sdk` (`@cursor/sdk`) e `opencode` (`@opencode-ai/sdk`).
-*   `src/agent/` : Montagem do prompt e orquestração da chamada ao engine injetado.
-*   `src/ado/` : Regras de validação do gate, de rodadas, formatação de threads e helpers do ADO.
-*   `skills/` : Contratos de prompts estáticos do agente (`SYSTEM_PROMPT.md` e `CODE_REVIEW.md`) e subpasta `skills/stacks/` contendo os prompts complementares com as recomendações de cada stack.
+*   `src/agent/` : Montagem do prompt (`prompt.ts`) e orquestração da chamada ao engine (`runner.ts`).
+*   `src/ado/` : Gate (`review-validation.ts`, `safe-outputs.ts`), rodadas, formatação de threads e helpers ADO.
+*   `src/orchestrator/` : Paralelismo in-process (`parallel-runner.ts`), merge (`merge-reviews.ts`), meta-reviewer e **auto-fix** (`autofix-runner.ts`).
+*   `src/git/autofix-commit.ts` : Commit consolidado e push após auto-fix.
+*   `skills/` : Contratos de prompts estáticos (`SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, `AUTO_FIX.md`) e subpasta `skills/stacks/` com recomendações por stack.
 *   `.agents/skills/` : Skills agênticas do ecossistema do runner (`code-review-self`, `megabrain`, `solve-pr` e scripts auxiliares).
+*   `.github/workflows/auto-fix.yml` : Pipeline de auto-fix (self-healing) acionada após code review.
 *   `run.sh` : Runner portátil (modo remoto via branch `release` ou `--local` para CI/dev).
 *   `examples/consumer-github-workflow.yml` : Template de workflow para repositórios consumidores.
 *   `.github/workflows/review-remote.yml` : Reusable workflow GitHub Actions para consumidores.
@@ -674,6 +692,7 @@ O **agentic-code-reviewers** foi desenhado para crescer por extensão, não por 
 2. **Escolha o ponto de extensão:** engine agêntica (`ExecutionEngine`), provedor de plataforma (`PlatformProvider`) ou stack (`STACKS` + `skills/stacks/`).
 3. **Implemente** seguindo os contratos em `src/engine/types.ts` e `src/provider/types.ts`.
 4. **Valide** com `npm test` e `npm run test:seed`.
-5. **Abra PR** com documentação das variáveis de ambiente e exemplos de uso.
+5. **Atualize documentação** — `README.md`, `AGENTS.md`, `docs/` e `.env.example` em sync com o código (ver [`AGENTS.md`](AGENTS.md) § Definition of Done).
+6. **Abra PR** com documentação das variáveis de ambiente e exemplos de uso.
 
 Novas engines (outros SDKs agênticos, harness locais, modelos self-hosted) e providers (GitLab, Bitbucket, Gitea, …) são encorajadas. O pipeline central (diff, gate, rodadas, publicação) permanece estável enquanto você pluga sua camada de execução.

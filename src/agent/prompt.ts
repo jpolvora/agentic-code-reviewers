@@ -109,6 +109,7 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
     `- **Branch:** \`${sourceRef}\` → \`${targetRef}\``,
     `- **Diff range:** \`${diffScopeLabel}\``,
     `- **Stack:** \`${config.stack}\``,
+    `- **Score mínimo para threads (\`AGENTIC_CODE_REVIEWERS_SCORE_MIN\`):** **${config.scoreMin}** — inclua em \`reviews\` **somente** achados com \`score ≥ ${config.scoreMin}\`; o runner descarta o restante antes de criar threads (default da pipeline: 6; CLI \`--score-min\` e env têm precedência).`,
     `- **Arquivos elegíveis:** ${context.diffStats.fileCount}`,
     context.diffStats.files.length > 0
       ? `- **Lista:** ${context.diffStats.files.slice(0, 30).join(', ')}${context.diffStats.files.length > 30 ? '...' : ''}`
@@ -201,8 +202,10 @@ function buildTwoPhaseWorkflow(context: PromptContext, scoreMin: number): string
     '',
     '#### 2.4 — Classificar e filtrar',
     '',
+    `> **Parâmetro obrigatório desta execução — scoreMin = ${scoreMin}** (env \`AGENTIC_CODE_REVIEWERS_SCORE_MIN\` ou \`--score-min\`; default 6). Achados com \`score < ${scoreMin}\` **nunca** entram em \`reviews\` — o gate TypeScript descarta antes de abrir threads na PR.`,
+    '',
     '1. Atribua `severity` e `score` conforme tabelas do **System Prompt**.',
-    `2. Aplique o filtro de publicação: score < ${scoreMin} → omita; só \`fix-code\` ou \`escalate\`.`,
+    `2. Aplique o filtro de publicação: **score < ${scoreMin} → omita** (não envie no JSON); só \`fix-code\` ou \`escalate\`.`,
     '3. Combine múltiplos achados na **mesma linha** em um único review.',
     '4. Preencha `comment` (amigável, sem código); `suggestedFix` só se houver patch cirúrgico claro (senão `""`).',
     '',
@@ -215,12 +218,12 @@ function buildTwoPhaseWorkflow(context: PromptContext, scoreMin: number): string
   ];
 }
 
-function buildVerdictAndAdoPolicy(): string[] {
+function buildVerdictAndAdoPolicy(scoreMin: number): string[] {
   return [
     '',
     '### Veredito final',
     '',
-    '1. Releia cada review contra o filtro de publicação do System Prompt.',
+    `1. Releia cada review contra o filtro de publicação (score ≥ ${scoreMin}, campos obrigatórios, \`fix-code\`/\`escalate\`). Remova do JSON qualquer item abaixo do limiar.`,
     '2. **Completude:** confirme que percorreu **todos** os arquivos elegíveis e que cada achado real e comprovado foi incluído — não reserve achados para rodadas futuras (convergência em uma rodada).',
     '3. **Não duplique** threads ADO existentes (contexto abaixo), incluindo a tabela de threads **já resolvidas** — não re-levante um problema resolvido sem **nova evidência** de que voltou.',
     '4. `resolvedThreads`: somente se **verificou** via tools que o problema foi corrigido.',
@@ -290,7 +293,7 @@ export function buildAgentPrompt(config: ReviewerConfig, context: PromptContext)
     sections.push(...buildSeedTestSection());
   }
 
-  sections.push(...buildTwoPhaseWorkflow(context, config.scoreMin), ...buildVerdictAndAdoPolicy());
+  sections.push(...buildTwoPhaseWorkflow(context, config.scoreMin), ...buildVerdictAndAdoPolicy(config.scoreMin));
 
   if (context.workItemContext) {
     sections.push('', context.workItemContext);
