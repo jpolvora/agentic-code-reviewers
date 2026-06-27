@@ -39,17 +39,11 @@ describe('env', () => {
     assert.equal(ENV.OPENCODE_API_KEY, 'OPENCODE_API_KEY');
     assert.equal(ENV.ENGINE, 'AGENTIC_CODE_REVIEWERS_ENGINE');
     assert.equal(ENV.SCORE_MIN, 'AGENTIC_CODE_REVIEWERS_SCORE_MIN');
-    assert.equal(ENV.EXECUTION_MODE, 'AGENTIC_CODE_REVIEWERS_EXECUTION_MODE');
   });
 
   it('env.cursorApiKey lê CURSOR_API_KEY', () => {
     setEnv('CURSOR_API_KEY', 'cursor_direct');
     assert.equal(env.cursorApiKey(), 'cursor_direct');
-  });
-
-  it('env.opencodeApiKey lê OPENCODE_API_KEY', () => {
-    setEnv('OPENCODE_API_KEY', 'sk_direct');
-    assert.equal(env.opencodeApiKey(), 'sk_direct');
   });
 
   it('readEnv lê apenas variável com prefixo AGENTIC_CODE_REVIEWERS_', () => {
@@ -69,8 +63,8 @@ describe('env', () => {
   });
 
   it('readEnv retorna undefined quando a chave não está definida', () => {
-    clearKeys('AGENTIC_CODE_REVIEWERS_REPO_URL');
-    assert.equal(readEnv('REPO_URL'), undefined);
+    clearKeys('AGENTIC_CODE_REVIEWERS_STACK');
+    assert.equal(readEnv('STACK'), undefined);
   });
 
   it('env.scoreMin lê AGENTIC_CODE_REVIEWERS_SCORE_MIN', () => {
@@ -111,11 +105,6 @@ describe('env', () => {
     clearKeys('GITHUB_TOKEN');
     setEnv('GH_TOKEN', 'gh_cli');
     assert.equal(env.githubToken(), 'gh_cli');
-  });
-
-  it('env.executionMode lê AGENTIC_CODE_REVIEWERS_EXECUTION_MODE', () => {
-    setEnv('AGENTIC_CODE_REVIEWERS_EXECUTION_MODE', 'sequential');
-    assert.equal(env.executionMode(), 'sequential');
   });
 
   it('env.maxRounds lê AGENTIC_CODE_REVIEWERS_MAX_ROUNDS', () => {

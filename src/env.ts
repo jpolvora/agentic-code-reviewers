@@ -30,6 +30,7 @@ export const ENV = {
   OPENCODE_KILL_PORT: primaryKey('OPENCODE_KILL_PORT'),
   OPENCODE_STREAM_REASONING: primaryKey('OPENCODE_STREAM_REASONING'),
   OPENCODE_BIN: primaryKey('OPENCODE_BIN'),
+  /** Credencial OpenCode Go — lida por `run.sh`/CI, não por `env.*`. */
   OPENCODE_API_KEY: 'OPENCODE_API_KEY',
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
   GITHUB_TOKEN: primaryKey('GITHUB_TOKEN'),
@@ -53,9 +54,7 @@ export const ENV = {
   ADO_ORG: primaryKey('ADO_ORG'),
   ADO_PROJECT: primaryKey('ADO_PROJECT'),
   ADO_REPO: primaryKey('ADO_REPO'),
-  REPO_URL: primaryKey('REPO_URL'),
   PROMPT_COLOR: primaryKey('PROMPT_COLOR'),
-  EXECUTION_MODE: primaryKey('EXECUTION_MODE'),
 } as const;
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
@@ -72,7 +71,6 @@ export const env = {
   opencodeKillPort: () => readEnv('OPENCODE_KILL_PORT'),
   opencodeStreamReasoning: () => readEnv('OPENCODE_STREAM_REASONING'),
   opencodeBin: () => readEnv('OPENCODE_BIN'),
-  opencodeApiKey: () => readCredential(ENV.OPENCODE_API_KEY),
   azureDevOpsPat: () => readEnv('AZURE_DEVOPS_PAT'),
   githubToken: () =>
     readEnv('GITHUB_TOKEN') ??
@@ -98,7 +96,5 @@ export const env = {
   adoOrg: () => readEnv('ADO_ORG'),
   adoProject: () => readEnv('ADO_PROJECT'),
   adoRepo: () => readEnv('ADO_REPO'),
-  repoUrl: () => readEnv('REPO_URL'),
   promptColor: () => readEnv('PROMPT_COLOR'),
-  executionMode: () => readEnv('EXECUTION_MODE'),
 } as const;

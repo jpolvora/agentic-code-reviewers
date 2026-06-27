@@ -108,36 +108,22 @@ O runner publica threads na PR mas **não reprova a build** (exit 0). Desenvolve
 ## Configuração (.env)
 
 ```bash
-cp .env.example .env
+cp .env.example .env   # essencial; avançadas → README § Configuração avançada
 ```
 
 | Variável | Obrigatório | Descrição |
 |----------|-------------|-----------|
 | `CURSOR_API_KEY` | Sim (`cursor-sdk`) | API key do Cursor |
-| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | Não* | PAT para ADO local |
-| `AGENTIC_CODE_REVIEWERS_MODEL` | Não | Modelo (default: `composer-2.5`) |
+| `OPENCODE_API_KEY` | Sim (`opencode` CI) | Chave OpenCode Go (`run.sh` → `auth.json`) |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | Não | `cursor-sdk` (default) ou `opencode` |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | Não | Modelo (default por engine) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | Não | Servidor externo; omitir = embutido |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Não | Branch de diff (default: `refs/heads/master`) |
-| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | Não | Tag do bot (default: `[Cursor Reviewer]`) |
-| `AGENTIC_CODE_REVIEWERS_VERBOSE` | Não | Logs (default: `true`); com engine `opencode`, também stream `[assistant]` no SSE |
-| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | Não | Timeout (default: `600000`) |
-| `AGENTIC_CODE_REVIEWERS_SANDBOX` | Não | Sandbox read-only (default: `true`) |
-| `AGENTIC_CODE_REVIEWERS_DRY_RUN` | Não | Dry-run via env |
-| `AGENTIC_CODE_REVIEWERS_ADO_ORG` | Não | Org ADO (local) |
-| `AGENTIC_CODE_REVIEWERS_ADO_PROJECT` | Não | Projeto ADO |
-| `AGENTIC_CODE_REVIEWERS_ADO_REPO` | Não | Repositório ADO |
-| `AGENTIC_CODE_REVIEWERS_PR_ID` | Não | ID da PR |
-| `AGENTIC_CODE_REVIEWERS_ENGINE` | Não | Engine LLM: `cursor-sdk` (default) ou `opencode` |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | Não | URL de servidor OpenCode externo. **Omitir = embutido (padrão).** |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | Não | Host do servidor embutido (default: `127.0.0.1`) |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | Não | Porta do servidor embutido (default: `4096`) |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | Não | Agente OpenCode na sessão (default: `explore`, read-only) |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | Não | Pipe do `opencode serve` embutido (default: `true`) |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | Não | Nível do servidor embutido (default: `DEBUG`) |
-| `OPENCODE_API_KEY` | Sim (`opencode`) | Chave OpenCode Go (CI / `auth.json`) |
-| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Não | Branch clonada pelo `run.sh` remoto (default: `release`) |
-| `AGENTIC_CODE_REVIEWERS_LOCAL` | Não | `1` = `run.sh --local` |
-| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | Não | Raiz do repositório alvo |
-| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | Não | Score mínimo para publicar thread (default: `6`). **Opcional** |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | Não | Incluir runner no diff (default: `false`) |
+
+Demais variáveis (OpenCode tuning, `SCORE_MIN`, `STACK`, tokens ADO/GitHub locais, etc.): [`README.md`](../README.md) § Configuração avançada.
+
+**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `RELEASE_BRANCH`, `LOCAL`.
 
 Carregamento: `tsx --env-file-if-exists=.env`.
 

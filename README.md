@@ -130,45 +130,59 @@ Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthro
 
 Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`**. Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
 
-Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example)):
+Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example) — só o essencial):
 
 ```bash
 cp .env.example .env
 ```
 
+### Essenciais
+
 | Variável | Padrão | Descrição |
 | :--- | :--- | :--- |
 | `CURSOR_API_KEY` | — | Chave do Cursor (obrigatória com engine `cursor-sdk`). |
-| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
-| `AGENTIC_CODE_REVIEWERS_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL de servidor OpenCode **externo** (opcional). Omitir = servidor embutido (padrão). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido (quando `OPENCODE_URL` vazio). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta preferida do embutido (`0` = só porta livre). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT` | `false` | `true` = mata ocupante da porta preferida antes do fallback. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_BIN` | — | Caminho do CLI (default: PATH ou `~/.opencode/bin/opencode`). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe de stdout/stderr do `opencode serve` embutido (`[opencode-server]`). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível passado ao servidor embutido (`DEBUG` \| `INFO` \| `WARN` \| `ERROR`). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream SSE `[reasoning]` durante `session.prompt`. |
 | `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` instala CLI + `auth.json`). |
-| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | `release` | Branch clonada pelo `run.sh` em modo remoto. |
-| `AGENTIC_CODE_REVIEWERS_LOCAL` | `false` | `1` / `true` = mesmo que `run.sh --local`. |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
-| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub (canônico). Fallback: `GITHUB_TOKEN` ou `GH_TOKEN`. |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub. Fallback: `GITHUB_TOKEN` ou `GH_TOKEN`. |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff (CI deste repo). |
+
+Preferir flags CLI quando possível: `--dry-run`, `--quiet`, `--stack`, `--score-min`, `--engine`, `--model`.
+
+### Configuração avançada
+
+Defaults sensatos — omita salvo necessidade explícita.
+
+| Variável | Padrão | Descrição |
+| :--- | :--- | :--- |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta preferida (`0` = porta livre). |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT` | `false` | Mata ocupante da porta preferida. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_BIN` | PATH / `~/.opencode/bin` | Caminho do CLI OpenCode. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente read-only na sessão. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe stdout/stderr do `opencode serve`. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream SSE `[reasoning]`. |
+| `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; `[assistant]` no SSE (`--quiet` desativa). |
+| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão (10 min). |
+| `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
 | `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
-| `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; com `opencode`, também stream `[assistant]` no SSE. |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread. |
-| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão (ambas engines; OpenCode cancela HTTP via `AbortSignal`). |
-| `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
-| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | auto | Raiz do repositório alvo. |
-| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff; adiciona `*.yml`, `*.yaml`, `*.sh` aos includes da stack. |
-| `AGENTIC_CODE_REVIEWERS_STACK` | `ABP/Angular` | Stack ativa ou autodetecção. |
+| `AGENTIC_CODE_REVIEWERS_STACK` | autodetect | Stack ou `Custom`. |
 | `AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT` | — | Prompt quando `stack=Custom`. |
-| `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | — | Globs de inclusão (CSV). |
-| `AGENTIC_CODE_REVIEWERS_REPO_URL` | GitHub | URL clonada pelo `run.sh`. |
-| `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | `parallel` | CI: `parallel` ou `sequential`. |
+| `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | stack | Globs de inclusão (CSV). |
+| `AGENTIC_CODE_REVIEWERS_EXTRA_EXCLUDE_PATTERNS` | — | Globs extras de exclusão. |
+| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | auto | Raiz do repositório alvo. |
+| `AGENTIC_CODE_REVIEWERS_DRY_RUN` | `false` | Preferir `--dry-run`. |
+| `AGENTIC_CODE_REVIEWERS_PR_ID` / `ADO_*` | CI auto | Overrides locais de contexto PR. |
+
+**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `RELEASE_BRANCH`, `LOCAL`, `USE_TSX`.
+
+**Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); não é lida pelo runner TypeScript.
 
 ---
 
@@ -355,7 +369,7 @@ Dispara **somente** em PRs com destino **`main`**. Um check por engine via matri
 | :--- | :--- |
 | `pull_request` | Paralelo por padrão |
 | `workflow_dispatch` | Input `execution_mode`: **parallel** ou **sequential** (+ PR/branchs obrigatórios) |
-| Variável `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | Sobrescreve o default em PRs (`parallel` ou `sequential`) |
+| Variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | Sobrescreve o default em PRs (`parallel` ou `sequential`). **Workflow only** — não passa por `env.ts`. |
 
 Em modo **sequential**, a matrix usa `max-parallel: 1`: as engines rodam uma após a outra no mesmo workflow (ordem da matrix: `cursor-sdk` → `opencode`).
 
