@@ -118,16 +118,30 @@ export function isThreadLineModified(
   return origLine !== updatedLine;
 }
 
-async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+interface FileFixResult {
+  relativePath: string;
+  resolvedItems: ResolvedThreadItem[];
+}
+
+async function mapPool<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R | undefined>,
+): Promise<R[]> {
   const queue = [...items];
-  await Promise.all(
+  const buckets = await Promise.all(
     Array.from({ length: Math.min(limit, queue.length) }, async () => {
+      const local: R[] = [];
       while (queue.length) {
         const item = queue.shift();
-        if (item !== undefined) await fn(item);
+        if (item === undefined) continue;
+        const result = await fn(item);
+        if (result !== undefined) local.push(result);
       }
+      return local;
     }),
   );
+  return buckets.flat();
 }
 
 export async function runAutoFixFlow(
@@ -167,7 +181,7 @@ export async function runAutoFixFlow(
   const modifiedFiles: string[] = [];
   const filePaths = Array.from(threadsByFile.keys());
 
-  await mapPool(filePaths, AUTOFIX_CONCURRENCY, async (filePath) => {
+  const fileResults = await mapPool(filePaths, AUTOFIX_CONCURRENCY, async (filePath) => {
       const threads = threadsByFile.get(filePath)!;
       const relativePath = filePath.replace(/^\/+/,'');
       const fullFilePath = path.resolve(config.repoRoot, relativePath);
@@ -176,12 +190,12 @@ export async function runAutoFixFlow(
       const rel = path.relative(path.resolve(config.repoRoot), fullFilePath);
       if (rel.startsWith('..') || path.isAbsolute(rel)) {
         logger.error(`Acesso fora do repositório bloqueado: ${filePath}`);
-        return;
+        return undefined;
       }
 
       if (!fs.existsSync(fullFilePath)) {
         logger.error(`Arquivo não encontrado para correção: ${filePath} (caminho resolvido: ${fullFilePath})`);
-        return;
+        return undefined;
       }
 
       const fileContent = fs.readFileSync(fullFilePath, 'utf8');
@@ -224,7 +238,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         const jsonText = extractJsonFromAgentOutput(result.fullText);
         if (!jsonText) {
           logger.error(`Falha ao extrair JSON da resposta do agente para o arquivo: ${filePath}`);
-          return;
+          return undefined;
         }
 
         const parsed = JSON.parse(jsonText) as {
@@ -234,12 +248,12 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
 
         if (!parsed.replacements || !Array.isArray(parsed.replacements)) {
           logger.error(`Formato de replacements inválido retornado para o arquivo: ${filePath}`);
-          return;
+          return undefined;
         }
 
         if (parsed.replacements.length === 0) {
           logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}. Threads não serão resolvidas.`);
-          return;
+          return undefined;
         }
 
         let updatedContent: string;
@@ -247,12 +261,12 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           updatedContent = applyReplacements(fileContent, parsed.replacements);
         } catch (err: any) {
           logger.error(`Erro ao aplicar substituições em ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
-          return;
+          return undefined;
         }
 
         if (updatedContent === fileContent) {
           logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}. Threads não serão resolvidas.`);
-          return;
+          return undefined;
         }
 
         const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
@@ -264,7 +278,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
-        modifiedFiles.push(relativePath);
+        const localResolvedItems: ResolvedThreadItem[] = [];
 
         // Resolve apenas threads cuja linha teve conteúdo alterado pelos replacements
         for (const thread of threads) {
@@ -276,7 +290,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           );
 
           if (isModified) {
-            resolvedItems.push({
+            localResolvedItems.push({
               threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
               fileName: thread.filePath,
               lineNumber: thread.lineNumber,
@@ -288,10 +302,18 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
             );
           }
         }
+
+        return { relativePath, resolvedItems: localResolvedItems };
       } catch (err: any) {
         logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+        return undefined;
       }
   });
+
+  for (const result of fileResults) {
+    modifiedFiles.push(result.relativePath);
+    resolvedItems.push(...result.resolvedItems);
+  }
 
   if (resolvedItems.length === 0) {
     logger.info('Nenhuma correção foi aplicada com sucesso.');
