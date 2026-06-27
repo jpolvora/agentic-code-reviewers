@@ -66,7 +66,7 @@ flowchart TD
     D --> E[read / grep / skills / rules]
     E --> F[Provar ou refutar cada hipótese]
     F --> G[Um bloco JSON final]
-    G --> H[TypeScript: parse + gate score ≥ SCORE_MIN (default 6)]
+    G --> H[TypeScript: parse + gate score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6)]
 ```
 
 - **Fase 1:** usa o diff pré-carregado (ou `git diff` via tool) para mapear candidatos nas linhas alteradas.
@@ -79,7 +79,7 @@ Durante o run aparecem eventos `thinking`, `tool_call` e `assistant` — tudo na
 
 A doc operacional fala em **decisão em duas camadas**:
 
-1. **Agente (LLM)** — triagem + prova + filtro score &lt; `SCORE_MIN` no prompt (valor injetado de `config.scoreMin`; default 6).
+1. **Agente (LLM)** — triagem + prova + filtro score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no prompt (valor injetado de `config.scoreMin`; default 6).
 2. **TypeScript** — `isPublishableReview(review, scoreMin)` descarta o que não passa no contrato antes de postar no ADO.
 
 Isso é pós-processamento determinístico do JSON, **não** uma segunda rodada do LLM. Ver [`flow-analysis.md`](flow-analysis.md) e `src/ado/review-validation.ts`.
@@ -100,7 +100,7 @@ O ganho clássico de multi-step é forçar evidência antes do veredito. A Fase 
 
 **3. A precisão já tem gate determinístico.**
 
-O filtro final **não é LLM** — é TypeScript (`isPublishableReview`, score `SCORE_MIN`–10 com default 6, campos obrigatórios). Isso é mais barato, reprodutível e testável (`npm test`) do que um segundo agente “juiz”.
+O filtro final **não é LLM** — é TypeScript (`isPublishableReview`, score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 com default 6, campos obrigatórios). Isso é mais barato, reprodutível e testável (`npm test`) do que um segundo agente “juiz”.
 
 **4. Custo e latência.**
 

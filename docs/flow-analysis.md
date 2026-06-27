@@ -1,6 +1,7 @@
 # Fluxo de análise e decisão — Agentic Code Reviewers
 
 > **Artefato de referência** — descreve o fluxo completo do **agentic-code-reviewers** desde a preparação do diff até a decisão do que vira thread real na PR.  
+> **Variáveis:** prefixo `AGENTIC_CODE_REVIEWERS_*` — ver [`AGENTS.md`](../AGENTS.md).  
 > **Última revisão:** jun/2026 (sandbox read-only do SDK, cancelamento real no timeout, resultado canônico via `run.wait()`, logging commands ADO, remoção do campo `urgency`, fence por linguagem em vez de ```suggestion).
 
 ---
@@ -18,7 +19,7 @@ flowchart TD
     C -->|Sim| F[Coleta ADO: work items + threads]
     F --> G[Agente SDK: Fases 1–2]
     G --> H[Parser JSON]
-    H --> I[Filtro score < SCORE_MIN (default 6) + política summary]
+    H --> I[Filtro score < AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) + política summary]
     I --> J[Dedup arquivo+linha]
     J --> K[Publica / resolve threads]
     K --> L[evaluateGate — resumo]
@@ -63,7 +64,7 @@ Ordem exata em `src/index.ts`:
 
 ### Arquivos elegíveis e Seleção de Stacks (`config.ts`)
 
-O escopo de arquivos elegíveis para diff/review é determinado pela **stack tecnológica** selecionada via CLI (`--stack`) ou variável de ambiente (`CURSOR_REVIEWER_STACK`). Por padrão, assume a stack `ABP/Angular`.
+O escopo de arquivos elegíveis para diff/review é determinado pela **stack tecnológica** selecionada via CLI (`--stack`) ou variável de ambiente (`AGENTIC_CODE_REVIEWERS_STACK`). Por padrão, assume a stack `ABP/Angular`.
 
 As stacks disponíveis e seus padrões de inclusão padrão são:
 
@@ -76,7 +77,7 @@ As stacks disponíveis e seus padrões de inclusão padrão são:
 
 O filtro de exclusão (`excludePatterns`) padrão remove proxies, bin/obj, `.md`, `.csproj` e, por padrão, o próprio diretório do runner (legado: `scripts/cursor-reviewer/**`) para evitar self-review indesejado.
 
-Variáveis associadas: `CURSOR_REVIEWER_STACK`, `CURSOR_REVIEWER_REVIEW_SELF`, `CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS`.
+Variáveis associadas: `AGENTIC_CODE_REVIEWERS_STACK`, `AGENTIC_CODE_REVIEWERS_REVIEW_SELF`, `AGENTIC_CODE_REVIEWERS_EXTRA_EXCLUDE_PATTERNS`.
 
 ### Work items (Azure DevOps)
 
@@ -133,9 +134,9 @@ O agente **não** recebe o conteúdo desses arquivos no prompt inicial — lê v
 
 ### Guardrails do SDK (`engine/cursor-sdk/stream.ts`)
 
-- **Sandbox read-only:** `local.sandboxOptions.enabled` (default `true`; `CURSOR_REVIEWER_SANDBOX=false` só para depuração) restringe escritas ao `cwd` e nega rede — reforço técnico do contrato read-only, além do `SYSTEM_PROMPT.md`. Em ambientes que não suportam o sandbox local do SDK (ex.: agentes hospedados de CI), o `runAgentStream` detecta o erro e reexecuta automaticamente sem sandbox (read-only segue garantido pelo `SYSTEM_PROMPT.md`).
+- **Sandbox read-only:** `local.sandboxOptions.enabled` (default `true`; `AGENTIC_CODE_REVIEWERS_SANDBOX=false` só para depuração) restringe escritas ao `cwd` e nega rede — reforço técnico do contrato read-only, além do `SYSTEM_PROMPT.md`. Em ambientes que não suportam o sandbox local do SDK (ex.: agentes hospedados de CI), o `runAgentStream` detecta o erro e reexecuta automaticamente sem sandbox (read-only segue garantido pelo `SYSTEM_PROMPT.md`).
 - **Resultado canônico:** o texto final vem de `run.wait()` → `RunResult.result`; o stream acumulado (`fullText`) é apenas fallback.
-- **Timeout com cancelamento real:** o SDK não aceita `AbortSignal`; ao estourar `CURSOR_REVIEWER_TIMEOUT_MS`, o runner chama `run.cancel()` (aborta stream + tool calls e faz `wait()` resolver como `cancelled`).
+- **Timeout com cancelamento real:** o SDK não aceita `AbortSignal`; ao estourar `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, o runner chama `run.cancel()` (aborta stream + tool calls e faz `wait()` resolver como `cancelled`).
 
 ---
 
@@ -217,16 +218,16 @@ Incluir em `reviews` só se **todas** forem verdadeiras:
 |-------|-------------------|-----------|
 | 0–2 | `resolve-comment` | **Não** — nit/estilo |
 | 3–5 | `resolve-comment` | **Não** |
-| 6–8 | `fix-code` | **Sim** (se score ≥ `SCORE_MIN`; default 6) |
+| 6–8 | `fix-code` | **Sim** (se score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`; default 6) |
 | 9–10 | `fix-code` | **Sim** — crítico |
 
-> **`resolve-comment`**: classificação de “fechar thread com justificativa, **sem mudar código**”. No reviewer, score abaixo de `SCORE_MIN` (default: &lt; 6) significa **não criar thread**. Se uma thread **for** publicada com `fix-code`, o dev ainda pode tratá-la como falso positivo ao revisar a PR.
+> **`resolve-comment`**: classificação de “fechar thread com justificativa, **sem mudar código**”. No reviewer, score abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: &lt; 6) significa **não criar thread**. Se uma thread **for** publicada com `fix-code`, o dev ainda pode tratá-la como falso positivo ao revisar a PR.
 
 ### Gate programático (TypeScript)
 
 Em `ado/review-validation.ts` + `post-comments.ts`, `isPublishableReview(review, scoreMin)` exige **todos** os critérios:
 
-Exige **todos**: `score` finito **SCORE_MIN–10** (default 6–10; configurável via env `SCORE_MIN` ou `--score-min`); `fileName` não vazio; `lineNumber` inteiro > 0; `severity` válida (`critical`/`warning`/`suggestion`); `comment` e `analysis` não vazios; `impactPaths` array não vazio com paths não vazios; `developerAction` ∈ {`fix-code`, `escalate`} (nunca `resolve-comment`). `suggestedFix` é **opcional**. **Omitir** `SCORE_MIN` mantém default **6** — pipelines existentes sem a variável não precisam de alteração.
+Exige **todos**: `score` finito **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** (default 6–10; configurável via env `AGENTIC_CODE_REVIEWERS_SCORE_MIN` ou `--score-min`); `fileName` não vazio; `lineNumber` inteiro > 0; `severity` válida (`critical`/`warning`/`suggestion`); `comment` e `analysis` não vazios; `impactPaths` array não vazio com paths não vazios; `developerAction` ∈ {`fix-code`, `escalate`} (nunca `resolve-comment`). `suggestedFix` é **opcional**. **Omitir** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` mantém default **6** — pipelines existentes sem a variável não precisam de alteração.
 
 Reviews fora desse contrato são **descartados** antes da publicação. A filtragem autoritativa roda uma única vez em `parseCodeReviewResponse`; `setPullRequestComments` mantém um filtro defensivo no boundary de POST do ADO. Dupla proteção: prompt + código.
 
@@ -241,7 +242,7 @@ Reviews fora desse contrato são **descartados** antes da publicação. A filtra
 - Sanitização de aspas/quebras se `JSON.parse` falhar; `reviews` não-array lança erro descritivo.
 - **Achatamento (Flatten):** Expande os agrupamentos de `relatedOccurrences` gerando múltiplos objetos `CodeReviewItem` separados, preservando a `analysis` mas distribuindo as threads pelos arquivos corretos (anti whack-a-mole).
 - Normalização defensiva de `fileName`, `lineNumber`, `impactPaths` e severidade.
-- `parseCodeReviewResponse` descarta reviews que não passam em `isPublishableReview` (score ≥ `SCORE_MIN`, default 6, + campos obrigatórios).
+- `parseCodeReviewResponse` descarta reviews que não passam em `isPublishableReview` (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6, + campos obrigatórios).
 
 Exit codes:
 
@@ -279,7 +280,7 @@ Garante a terminação do loop `fix-pr ↔ reviewer`:
 
 - **Estado persistido:** thread geral (sem `filePath`) com marcador `<!-- reviewer-round-state -->` e `Rodada: N`. Lida via `parseRoundStateFromThreads` (a partir de `allThreads`), atualizada via PATCH (uma única thread, sem spam).
 - **Rodada atual** = rodadas anteriores + 1 (só com contexto ADO).
-- **Escalonamento** (`decideRoundEscalation`): quando `currentRound > maxRounds` (`CURSOR_REVIEWER_MAX_ROUNDS`, default 5; `0` desabilita) **e** há reviews novos ou threads pendentes do bot.
+- **Escalonamento** (`decideRoundEscalation`): quando `currentRound > maxRounds` (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`, default 5; `0` desabilita) **e** há reviews novos ou threads pendentes do bot.
 - **Em escalonamento:** `splitReviewsForEscalation` mantém só `critical`; warnings/suggestions são suprimidos; `persistRoundState` grava o aviso de **revisão humana recomendada**. Resolução de threads confirmadas segue normal.
 - **Persistência:** somente quando a rodada teve issues (`hasOpenIssues || escalate`). Dry-run apenas loga a decisão (sem POST/PATCH).
 
@@ -329,8 +330,8 @@ Variáveis lidas automaticamente na pipeline:
 | `SYSTEM_TEAMPROJECT` | Projeto |
 | `BUILD_REPOSITORY_NAME` | Repositório |
 | `SYSTEM_ACCESSTOKEN` | Publicação ADO |
-| `CURSOR_API_KEY` | Agente Cursor |
-| `CURSOR_REVIEWER_TARGET_BRANCH` | Target override (variable group) |
+| `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | Agente Cursor |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Target override (variable group) |
 
 CLI `--org`, `--project`, etc. permanecem disponíveis para uso local.
 
@@ -375,7 +376,7 @@ Revisão concluída sem apontamentos. ...
 ## Mapa de módulos
 
 ```
-scripts/cursor-reviewer/
+scripts/agentic-code-reviewers/   # legado: scripts/cursor-reviewer/
 ├── src/index.ts              Orquestração + gate
 ├── src/config.ts             Env, CLI, extractOrgFromCollectionUri, exclude patterns
 ├── src/agent/

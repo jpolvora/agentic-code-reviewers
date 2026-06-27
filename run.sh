@@ -8,10 +8,10 @@
 
 set -euo pipefail
 
-CURSOR_REVIEWER_REPO_URL="${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}"
+REPO_URL="${AGENTIC_CODE_REVIEWERS_REPO_URL:-${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}}"
 TEMP_DIR=".tmp-agentic-code-reviewers"
 CALLER_DIR="$(pwd)"
-ENGINE_RAW="${CURSOR_REVIEWER_ENGINE:-cursor-sdk}"
+ENGINE_RAW="${AGENTIC_CODE_REVIEWERS_ENGINE:-${CURSOR_REVIEWER_ENGINE:-cursor-sdk}}"
 FORWARD_ARGS=()
 
 usage() {
@@ -33,8 +33,9 @@ Demais argumentos são repassados ao reviewer, por exemplo:
   --gh --pr-id 42
 
 Variáveis de ambiente:
-  CURSOR_REVIEWER_ENGINE     Mesmo que --engine
-  CURSOR_REVIEWER_REPO_URL   URL do repositório (default: agentic-code-reviewers)
+  AGENTIC_CODE_REVIEWERS_ENGINE     Mesmo que --engine
+  AGENTIC_CODE_REVIEWERS_REPO_URL   URL do repositório (default: agentic-code-reviewers)
+  (legado: CURSOR_REVIEWER_ENGINE, CURSOR_REVIEWER_REPO_URL)
 
 Exemplos:
   curl -fsSL .../run.sh | bash -s -- --dry-run
@@ -91,15 +92,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-CURSOR_REVIEWER_ENGINE="$(normalize_engine "$ENGINE_RAW")"
-export CURSOR_REVIEWER_ENGINE
+AGENTIC_CODE_REVIEWERS_ENGINE="$(normalize_engine "$ENGINE_RAW")"
+export AGENTIC_CODE_REVIEWERS_ENGINE
 
 echo "=== [Runner] Iniciando execução remota do Agentic Code Reviewers ==="
-echo "Repositório do Reviewer: $CURSOR_REVIEWER_REPO_URL"
+echo "Repositório do Reviewer: $REPO_URL"
 echo "Diretório Alvo da Análise: $CALLER_DIR"
-echo "Engine: $CURSOR_REVIEWER_ENGINE"
+echo "Engine: $AGENTIC_CODE_REVIEWERS_ENGINE"
 
-if [[ "$CURSOR_REVIEWER_ENGINE" == "opencode" ]] && ! command -v opencode >/dev/null 2>&1; then
+if [[ "$AGENTIC_CODE_REVIEWERS_ENGINE" == "opencode" ]] && ! command -v opencode >/dev/null 2>&1; then
   echo "AVISO: engine opencode requer o CLI 'opencode' instalado (https://opencode.ai/install)" >&2
 fi
 
@@ -114,12 +115,12 @@ trap cleanup EXIT
 rm -rf "$CALLER_DIR/$TEMP_DIR"
 
 echo "=== [Runner] Baixando artefatos compilados (branch release) ==="
-git clone --depth 1 --branch release "$CURSOR_REVIEWER_REPO_URL" "$CALLER_DIR/$TEMP_DIR"
+git clone --depth 1 --branch release "$REPO_URL" "$CALLER_DIR/$TEMP_DIR"
 
 echo "=== [Runner] Instalando dependências de runtime ==="
 cd "$CALLER_DIR/$TEMP_DIR"
 npm ci --omit=dev
 
 VERSION=$(node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); console.log(pkg.version);")
-echo "=== [Runner] Executando Agentic Code Reviewers v$VERSION (engine: $CURSOR_REVIEWER_ENGINE) ==="
+echo "=== [Runner] Executando Agentic Code Reviewers v$VERSION (engine: $AGENTIC_CODE_REVIEWERS_ENGINE) ==="
 node dist/index.js --repo-root "$CALLER_DIR" "${FORWARD_ARGS[@]}"

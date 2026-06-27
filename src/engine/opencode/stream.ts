@@ -7,6 +7,7 @@ import {
 } from '@opencode-ai/sdk';
 import { logAgentPromptBeforeSend } from '../../agent/log-prompt.js';
 import type { ReviewerConfig } from '../../config.js';
+import { env, ENV } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
 import { type OpencodeModelSelection, resolveOpencodeModelSelection } from './model.js';
@@ -40,32 +41,30 @@ type OpencodeRuntime = {
 };
 
 function resolveTimeoutMs(): number {
-  const envValue = process.env.CURSOR_REVIEWER_TIMEOUT_MS?.trim();
+  const envValue = env.timeoutMs()?.trim();
   if (!envValue) return DEFAULT_TIMEOUT_MS;
   const parsed = Number(envValue);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
 function resolveServerUrl(): string | undefined {
-  const raw =
-    process.env.CURSOR_REVIEWER_OPENCODE_URL?.trim() ||
-    process.env.OPENCODE_SERVER_URL?.trim();
+  const raw = env.opencodeUrl()?.trim();
   return raw || undefined;
 }
 
 function resolveHostname(): string {
-  return process.env.CURSOR_REVIEWER_OPENCODE_HOSTNAME?.trim() || DEFAULT_HOSTNAME;
+  return env.opencodeHostname()?.trim() || DEFAULT_HOSTNAME;
 }
 
 function resolvePort(): number {
-  const raw = process.env.CURSOR_REVIEWER_OPENCODE_PORT?.trim();
+  const raw = env.opencodePort()?.trim();
   if (!raw) return DEFAULT_PORT;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
 }
 
 function resolveAgentName(): string {
-  return process.env.CURSOR_REVIEWER_OPENCODE_AGENT?.trim() || DEFAULT_AGENT;
+  return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
 }
 
 /** Config inline do servidor embutido (modelo + sandbox read-only). */
@@ -303,7 +302,7 @@ export async function runOpencodeStream(
       }
       throw new Error(
         `Timeout: agente OpenCode excedeu ${(timeoutMs / 1000).toFixed(0)}s. ` +
-          'Aumente CURSOR_REVIEWER_TIMEOUT_MS se necessário.',
+          `Aumente ${ENV.TIMEOUT_MS} se necessário.`,
       );
     }
 

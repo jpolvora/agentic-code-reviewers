@@ -1,7 +1,8 @@
 # Score e severidade — Agentic Code Reviewers
 
-> **Artefato de referência** — descreve como o **score** (0–10) e a **severidade** (`critical` / `warning` / `suggestion`) são atribuídos, validados e usados na publicação de threads na PR.  
-> **Complementa:** [`flow-analysis.md`](flow-analysis.md) (fluxo geral) · [`../skills/SYSTEM_PROMPT.md`](../skills/SYSTEM_PROMPT.md) (contrato JSON) · [`.agents/skills/code-review/SKILL.md`](../../../.agents/skills/code-review/SKILL.md) (critérios do projeto).
+> **Artefato de referência** — score (0–10), severidade e publicação de threads.  
+> **Complementa:** [`flow-analysis.md`](flow-analysis.md) · [`../skills/SYSTEM_PROMPT.md`](../skills/SYSTEM_PROMPT.md) · [`AGENTS.md`](../AGENTS.md).  
+> **Variáveis:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default `6`; legado: `SCORE_MIN`).
 
 ---
 
@@ -10,7 +11,7 @@
 O **Agentic Code Reviewers** **não calcula score por fórmula** (`score = f(linhas, arquivos, …)`). O fluxo é:
 
 1. **Agente LLM** — após provar o achado com tools, **atribui** `score`, `severity` e `developerAction` conforme rubricas dos prompts.
-2. **TypeScript** — **valida** se o review é publicável (`isPublishableReview`); descarta score abaixo de `SCORE_MIN` (default **6**) ou contrato inválido.
+2. **TypeScript** — **valida** se o review é publicável (`isPublishableReview`); descarta score abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default **6**) ou contrato inválido.
 
 ```mermaid
 flowchart TD
@@ -18,23 +19,23 @@ flowchart TD
     B --> C{4 itens de prova + gate de 6 critérios?}
     C -->|Não| D[Omitido — não entra em reviews]
     C -->|Sim| E[LLM atribui score 0–10 + severity]
-    E --> F{score ≥ SCORE_MIN e campos OK?}
+    E --> F{score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN e campos OK?}
     F -->|Não| G[Descartado em parseCodeReviewResponse]
     F -->|Sim| H[Thread na PR com label 🛑 / ⚠️ / 💡]
 ```
 
-**Conclusão prática:** o score é uma **calibração qualitativa** do agente, não um número derivado automaticamente do código. O runner garante apenas o **intervalo publicável** (`SCORE_MIN`–10, default **6**–10) e a **integridade do contrato JSON**.
+**Conclusão prática:** o score é uma **calibração qualitativa** do agente, não um número derivado automaticamente do código. O runner garante apenas o **intervalo publicável** (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10, default **6**–10) e a **integridade do contrato JSON**.
 
-### `SCORE_MIN` (configurável, opt-in)
+### `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (configurável, opt-in)
 
 | Canal | Exemplo | Default se omitido |
 |-------|---------|-------------------|
-| Env | `SCORE_MIN=4` | `6` |
+| Env | `AGENTIC_CODE_REVIEWERS_SCORE_MIN=4` | `6` |
 | CLI | `--score-min 4` | `6` |
 
-**Precedência:** `--score-min` > `SCORE_MIN` > `6`.
+**Precedência:** `--score-min` > `AGENTIC_CODE_REVIEWERS_SCORE_MIN` > `6`.
 
-**Compatibilidade:** pipelines e invocações existentes que **não** definem `SCORE_MIN` nem `--score-min` mantêm o limiar histórico **6** — sem breaking change. Só defina `SCORE_MIN` quando quiser abaixar (ex.: `4`) ou subir o rigor do que vira thread acionável.
+**Compatibilidade:** pipelines e invocações existentes que **não** definem `AGENTIC_CODE_REVIEWERS_SCORE_MIN` nem `--score-min` mantêm o limiar histórico **6** — sem breaking change. Só defina `AGENTIC_CODE_REVIEWERS_SCORE_MIN` quando quiser abaixar (ex.: `4`) ou subir o rigor do que vira thread acionável.
 
 O prompt do agente (`src/agent/prompt.ts`) e o gate TypeScript (`review-validation.ts`) usam o mesmo valor carregado em `config.scoreMin`.
 
@@ -44,11 +45,11 @@ O prompt do agente (`src/agent/prompt.ts`) e o gate TypeScript (`review-validati
 
 | Camada | Arquivo | Papel |
 |--------|---------|-------|
-| Contrato da pipeline | `skills/SYSTEM_PROMPT.md` | Tabelas score × severity × `developerAction`; filtro orientativo (gate efetivo: `SCORE_MIN`, default 6) |
-| Orquestração do prompt | `src/agent/prompt.ts` | Fases 1–2; instrução de classificar conforme System Prompt; injeta `SCORE_MIN` no filtro |
+| Contrato da pipeline | `skills/SYSTEM_PROMPT.md` | Tabelas score × severity × `developerAction`; filtro orientativo (gate efetivo: `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6) |
+| Orquestração do prompt | `src/agent/prompt.ts` | Fases 1–2; instrução de classificar conforme System Prompt; injeta `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no filtro |
 | Critérios do projeto | `.agents/skills/code-review/SKILL.md` | Brechas, checklist ABP/Angular, calibração 6–8 vs 9–10 |
 | Modelo compartilhado | `.agents/skills/fix-pr/SKILL.md` | Escala 0–10 e eixos de julgamento (fix-pr ↔ reviewer) |
-| Configuração | `src/config.ts` | `SCORE_MIN` (env) / `--score-min` (CLI); `CURSOR_REVIEWER_ENGINE` (`cursor-sdk` \| `opencode`); default `6` / `cursor-sdk` |
+| Configuração | `src/config.ts` | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (env) / `--score-min` (CLI); `AGENTIC_CODE_REVIEWERS_ENGINE`; default `6` / `cursor-sdk` |
 | Execução LLM | `src/engine/` | `getEngine(config)` — `cursor-sdk` (`@cursor/sdk`) ou `opencode` (`@opencode-ai/sdk`) |
 | Gate programático | `src/ado/review-validation.ts` | `DEFAULT_SCORE_MIN = 6`, `MAX_PUBLISHABLE_SCORE = 10`; `isPublishableReview(review, scoreMin)` |
 | Parser | `src/parser/review-response.ts` | Normaliza score; severidade inválida → default `warning` |
@@ -59,7 +60,7 @@ O prompt do agente (`src/agent/prompt.ts`) e o gate TypeScript (`review-validati
 
 ## Pré-requisitos antes de pontuar
 
-Nenhum achado recebe score publicável sem passar pelas etapas abaixo. Se falhar em qualquer uma, o item **não entra** em `reviews` (ou entra com score abaixo de `SCORE_MIN` e é descartado pelo gate).
+Nenhum achado recebe score publicável sem passar pelas etapas abaixo. Se falhar em qualquer uma, o item **não entra** em `reviews` (ou entra com score abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` e é descartado pelo gate).
 
 ### Fase 1 — Triagem (descarte imediato)
 
@@ -100,7 +101,7 @@ Alinhados à skill `fix-pr` e `code-review`:
 
 | # | Pergunta | Efeito típico na nota |
 |---|----------|------------------------|
-| 1 | O caminho de falha é executável e provável? | Sem isso → omitir ou score abaixo de `SCORE_MIN` |
+| 1 | O caminho de falha é executável e provável? | Sem isso → omitir ou score abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` |
 | 2 | Há coerência com work item / plano da US? | Desalinhamento com AC → sobe (8–9) |
 | 3 | Já existe proteção (teste, validação, invariante)? | Se sim → descer ou omitir (≤ 5) |
 | 4 | Impacto material (segurança, dados, fiscal, negócio)? | Material + sem proteção → 8–10 |
@@ -196,7 +197,7 @@ Mapeamento orientativo severidade ↔ tipo de defeito:
 
 O TypeScript **não** reescreve severity com base no score. A calibração é responsabilidade do agente:
 
-| Combinação esperada | Combinação atípica (aceita se score ≥ SCORE_MIN) |
+| Combinação esperada | Combinação atípica (aceita se score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN) |
 |---------------------|-------------------------------------------|
 | score 9–10 + `critical` | score 9 + `warning` (runner aceita) |
 | score 6–8 + `warning` | score 8 + `critical` (runner aceita) |
@@ -209,7 +210,7 @@ O TypeScript **não** reescreve severity com base no score. A calibração é re
 Implementação em `src/ado/review-validation.ts` + configuração em `src/config.ts`:
 
 ```typescript
-export const DEFAULT_SCORE_MIN = 6; // usado quando SCORE_MIN / --score-min omitidos
+export const DEFAULT_SCORE_MIN = 6; // usado quando AGENTIC_CODE_REVIEWERS_SCORE_MIN / --score-min omitidos
 export const MAX_PUBLISHABLE_SCORE = 10;
 
 // isPublishableReview(review, scoreMin = DEFAULT_SCORE_MIN)
@@ -219,7 +220,7 @@ export const MAX_PUBLISHABLE_SCORE = 10;
 
 | Campo | Regra |
 |-------|-------|
-| `score` | Número finito, **SCORE_MIN ≤ score ≤ 10** (default: **6 ≤ score ≤ 10**) |
+| `score` | Número finito, **AGENTIC_CODE_REVIEWERS_SCORE_MIN ≤ score ≤ 10** (default: **6 ≤ score ≤ 10**) |
 | `fileName` | Não vazio |
 | `lineNumber` | Inteiro **> 0** |
 | `severity` | `critical` \| `warning` \| `suggestion` |
@@ -231,7 +232,7 @@ export const MAX_PUBLISHABLE_SCORE = 10;
 
 Reviews que falham são descartados em `parseCodeReviewResponse` **antes** de POST no ADO. Mensagem típica:
 
-> Policy: N review(s) descartado(s) — score < SCORE_MIN, campos obrigatórios ausentes ou contrato inválido.
+> Policy: N review(s) descartado(s) — score < AGENTIC_CODE_REVIEWERS_SCORE_MIN, campos obrigatórios ausentes ou contrato inválido.
 
 (Com o default, equivale a `score < 6`.)
 
@@ -251,7 +252,7 @@ Em `src/parser/review-response.ts`:
 | **Corpo da thread** | `format-thread.ts` — prefixo por severity + bloco `<details>` com `Score: N/10` |
 | **Pipeline Azure DevOps** | `pipeline-logging.ts` — `critical` → `##vso[task.logissue type=error]`; demais → `type=warning` |
 | **Resumo positivo** | Se houver review `critical`, `reviewSummary` é **ignorado** |
-| **Escalonamento** | `currentRound > CURSOR_REVIEWER_MAX_ROUNDS` (default 3) + issues abertas → publica **só** `critical`; suprime `warning`/`suggestion` novos |
+| **Escalonamento** | `currentRound > AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5) + issues abertas → publica **só** `critical`; suprime `warning`/`suggestion` novos |
 | **Dedup** | Chave `arquivoNormalizado\|line:N` — mesma linha não gera thread duplicada |
 
 ---
@@ -280,7 +281,7 @@ Regras explícitas do `SYSTEM_PROMPT.md`:
 | Achado **comprovado** que passa no gate | **Publicar** — não omitir para “não poluir” |
 | PR sem issues novas | `"reviews": []` + `reviewSummary` positivo |
 
-Objetivo anti-loop: **completude na mesma rodada** — listar todos os achados materiais de uma vez (score ≥ `SCORE_MIN`, default 6), não reservar para rodadas futuras.
+Objetivo anti-loop: **completude na mesma rodada** — listar todos os achados materiais de uma vez (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6), não reservar para rodadas futuras.
 
 ---
 
@@ -292,11 +293,11 @@ Objetivo anti-loop: **completude na mesma rodada** — listar todos os achados m
 
 ### O runner corrige score ou severity inconsistentes?
 
-**Não.** Só valida intervalo `SCORE_MIN`–10 (default 6–10) e campos obrigatórios. Severidade inválida vira `warning` no parser; score fora do intervalo descarta o item.
+**Não.** Só valida intervalo `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 (default 6–10) e campos obrigatórios. Severidade inválida vira `warning` no parser; score fora do intervalo descarta o item.
 
 ### Posso mudar o limiar sem quebrar pipelines antigas?
 
-**Sim.** `SCORE_MIN` e `--score-min` são **opcionais**. Omitir ambos mantém default **6** — comportamento idêntico às versões anteriores do runner.
+**Sim.** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` e `--score-min` são **opcionais**. Omitir ambos mantém default **6** — comportamento idêntico às versões anteriores do runner.
 
 ### Score 6 vs 8 vs 10 — qual a diferença prática?
 
@@ -310,7 +311,7 @@ Todos geram thread; a pipeline **não bloqueia** a build por score (exit 0).
 
 ### Por que scores abaixo do mínimo não viram thread?
 
-Com o default `SCORE_MIN=6`, scores 0–5 não publicam — evita ruído (nits, estilo, alertas não comprovados). Ao **abaixar** `SCORE_MIN` (ex.: `4`), issues com score 4–5 passam a virar thread; ao **omitir** a variável, nada muda em relação ao comportamento histórico.
+Com o default `AGENTIC_CODE_REVIEWERS_SCORE_MIN=6`, scores 0–5 não publicam — evita ruído (nits, estilo, alertas não comprovados). Ao **abaixar** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (ex.: `4`), issues com score 4–5 passam a virar thread; ao **omitir** a variável, nada muda em relação ao comportamento histórico.
 
 ---
 

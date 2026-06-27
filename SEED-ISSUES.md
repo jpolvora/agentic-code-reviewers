@@ -37,7 +37,7 @@ Validar que o **agentic-code-reviewers** detecta **6 cenários intencionais** (3
 
 ## Como executar
 
-### Teste E2E (recomendado — exige `CURSOR_API_KEY`)
+### Teste E2E (recomendado — exige `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`)
 
 ```bash
 # Na raiz do repositório (standalone)

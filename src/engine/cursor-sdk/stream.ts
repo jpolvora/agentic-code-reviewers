@@ -2,6 +2,7 @@ import { Agent, CursorAgentError } from '@cursor/sdk';
 import type { LocalAgentOptions, Run } from '@cursor/sdk';
 import { logAgentPromptBeforeSend } from '../../agent/log-prompt.js';
 import type { ReviewerConfig } from '../../config.js';
+import { ENV, env } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { resolveAgentModelSelection } from './model.js';
 import {
@@ -26,17 +27,17 @@ export interface RunAgentOptions {
   resumeAgentId?: string;
 }
 
-/** Default: 10 minutos. Configurável via CURSOR_REVIEWER_TIMEOUT_MS. */
+/** Default: 10 minutos. Configurável via AGENTIC_CODE_REVIEWERS_TIMEOUT_MS. */
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
  * Opções `local` do agente. O sandbox **força** o modo somente leitura no nível
  * do SDK (restringe escritas ao `cwd` e nega rede): cinto-e-suspensório do
  * contrato read-only declarado no SYSTEM_PROMPT. Desativável via
- * CURSOR_REVIEWER_SANDBOX=false apenas para depuração local.
+ * AGENTIC_CODE_REVIEWERS_SANDBOX=false apenas para depuração local.
  */
 function buildLocalOptions(config: ReviewerConfig): Required<Pick<LocalAgentOptions, 'sandboxOptions'>> & LocalAgentOptions {
-  const sandboxEnabled = process.env.CURSOR_REVIEWER_SANDBOX?.trim().toLowerCase() !== 'false';
+  const sandboxEnabled = env.sandbox()?.trim().toLowerCase() !== 'false';
   return {
     cwd: config.repoRoot,
     settingSources: ['project'],
@@ -46,7 +47,7 @@ function buildLocalOptions(config: ReviewerConfig): Required<Pick<LocalAgentOpti
 }
 
 function resolveTimeoutMs(): number {
-  const envValue = process.env.CURSOR_REVIEWER_TIMEOUT_MS?.trim();
+  const envValue = env.timeoutMs()?.trim();
   if (!envValue) return DEFAULT_TIMEOUT_MS;
   const parsed = Number(envValue);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
@@ -189,7 +190,7 @@ export async function runAgentStream(
       if (timedOut || result.status === 'cancelled') {
         throw new Error(
           `Timeout: agente excedeu ${(timeoutMs / 1000).toFixed(0)}s e o run foi cancelado. ` +
-            'Aumente CURSOR_REVIEWER_TIMEOUT_MS se necessário.',
+            `Aumente ${ENV.TIMEOUT_MS} se necessário.`,
         );
       }
 

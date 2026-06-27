@@ -6,12 +6,13 @@
 
 ## Índice
 
+- [Skills — roteamento e gestão](#skills--roteamento-e-gestão)
 - [Portabilidade e Customização de Prompts](#portabilidade-e-customização-de-prompts)
 - [Modos git (local vs CI)](#modos-git-local-vs-ci)
 - [Arquivos elegíveis](#arquivos-elegíveis)
 - [Resumo do review](#resumo-do-review)
 - [Configuração (.env)](#configuração-env)
-- [SCORE_MIN (limiar de threads)](#score_min-limiar-de-threads)
+- [AGENTIC_CODE_REVIEWERS_SCORE_MIN (limiar de threads)](#agentic_code_reviewers_score_min-limiar-de-threads)
 - [Alterar o modelo LLM](#alterar-o-modelo-llm)
 - [Azure Pipelines](#azure-pipelines)
 - [Como rodar localmente](#como-rodar-localmente)
@@ -26,9 +27,24 @@
 
 ---
 
+## Skills — roteamento e gestão
+
+Duas camadas — não confundir:
+
+| Camada | Pasta | Carregamento |
+|--------|-------|--------------|
+| **Runtime (CI/produção)** | `skills/` | `buildAgentPrompt()` em cada `npm run review` |
+| **IDE (desenvolvimento)** | `.agents/skills/` | Usuário invoca `/code-review-self`, `/megabrain`, `/solve-pr` |
+
+Detalhes, fluxograma de decisão e checklist de manutenção: [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão).
+
+Skills genéricas entre projetos: [workflow-skills](https://github.com/jpolvora/workflow-skills).
+
+---
+
 ## Portabilidade e Customização de Prompts
 
-O runner pode ser executado a partir de sua própria raiz e configurado para atuar em qualquer repositório Git alvo usando `--repo-root <caminho>` ou `CURSOR_REVIEWER_REPO_ROOT`. Por padrão, assume `../../` relativo à sua própria pasta (modo submódulo). Como repositório autônomo, detecta automaticamente a própria raiz.
+O runner pode ser executado a partir de sua própria raiz e configurado para atuar em qualquer repositório Git alvo usando `--repo-root <caminho>` ou `AGENTIC_CODE_REVIEWERS_REPO_ROOT`. Por padrão, assume `../../` relativo à sua própria pasta (modo submódulo). Como repositório autônomo, detecta automaticamente a própria raiz.
 
 | Arquivo | Editável | Descrição |
 |---------|----------|-----------|
@@ -61,8 +77,10 @@ Se a ref target não existir localmente, fetch mínimo de `origin/{target}` (`--
 
 | Variável | Default | Descrição |
 |----------|---------|-----------|
-| `CURSOR_REVIEWER_REVIEW_SELF` | `false` | Inclui o próprio runner no review |
-| `CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS` | — | Globs extras separados por vírgula |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Inclui o próprio runner no review |
+| `AGENTIC_CODE_REVIEWERS_EXTRA_EXCLUDE_PATTERNS` | — | Globs extras separados por vírgula |
+
+> Nomes legados (`CURSOR_REVIEWER_*`, `CURSOR_API_KEY`, `SCORE_MIN`) continuam funcionando como fallback.
 
 Diff: `--diff-filter=AMR` (Added, Modified, Renamed). `--include-uncommitted` adiciona working tree.
 
@@ -93,33 +111,36 @@ cp .env.example .env
 
 | Variável | Obrigatório | Descrição |
 |----------|-------------|-----------|
-| `CURSOR_API_KEY` | Sim | API key do Cursor |
-| `AZURE_DEVOPS_EXT_PAT` | Não* | PAT para ADO local |
-| `CURSOR_REVIEWER_MODEL` | Não | Modelo (default: `composer-2.5`) |
-| `CURSOR_REVIEWER_TARGET_BRANCH` | Não | Branch de diff (default: `refs/heads/master`) |
-| `CURSOR_REVIEWER_BOT_TAG` | Não | Tag do bot (default: `[Cursor Reviewer]`) |
-| `CURSOR_REVIEWER_VERBOSE` | Não | Logs (default: `true`) |
-| `CURSOR_REVIEWER_TIMEOUT_MS` | Não | Timeout (default: `600000`) |
-| `CURSOR_REVIEWER_SANDBOX` | Não | Sandbox read-only (default: `true`) |
-| `CURSOR_REVIEWER_DRY_RUN` | Não | Dry-run via env |
-| `CURSOR_REVIEWER_ADO_ORG` | Não | Org ADO (local) |
-| `CURSOR_REVIEWER_ADO_PROJECT` | Não | Projeto ADO |
-| `CURSOR_REVIEWER_ADO_REPO` | Não | Repositório ADO |
-| `CURSOR_REVIEWER_PR_ID` | Não | ID da PR |
-| `CURSOR_REVIEWER_MODEL` | Não | Modelo (default por engine: `composer-2.5` / `anthropic/claude-sonnet-4-6`) |
-| `CURSOR_REVIEWER_ENGINE` | Não | Engine LLM: `cursor-sdk` (default) ou `opencode` |
-| `CURSOR_REVIEWER_REPO_ROOT` | Não | Raiz do repositório alvo |
-| `SCORE_MIN` | Não | Score mínimo (inclusive) para publicar thread (default: `6`). **Opcional** — omitir = comportamento histórico |
+| `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | Sim | API key do Cursor |
+| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | Não* | PAT para ADO local |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | Não | Modelo (default: `composer-2.5`) |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Não | Branch de diff (default: `refs/heads/master`) |
+| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | Não | Tag do bot (default: `[Cursor Reviewer]`) |
+| `AGENTIC_CODE_REVIEWERS_VERBOSE` | Não | Logs (default: `true`) |
+| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | Não | Timeout (default: `600000`) |
+| `AGENTIC_CODE_REVIEWERS_SANDBOX` | Não | Sandbox read-only (default: `true`) |
+| `AGENTIC_CODE_REVIEWERS_DRY_RUN` | Não | Dry-run via env |
+| `AGENTIC_CODE_REVIEWERS_ADO_ORG` | Não | Org ADO (local) |
+| `AGENTIC_CODE_REVIEWERS_ADO_PROJECT` | Não | Projeto ADO |
+| `AGENTIC_CODE_REVIEWERS_ADO_REPO` | Não | Repositório ADO |
+| `AGENTIC_CODE_REVIEWERS_PR_ID` | Não | ID da PR |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | Não | Engine LLM: `cursor-sdk` (default) ou `opencode` |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | Não | URL de servidor OpenCode externo. **Omitir = embutido (padrão).** |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | Não | Host do servidor embutido (default: `127.0.0.1`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | Não | Porta do servidor embutido (default: `4096`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | Não | Agente OpenCode na sessão (default: `explore`, read-only) |
+| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | Não | Raiz do repositório alvo |
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | Não | Score mínimo para publicar thread (default: `6`). **Opcional** |
 
 Carregamento: `tsx --env-file-if-exists=.env`.
 
-### `SCORE_MIN` (limiar de threads)
+### `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (limiar de threads)
 
-Controla quais issues do agente viram threads na PR (`score >= SCORE_MIN`). **Opt-in:** pipelines e scripts que não definem `SCORE_MIN` nem `--score-min` continuam com limiar **6**.
+Controla quais issues do agente viram threads na PR (`score >= scoreMin`). **Opt-in:** omitir env e `--score-min` mantém limiar **6**.
 
 ```bash
 # .env — publicar também scores 4 e 5
-SCORE_MIN=4
+AGENTIC_CODE_REVIEWERS_SCORE_MIN=4
 
 # pontual na CLI (precedência sobre env)
 npm run review -- --dry-run --score-min 4
@@ -129,17 +150,45 @@ npm run review -- --dry-run --score-min 4
 
 ## Alterar o modelo LLM
 
-Prioridade: CLI `--model` > env `CURSOR_REVIEWER_MODEL` > default `composer-2.5`.
+Prioridade: CLI `--model` > env `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`.
 
 ```bash
 # .env
-CURSOR_REVIEWER_MODEL=composer-2.5
+AGENTIC_CODE_REVIEWERS_MODEL=composer-2.5
 
 # flag pontual
 npm run review -- --dry-run --model claude-4.6-sonnet-medium-thinking
 ```
 
 IDs comuns: `composer-2.5`, `composer-2.5-fast`, `claude-4.6-sonnet-medium-thinking`, `gpt-5.4-medium`.
+
+---
+
+## Engine OpenCode (`opencode`)
+
+Com `AGENTIC_CODE_REVIEWERS_ENGINE=opencode`, o runner usa `@opencode-ai/sdk`. **Por padrão** sobe sua própria instância do servidor (`createOpencodeServer` → `opencode serve` em `127.0.0.1:4096`) e conecta o client — não é necessário `opencode serve` manual nem definir `OPENCODE_URL`.
+
+### Configuração mínima (servidor embutido)
+
+```bash
+AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+# opcional: OPENCODE_HOSTNAME, OPENCODE_PORT, OPENCODE_AGENT
+```
+
+Pré-requisitos: CLI `opencode` no `PATH`; credenciais LLM em `~/.local/share/opencode/auth.json` (`opencode providers`); porta `4096` livre (ou altere `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT`).
+
+Implementação: `src/engine/opencode/stream.ts` — permissões read-only (`edit`/`bash`/`webfetch`: `deny`) na config do servidor embutido.
+
+### Servidor externo (opcional)
+
+Use quando já houver TUI ou `opencode serve` em execução:
+
+```bash
+AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
+```
+
+Documentação OpenCode: [SDK](https://opencode.ai/docs/sdk/) · [Servidor](https://opencode.ai/docs/server/).
 
 ---
 
@@ -156,15 +205,15 @@ cp agentic-code-reviewers/azure-pipelines-cursor-code-review.yml ./
 
 | Variável | Descrição |
 |----------|-----------|
-| `group: vg-agentic-code-reviewers` | Variable group com `CURSOR_API_KEY` |
+| `group: vg-agentic-code-reviewers` | Variable group com `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` |
 | `REVIEWER_DIR` | Path do projeto (default: `scripts/agentic-code-reviewers` ou legado `scripts/cursor-reviewer`) |
-| `CURSOR_REVIEWER_TARGET_BRANCH` | Branch target |
-| `CURSOR_REVIEWER_MODEL` | Modelo LLM |
-| `SCORE_MIN` | *(opcional)* Limiar de publicação; omitir = `6` |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Branch target |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | Modelo LLM |
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | *(opcional)* Limiar de publicação; omitir = `6` |
 
 ### Pré-requisitos ADO
 
-1. Variable group com `CURSOR_API_KEY`
+1. Variable group com `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`
 2. Build Service com permissão **Contribute to pull requests**
 3. OAuth token habilitado
 4. Agent pool `ubuntu-latest` + Node 22.13+
@@ -185,7 +234,7 @@ Pipeline com `trigger: none` — dispara via Build Validation em PR. Exit 0 mesm
 
 - Node.js 22.13+
 - `npm install`
-- `.env` com `CURSOR_API_KEY`
+- `.env` com `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`
 
 ### Dry-run básico
 
@@ -227,7 +276,7 @@ npm run review -- \
 
 ### Publicação real (sem `--dry-run`)
 
-Requer contexto ADO completo + token (`AZURE_DEVOPS_EXT_PAT` ou `SYSTEM_ACCESSTOKEN`).
+Requer contexto ADO completo + token (`AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` ou `SYSTEM_ACCESSTOKEN`).
 
 ---
 
@@ -301,7 +350,7 @@ Parser: último bloco ` ```json ` válido → fallback para último `{...}` com 
 }
 ```
 
-Campos obrigatórios: `fileName`, `lineNumber`, `severity`, `comment`, `score`, `developerAction`, `analysis`, `impactPaths`. `suggestedFix` opcional (fence por linguagem, nunca ` ```suggestion `). Score &lt; `SCORE_MIN` (default 6) → descartado pelo gate TypeScript.
+Campos obrigatórios: `fileName`, `lineNumber`, `severity`, `comment`, `score`, `developerAction`, `analysis`, `impactPaths`. `suggestedFix` opcional (fence por linguagem, nunca ` ```suggestion `). Score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6) → descartado pelo gate TypeScript.
 
 ---
 
@@ -368,9 +417,9 @@ Pipeline: SUCESSO (exit 0)
 
 | Variável | Origem |
 |----------|--------|
-| `CURSOR_REVIEWER_MODEL` | Variable group / pipeline var |
-| `SCORE_MIN` | *(opcional)* Variable group / pipeline var; omitir = default `6` |
-| `CURSOR_REVIEWER_TARGET_BRANCH` | Variable group / pipeline var |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | Variable group / pipeline var |
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | *(opcional)* Variable group / pipeline var; omitir = default `6` |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Variable group / pipeline var |
 | `SYSTEM_PULLREQUEST_SOURCEBRANCH` | Pipeline ADO |
 | `SYSTEM_PULLREQUEST_TARGETBRANCH` | Pipeline ADO |
 | `SYSTEM_PULLREQUEST_PULLREQUESTID` | Pipeline ADO |
@@ -383,10 +432,10 @@ Pipeline: SUCESSO (exit 0)
 
 ## Troubleshooting
 
-### `CURSOR_API_KEY é obrigatório`
+### `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY é obrigatório`
 
 1. Confirme que `.env` existe
-2. Verifique se a chave está preenchida
+2. Verifique se a chave está preenchida (`AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`; legado: `CURSOR_API_KEY`)
 3. Use `npm run review` (carrega `--env-file=.env`)
 
 ### `Contexto ADO incompleto`
@@ -395,7 +444,7 @@ Fora da pipeline, use `--dry-run` ou passe `--org`, `--project`, `--repo`, `--pr
 
 ### `Token ADO ausente`
 
-Pipeline: habilite **Allow scripts to access the OAuth token**. Local: `AZURE_DEVOPS_EXT_PAT`.
+Pipeline: habilite **Allow scripts to access the OAuth token**. Local: `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` (legado: `AZURE_DEVOPS_EXT_PAT`).
 
 ### Nenhum arquivo elegível
 
@@ -417,12 +466,12 @@ O **agentic-code-reviewers** é estruturado de forma a ser totalmente independen
 
 ### Engines agênticas (`ExecutionEngine`)
 
-A camada LLM/harness é plugável via `CURSOR_REVIEWER_ENGINE`. Contrato em `src/engine/types.ts`:
+A camada LLM/harness é plugável via `AGENTIC_CODE_REVIEWERS_ENGINE`. Contrato em `src/engine/types.ts`:
 
 | Engine | Status | Pacote |
 |--------|--------|--------|
 | `cursor-sdk` | Estável (default) | `@cursor/sdk` |
-| `opencode` | Estável | `@opencode-ai/sdk` |
+| `opencode` | Estável | `@opencode-ai/sdk` — **padrão:** servidor embutido (`createOpencodeServer`); `OPENCODE_URL` opcional para servidor externo |
 | Custom | Via PR | Seu adapter |
 
 Para adicionar uma engine:

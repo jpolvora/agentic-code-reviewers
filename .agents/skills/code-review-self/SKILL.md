@@ -181,7 +181,7 @@ Opcionais: `relatedOccurrences`, `suggestedFix`.
 
 Comentários que falharem em **qualquer** critério serão descartados. Aplique **antes** de emitir o JSON final:
 
-- `score`: número finito, **SCORE_MIN ≤ score ≤ 10** (default **6 ≤ score ≤ 10**; configurável via env `SCORE_MIN` ou `--score-min`; omitir = default 6).
+- `score`: número finito, **AGENTIC_CODE_REVIEWERS_SCORE_MIN ≤ score ≤ 10** (default **6 ≤ score ≤ 10**; env `AGENTIC_CODE_REVIEWERS_SCORE_MIN` ou `--score-min`; legado: `SCORE_MIN`).
 - `fileName`: não vazio após trim.
 - `lineNumber`: inteiro **> 0**, na linha alterada mais responsável.
 - `severity`: `critical` | `warning` | `suggestion`.
@@ -200,7 +200,7 @@ Plano de postagem (`getCodeReviewPostingPlan`): se `reviews.length > 0` ou `hasC
 
 - Marcador: `<!-- reviewer-round-state -->` em thread geral do bot.
 - `currentRound = priorRoundState.round + 1` (0 se não houver contexto).
-- `decideRoundEscalation`: `escalate = maxRounds > 0 && currentRound > maxRounds && hasOpenIssues` (default `maxRounds=5`; `CURSOR_REVIEWER_MAX_ROUNDS`; 0 desativa).
+- `decideRoundEscalation`: `escalate = maxRounds > 0 && currentRound > maxRounds && hasOpenIssues` (default `maxRounds=5`; `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; 0 desativa).
 - Em escalonamento: mantenha apenas `critical`; suprima `warning`/`suggestion` (conte e reporte o suprimido). Adicione aviso de handoff humano.
 - `hasOpenIssues` = haveria novos reviews OU threads bot pendentes.
 
@@ -267,7 +267,7 @@ Após concluir a revisão:
 
 ## 15. Notas operacionais
 
-- **Autoexclusão:** exclua a pasta do próprio runner do diff a menos que `CURSOR_REVIEWER_REVIEW_SELF=true`.
-- **Seed test:** se `--seed-test`, leia `scripts/cursor-reviewer/SEED-ISSUES.md` e `fixtures/seed/expected-scenarios.json`; não descarte achados por `Compile Remove` ou rota Angular ausente; cada review com `suggestedFix`, score ≥ 5, keywords do cenário.
+- **Autoexclusão:** exclua a pasta do próprio runner do diff a menos que `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true`.
+- **Seed test:** se `--seed-test`, leia `SEED-ISSUES.md` e `fixtures/seed/expected-scenarios.json`; não descarte achados por `Compile Remove` ou rota Angular ausente; cada review com `suggestedFix`, score ≥ 5, keywords do cenário.
 - **Convergência:** o objetivo é uma rodada única completa — não sub-reporte para gerar mais rodadas.
 - **Fidelidade:** sempre que possível, leia os arquivos canônicos `skills/*.md` para alinhar texto exato com a versão em vigor do runner.

@@ -8,7 +8,7 @@ assert_required_skill() {
   local relative_path="$1"
   local skill_path="$SCRIPT_DIR/$relative_path"
   if [[ ! -f "$skill_path" ]]; then
-    echo "❌ [cursor-reviewer] Skill/Prompt obrigatória ausente: $relative_path" >&2
+    echo "❌ [agentic-code-reviewers] Skill/Prompt obrigatória ausente: $relative_path" >&2
     echo "   Runner: $SCRIPT_DIR" >&2
     echo "   Garanta que a skill está em skills/ antes de executar." >&2
     exit 1
@@ -21,13 +21,15 @@ assert_required_skill "skills/SYSTEM_PROMPT.md"
 cd "$SCRIPT_DIR"
 
 has_cursor_api_key() {
-  [[ -n "${CURSOR_API_KEY:-}" ]] || grep -Eq '^[[:space:]]*CURSOR_API_KEY[[:space:]]*=[[:space:]]*[^[:space:]#]+' "$SCRIPT_DIR/.env" 2>/dev/null
+  [[ -n "${AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY:-${CURSOR_API_KEY:-}}" ]] \
+    || grep -Eq '^[[:space:]]*(AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY|CURSOR_API_KEY)[[:space:]]*=[[:space:]]*[^[:space:]#]+' "$SCRIPT_DIR/.env" 2>/dev/null
 }
 
 if ! has_cursor_api_key; then
-  echo "Defina CURSOR_API_KEY antes de executar."
-  echo "  export CURSOR_API_KEY=cursor_..."
-  echo "  ou configure scripts/cursor-reviewer/.env"
+  echo "Defina AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY antes de executar."
+  echo "  export AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY=cursor_..."
+  echo "  (legado: CURSOR_API_KEY)"
+  echo "  ou configure .env na raiz do projeto"
   exit 1
 fi
 
@@ -39,7 +41,7 @@ normalize_ref() {
   printf '%s' "$ref"
 }
 
-TARGET_BRANCH="${2:-${CURSOR_REVIEWER_TARGET_BRANCH:-refs/heads/master}}"
+TARGET_BRANCH="${2:-${AGENTIC_CODE_REVIEWERS_TARGET_BRANCH:-${CURSOR_REVIEWER_TARGET_BRANCH:-refs/heads/master}}}"
 TARGET_BRANCH="$(normalize_ref "$TARGET_BRANCH")"
 
 is_ci_environment() {
