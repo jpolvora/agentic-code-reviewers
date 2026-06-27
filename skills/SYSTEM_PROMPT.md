@@ -74,7 +74,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 
 `relatedOccurrences`: **opcional** — array de objetos contendo `fileName` e `lineNumber` para agrupar ocorrências do **mesmo defeito** em outros arquivos (evita o loop whack-a-mole).
 
-`suggestedFix`: **opcional** — preencha com bloco de código por linguagem (` ```csharp `, ` ```ts `, ` ```html ` ou ` ```diff `) quando houver correção cirúrgica clara, buscando a **elegância e simplicidade máxima**; use `""` se o achado for conceitual (ex.: falta de autorização sem patch óbvio). **Não** use ` ```suggestion ` — o Azure DevOps não suporta "apply suggestion".
+`suggestedFix`: **altamente recomendado (habilita Auto-Fix)** — preencha com bloco de código por linguagem (` ```csharp `, ` ```ts `, ` ```html ` ou ` ```diff `) quando houver correção clara. **Para habilitar a correção automática, forneça um `suggestedFix` acionável mesmo que a solução seja simplesmente remover o bloco de código vulnerável.** Busque a elegância e simplicidade máxima; use `""` apenas se o achado for puramente conceitual (ex.: falta de autorização sem patch óbvio). **Não** use ` ```suggestion ` — o Azure DevOps não suporta "apply suggestion".
 
 ### Filtro de publicação (somente o que vira thread na PR)
 
@@ -84,7 +84,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 | `developerAction` | `fix-code` ou `escalate` — nunca `resolve-comment` em reviews novos |
 | `lineNumber` | Inteiro **> 0**, na linha alterada mais responsável |
 | `comment` | Objetivo, causal e profundo; sem prefixos de severidade nem blocos de código |
-| `suggestedFix` | Opcional — código elegante e minimalista (` ```csharp `/` ```ts `/` ```diff `) quando houver patch claro; `""` se conceitual |
+| `suggestedFix` | Altamente recomendado para habilitar Auto-Fix — código elegante (` ```csharp `/` ```ts `/` ```diff `), inclusive para remoção de código; `""` apenas se estritamente conceitual |
 | `analysis` | Análise profunda estruturada (Evidência, Cenário Causal, Proteções, Descartes) |
 | `impactPaths` | Arquivos lidos via tools que sustentam o achado |
 | PR limpa | `"reviews": []` + `reviewSummary` preenchido |
