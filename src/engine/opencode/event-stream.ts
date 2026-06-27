@@ -1,5 +1,6 @@
 import type { Event, GlobalEvent, OpencodeClient, Part, Permission } from '@opencode-ai/sdk';
 import path from 'node:path';
+import { env } from '../../env.js';
 import type { Logger } from '../../logger.js';
 
 export type OpencodeEventStreamOptions = {
@@ -8,9 +9,15 @@ export type OpencodeEventStreamOptions = {
   directory: string;
   logger: Logger;
   signal: AbortSignal;
+  /** Stream reasoning parts (default: env / true). */
+  streamReasoning?: boolean;
+  /** Stream assistant text parts (default: env / false). */
+  streamAssistant?: boolean;
 };
 
 type PermissionReply = 'once' | 'always' | 'reject';
+
+type TextLikePart = Extract<Part, { type: 'text' | 'reasoning' }>;
 
 export function directoriesMatch(left: string, right: string): boolean {
   return path.resolve(left) === path.resolve(right);
@@ -45,9 +52,27 @@ export function formatToolPart(part: Extract<Part, { type: 'tool' }>): string {
   return `${part.tool} — ${part.state.status}${suffix}`;
 }
 
+export function isTextLikePart(part: Part): part is TextLikePart {
+  return part.type === 'text' || part.type === 'reasoning';
+}
+
+/** Extrai chunk para stream SSE: `delta` incremental ou diff de `part.text`. */
+export function extractPartStreamChunk(
+  part: TextLikePart,
+  printedLength: number,
+  delta?: string,
+): { chunk: string; nextLength: number } | undefined {
+  if (delta) {
+    return { chunk: delta, nextLength: printedLength + delta.length };
+  }
+
+  if (!part.text || part.text.length <= printedLength) return undefined;
+  return { chunk: part.text.slice(printedLength), nextLength: part.text.length };
+}
+
 export function eventBelongsToSession(event: Event, sessionId: string): boolean {
-  const properties = event.properties as { sessionID?: string };
-  if (!properties.sessionID) {
+  const properties = event.properties as { sessionID?: string } | undefined;
+  if (!properties?.sessionID) {
     return event.type === 'session.error';
   }
   return properties.sessionID === sessionId;
@@ -55,6 +80,22 @@ export function eventBelongsToSession(event: Event, sessionId: string): boolean 
 
 function belongsToSession(event: Event, sessionId: string): boolean {
   return eventBelongsToSession(event, sessionId);
+}
+
+function parseStreamFlag(value: string | undefined, defaultValue: boolean): boolean {
+  const raw = value?.trim().toLowerCase();
+  if (!raw) return defaultValue;
+  if (raw === 'false' || raw === '0' || raw === 'off' || raw === 'no') return false;
+  if (raw === 'true' || raw === '1' || raw === 'on' || raw === 'yes') return true;
+  return defaultValue;
+}
+
+function resolveStreamReasoning(options: OpencodeEventStreamOptions): boolean {
+  return options.streamReasoning ?? parseStreamFlag(env.opencodeStreamReasoning(), true);
+}
+
+function resolveStreamAssistant(options: OpencodeEventStreamOptions): boolean {
+  return options.streamAssistant ?? parseStreamFlag(env.opencodeStreamAssistant(), false);
 }
 
 async function autoReplyPermission(
@@ -77,9 +118,10 @@ async function autoReplyPermission(
 }
 
 function handleEvent(event: GlobalEvent, options: OpencodeEventStreamOptions, streamState: StreamState): void {
-  if (!directoriesMatch(event.directory, options.directory)) return;
+  if (event.directory && !directoriesMatch(event.directory, options.directory)) return;
 
   const payload = event.payload;
+  if (!payload) return;
   if (!belongsToSession(payload, options.sessionId)) return;
 
   switch (payload.type) {
@@ -116,14 +158,21 @@ function handleEvent(event: GlobalEvent, options: OpencodeEventStreamOptions, st
         return;
       }
 
-      const delta = payload.properties.delta;
-      if (!delta) return;
+      if (!isTextLikePart(part)) return;
 
-      if (part.type === 'text') {
-        writeStreamDelta('[assistant] ', 'assistant', delta, streamState, options.logger);
-      } else if (part.type === 'reasoning') {
-        writeStreamDelta('[reasoning] ', 'reasoning', delta, streamState, options.logger);
-      }
+      const streamReasoning = resolveStreamReasoning(options);
+      const streamAssistant = resolveStreamAssistant(options);
+      if (part.type === 'reasoning' && !streamReasoning) return;
+      if (part.type === 'text' && !streamAssistant) return;
+
+      const printedLength = streamState.partChars.get(part.id) ?? 0;
+      const extracted = extractPartStreamChunk(part, printedLength, payload.properties.delta);
+      if (!extracted?.chunk) return;
+
+      streamState.partChars.set(part.id, extracted.nextLength);
+      const prefix = part.type === 'reasoning' ? '[reasoning] ' : '[assistant] ';
+      const stream = part.type === 'reasoning' ? 'reasoning' : 'assistant';
+      writeStreamDelta(prefix, stream, extracted.chunk, streamState);
       break;
     }
     default:
@@ -134,6 +183,7 @@ function handleEvent(event: GlobalEvent, options: OpencodeEventStreamOptions, st
 type StreamState = {
   lastStream: 'assistant' | 'reasoning' | 'other';
   toolStatuses: Map<string, string>;
+  partChars: Map<string, number>;
 };
 
 function writeStreamDelta(
@@ -141,7 +191,6 @@ function writeStreamDelta(
   stream: 'assistant' | 'reasoning',
   delta: string,
   state: StreamState,
-  logger: Logger,
 ): void {
   if (state.lastStream !== stream) {
     if (state.lastStream !== 'other') {
@@ -158,6 +207,7 @@ export async function consumeOpencodeEventStream(options: OpencodeEventStreamOpt
   const streamState: StreamState = {
     lastStream: 'other',
     toolStatuses: new Map(),
+    partChars: new Map(),
   };
 
   const events = await options.client.global.event({ signal: options.signal });

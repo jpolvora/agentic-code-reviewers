@@ -60,9 +60,10 @@ function resolveHostname(): string {
 
 function resolvePort(): number {
   const raw = env.opencodePort()?.trim();
-  if (!raw) return DEFAULT_PORT;
+  if (!raw || raw.toLowerCase() === 'auto') return DEFAULT_PORT;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_PORT;
+  return parsed;
 }
 
 function resolveAgentName(): string {
@@ -135,7 +136,11 @@ async function createRuntime(
 
   const hostname = resolveHostname();
   const port = resolvePort();
-  logger.info(`OpenCode: iniciando servidor embutido em ${hostname}:${port}`);
+  logger.info(
+    port === 0
+      ? `OpenCode: servidor embutido em ${hostname} (porta livre do SO)`
+      : `OpenCode: servidor embutido ${hostname}:${port} (reutiliza, sequência ou porta livre)`,
+  );
 
   const logServerOutput = resolveServerLogEnabled();
   const server = await createEmbeddedOpencodeServer({
@@ -148,7 +153,7 @@ async function createRuntime(
     logger,
   });
 
-  logger.info(`OpenCode server: ${server.url}`);
+  logger.info(`OpenCode server: ${server.url} (porta ${server.port})`);
   if (logServerOutput) {
     logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
   }

@@ -573,9 +573,12 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   const resolvedProject = resolveProject(moduleUrl, repoRootOverride);
   const repoRoot = resolvedProject.repoRoot;
 
-  const cursorApiKey = env.cursorApiKey();
-  if (!cursorApiKey) {
-    throw new Error(`${ENV.CURSOR_API_KEY} é obrigatório. Veja .env.example`);
+  const engine = parseEngine(cli.engine ?? env.engine());
+  const cursorApiKey = env.cursorApiKey() ?? '';
+  if (engine === 'cursor-sdk' && !cursorApiKey) {
+    throw new Error(
+      `${ENV.CURSOR_API_KEY} é obrigatório com engine cursor-sdk. Veja .env.example`,
+    );
   }
 
   const sourceBranch = resolveSourceBranch(cli, repoRoot);
@@ -769,8 +772,6 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
       )
     : null;
 
-  const engine = parseEngine(cli.engine ?? env.engine());
-
   return {
     repoRoot,
     cursorApiKey,
@@ -840,7 +841,7 @@ Pré-requisitos do projeto alvo (obrigatórios — o script encerra se ausentes)
   skills/CODE_REVIEW.md
   skills/SYSTEM_PROMPT.md
 
-Variáveis: credenciais ${ENV.CURSOR_API_KEY}, ${ENV.OPENCODE_API_KEY} (sem prefixo); demais com prefixo ${ENV_PREFIX}: ${ENV.ENGINE} (default: cursor-sdk),
+Variáveis: ${ENV.CURSOR_API_KEY} (engine cursor-sdk), ${ENV.OPENCODE_API_KEY} (engine opencode); demais com prefixo ${ENV_PREFIX}: ${ENV.ENGINE} (default: cursor-sdk),
   ${ENV.TARGET_BRANCH} (default: refs/heads/master),
   ${ENV.SCORE_MIN} (default: 6), ${ENV.INCLUDE_UNCOMMITTED}, ${ENV.SEED_TEST},
   ${ENV.REVIEW_SELF}, ${ENV.EXTRA_EXCLUDE_PATTERNS}, ...

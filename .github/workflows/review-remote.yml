@@ -13,8 +13,16 @@
 #   jobs:
 #     review:
 #       uses: OWNER/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+#       with:
+#         engine: cursor-sdk
 #       secrets:
 #         CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+#
+# OpenCode:
+#       with:
+#         engine: opencode
+#         model: opencode-go/deepseek-v4-flash
+#       secrets:
 #         OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 #
 # Alternativa sem reusable workflow: examples/consumer-github-workflow.yml
@@ -57,7 +65,7 @@ on:
         default: ''
     secrets:
       CURSOR_API_KEY:
-        required: true
+        required: false
       OPENCODE_API_KEY:
         required: false
 
@@ -79,29 +87,29 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate secrets
+      - name: Validate engine secret
         env:
-          CURSOR_KEY: ${{ secrets.CURSOR_API_KEY }}
-          OPENCODE_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
-          if [ -z "$CURSOR_KEY" ]; then
-            echo "::error::Secret CURSOR_API_KEY é obrigatório."
+          if [ "${{ inputs.engine }}" = "cursor-sdk" ] && [ -z "$CURSOR_API_KEY" ]; then
+            echo "::error::Secret CURSOR_API_KEY é obrigatório para engine cursor-sdk."
             exit 1
           fi
-          if [ "${{ inputs.engine }}" = "opencode" ] && [ -z "$OPENCODE_KEY" ]; then
+          if [ "${{ inputs.engine }}" = "opencode" ] && [ -z "$OPENCODE_API_KEY" ]; then
             echo "::error::Secret OPENCODE_API_KEY é obrigatório para engine opencode."
             exit 1
           fi
 
       - name: Run remote reviewer
         env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ inputs.engine }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ inputs.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REPO_URL: https://github.com/${{ inputs.runner_repository }}.git
           AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH: ${{ inputs.runner_ref }}
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          CURSOR_API_KEY: ${{ inputs.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
+          OPENCODE_API_KEY: ${{ inputs.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
           PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
           SOURCE_BRANCH: ${{ inputs.source_branch || github.head_ref }}
           TARGET_BRANCH: ${{ inputs.target_branch || github.event.pull_request.base.ref || 'main' }}

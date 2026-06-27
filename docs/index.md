@@ -113,7 +113,7 @@ cp .env.example .env
 
 | Variável | Obrigatório | Descrição |
 |----------|-------------|-----------|
-| `CURSOR_API_KEY` | Sim | API key do Cursor |
+| `CURSOR_API_KEY` | Sim (`cursor-sdk`) | API key do Cursor |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | Não* | PAT para ADO local |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | Não | Modelo (default: `composer-2.5`) |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Não | Branch de diff (default: `refs/heads/master`) |
@@ -133,7 +133,7 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | Não | Agente OpenCode na sessão (default: `explore`, read-only) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | Não | Pipe do `opencode serve` embutido (default: `true`) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | Não | Nível do servidor embutido (default: `DEBUG`) |
-| `OPENCODE_API_KEY` | Não | Chave OpenCode Go (CI / `auth.json`) |
+| `OPENCODE_API_KEY` | Sim (`opencode`) | Chave OpenCode Go (CI / `auth.json`) |
 | `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Não | Branch clonada pelo `run.sh` remoto (default: `release`) |
 | `AGENTIC_CODE_REVIEWERS_LOCAL` | Não | `1` = `run.sh --local` |
 | `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | Não | Raiz do repositório alvo |
@@ -175,7 +175,14 @@ IDs comuns: `composer-2.5`, `composer-2.5-fast`, `claude-4.6-sonnet-medium-think
 
 Com `AGENTIC_CODE_REVIEWERS_ENGINE=opencode`, o runner usa `@opencode-ai/sdk`. **Por padrão** sobe servidor embutido (`createEmbeddedOpencodeServer` → `opencode serve` em `127.0.0.1:4096`) e conecta o client — não é necessário `opencode serve` manual nem `OPENCODE_URL`.
 
-Durante `session.prompt`, o runner assina eventos SSE (`client.global.event`) e registra `[status]`, `[tool]` e deltas de texto. O stdout/stderr do processo `opencode serve` pode ser piped com `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true` (default).
+Durante `session.prompt`, o runner assina eventos SSE (`client.global.event`) e registra `[status]`, `[tool]`, `[reasoning]` (quando o modelo emite `message.part.updated` com `type: "reasoning"`) e, opcionalmente, `[assistant]`. O stdout/stderr do processo `opencode serve` pode ser piped com `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true` (default).
+
+| Variável | Default | Uso |
+|---|---|---|
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream de partes `reasoning` via SSE (`delta` ou diff de `part.text`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_ASSISTANT` | `false` | Stream de partes `text` (resposta final; pode ser JSON longo) |
+
+Nem todo modelo/provedor expõe raciocínio em stream — se só aparecem `[tool]`/`[status]`, o provider pode não emitir partes `reasoning`.
 
 ### Configuração mínima (servidor embutido)
 
@@ -481,7 +488,7 @@ Pipeline: SUCESSO (exit 0)
 
 ## Troubleshooting
 
-### `CURSOR_API_KEY é obrigatório`
+### `CURSOR_API_KEY é obrigatório` (engine cursor-sdk)
 
 1. Confirme que `.env` existe
 2. Verifique se a chave está preenchida (`CURSOR_API_KEY`)
@@ -511,7 +518,7 @@ Rode com `--verbose` e inspecione a saída bruta do agente.
 
 1. Confirme `opencode` no `PATH` e credenciais (`auth.json` ou `OPENCODE_API_KEY`)
 2. Ative logs: `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL=DEBUG` (default)
-3. Verifique porta `4096` livre ou altere `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT`
+3. Verifique porta preferida livre, use `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT=0` ou deixe o runner escolher porta livre automaticamente
 4. Em CI não interativo, não use permissões `ask` — o runner nega automaticamente na config embutida
 
 ---

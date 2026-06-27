@@ -132,7 +132,7 @@ flowchart TD
 
 ### O que é obrigatório para rodar?
 
-**Resposta:** Sempre `CURSOR_API_KEY`. PAT/OAuth só se precisar de ADO (US/Task, threads, publicação).
+**Resposta:** Com engine `cursor-sdk`: `CURSOR_API_KEY`. Com `opencode`: `OPENCODE_API_KEY` (ou `auth.json`). PAT/OAuth só se precisar de ADO (US/Task, threads, publicação).
 
 ### Preciso de PAT local?
 
@@ -144,7 +144,7 @@ flowchart TD
 
 ### Quais variáveis de ambiente são mais usadas?
 
-**Resposta:** `CURSOR_API_KEY` (obrig.), `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
+**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
 
 *Evidência:* `src/config.ts`; `test/config.test.ts`.
 
@@ -591,7 +591,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 | US/Task faz parte do system prompt? | **Não** — conteúdo dinâmico da API ADO, append no prompt composto ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)). |
 | Como configurar o modelo? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; IDs em `model.ts`. |
 | Modelo inválido na pipeline? | Macro ADO vazia cai no default; ID inexistente no enum → exit 1 na subida. |
-| Preciso de PAT local? | Só para ADO (threads/work items/publicação); dry-run básico: só `CURSOR_API_KEY`. |
+| Preciso de PAT local? | Só para ADO (threads/work items/publicação); dry-run básico: credencial da engine (`CURSOR_API_KEY` ou `OPENCODE_API_KEY`). |
 
 ---
 

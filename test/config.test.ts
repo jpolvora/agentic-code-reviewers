@@ -655,16 +655,30 @@ describe('loadConfig', () => {
     });
   });
 
-  it('mensagem de erro de API key cita nome canônico', () => {
+  it('mensagem de erro de API key cita nome canônico (cursor-sdk)', () => {
     withEnv(
       {
         CURSOR_API_KEY: undefined,
       },
       () => {
         assert.throws(
-          () => loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']),
+          () => loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--engine', 'cursor-sdk']),
           /CURSOR_API_KEY é obrigatório/,
         );
+      },
+    );
+  });
+
+  it('opencode não exige CURSOR_API_KEY', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: undefined,
+        AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--engine', 'opencode']);
+        assert.equal(config.engine, 'opencode');
+        assert.equal(config.cursorApiKey, '');
       },
     );
   });

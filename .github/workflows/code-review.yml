@@ -2,8 +2,9 @@
 # Executa via run.sh --local (checkout atual, sem clone da branch release).
 # Sequential: workflow_dispatch input ou vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE=sequential
 #
-# Secrets: CURSOR_API_KEY (obrigatório)
-#          OPENCODE_API_KEY (job opencode)
+# Secrets (por engine):
+#   cursor-sdk → CURSOR_API_KEY
+#   opencode   → OPENCODE_API_KEY
 name: Agentic Code Review
 
 on:
@@ -75,29 +76,29 @@ jobs:
       - if: matrix.engine == 'cursor-sdk'
         run: npm run typecheck
 
-      - name: Validate secrets
+      - name: Validate engine secret
         env:
-          CURSOR_KEY: ${{ secrets.CURSOR_API_KEY }}
-          OPENCODE_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
-          if [ -z "$CURSOR_KEY" ]; then
-            echo "::error::Configure CURSOR_API_KEY em Settings → Secrets."
+          if [ "${{ matrix.engine }}" = "cursor-sdk" ] && [ -z "$CURSOR_API_KEY" ]; then
+            echo "::error::Configure secret CURSOR_API_KEY em Settings → Secrets (engine cursor-sdk)."
             exit 1
           fi
-          if [ "${{ matrix.engine }}" = "opencode" ] && [ -z "$OPENCODE_KEY" ]; then
-            echo "::error::Configure OPENCODE_API_KEY em Settings → Secrets."
+          if [ "${{ matrix.engine }}" = "opencode" ] && [ -z "$OPENCODE_API_KEY" ]; then
+            echo "::error::Configure secret OPENCODE_API_KEY em Settings → Secrets (engine opencode)."
             exit 1
           fi
 
       - name: Run reviewer (${{ matrix.engine }})
         env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
+          OPENCODE_API_KEY: ${{ matrix.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
         run: |
           bash run.sh --local --gh \
             --pr-id "$PR_NUMBER" \

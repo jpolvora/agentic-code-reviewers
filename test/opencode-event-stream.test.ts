@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   directoriesMatch,
   eventBelongsToSession,
+  extractPartStreamChunk,
   formatSessionStatus,
   formatToolPart,
   permissionReplyForType,
@@ -99,5 +100,23 @@ describe('opencode event-stream', () => {
       }),
       'read — completed — Read file',
     );
+  });
+
+  it('extractPartStreamChunk usa delta ou diff de part.text', () => {
+    const part = {
+      id: 'p1',
+      sessionID: 's1',
+      messageID: 'm1',
+      type: 'reasoning' as const,
+      text: 'hello world',
+      time: { start: 0 },
+    };
+    const fromDelta = extractPartStreamChunk(part, 0, 'hello');
+    assert.deepEqual(fromDelta, { chunk: 'hello', nextLength: 5 });
+
+    const fromText = extractPartStreamChunk(part, 5, undefined);
+    assert.deepEqual(fromText, { chunk: ' world', nextLength: 11 });
+
+    assert.equal(extractPartStreamChunk(part, 11, undefined), undefined);
   });
 });

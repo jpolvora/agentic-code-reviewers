@@ -117,7 +117,7 @@ AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
 Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthropic/claude-sonnet-4-6`). Liste com `opencode models <provider>`.
 
 > [!NOTE]
-> `CURSOR_API_KEY` continua obrigatória no `loadConfig` mesmo com `opencode`; use um valor válido ou placeholder se só rodar via OpenCode local.
+> Com `opencode`, credenciais LLM ficam no servidor (`auth.json` ou `OPENCODE_API_KEY`); `CURSOR_API_KEY` não é necessária. Com `cursor-sdk`, só `CURSOR_API_KEY` é exigida.
 
 ---
 
@@ -133,7 +133,7 @@ cp .env.example .env
 
 | Variável | Padrão | Descrição |
 | :--- | :--- | :--- |
-| `CURSOR_API_KEY` | — | Chave do Cursor. Obrigatória no bootstrap. |
+| `CURSOR_API_KEY` | — | Chave do Cursor (obrigatória com engine `cursor-sdk`). |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL de servidor OpenCode **externo** (opcional). Omitir = servidor embutido (padrão). |
@@ -142,7 +142,7 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão. |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe de stdout/stderr do `opencode serve` embutido (`[opencode-server]`). |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível passado ao servidor embutido (`DEBUG` \| `INFO` \| `WARN` \| `ERROR`). |
-| `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI / auth.json). |
+| `OPENCODE_API_KEY` | — | Chave OpenCode Go (obrigatória com engine `opencode` em CI). |
 | `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | `release` | Branch clonada pelo `run.sh` em modo remoto. |
 | `AGENTIC_CODE_REVIEWERS_LOCAL` | `false` | `1` / `true` = mesmo que `run.sh --local`. |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
@@ -369,8 +369,7 @@ Após merge em **`main`**, o workflow de release:
 
 | Secret | Job |
 | :--- | :--- |
-| `CURSOR_API_KEY` | Ambos (validação no bootstrap) |
-| `GITHUB_TOKEN` | Automático no workflow (`permissions`) |
+| `CURSOR_API_KEY` | Job `cursor-sdk` |
 | `OPENCODE_API_KEY` | Job `opencode` |
 
 #### Em repositórios consumidores
@@ -495,7 +494,7 @@ Ver [`examples/consumer-github-workflow.yml`](examples/consumer-github-workflow.
 ```
 
 > [!IMPORTANT]
-> `CURSOR_API_KEY` é obrigatória no bootstrap. Com `opencode`, credenciais LLM ficam no servidor (`auth.json` ou `OPENCODE_API_KEY`); o runner sobe o servidor embutido por padrão.
+> Com `opencode`, credenciais LLM ficam no servidor (`auth.json` ou `OPENCODE_API_KEY`); o runner sobe o servidor embutido por padrão. Com `cursor-sdk`, configure `CURSOR_API_KEY`.
 
 ---
 
