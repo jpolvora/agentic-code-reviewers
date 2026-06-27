@@ -1,6 +1,6 @@
 import { AdoClient } from './client.js';
 import { commentHasBotTag } from './utils.js';
-import { isAgenticReviewerComment } from '../bot-tag.js';
+
 import type { AdoThreadsResponse, CodeReviewItem } from './types.js';
 
 /** Marcador HTML da thread (geral) que persiste o contador de rodadas de review. */
@@ -47,7 +47,7 @@ export function parseRoundStateFromThreads(
     const botComment = thread.comments.find(
       (comment) =>
         !comment.isDeleted &&
-        isAgenticReviewerComment(comment.content) &&
+        commentHasBotTag(comment.content, botTag, 'contains') &&
         comment.content.includes(ROUND_STATE_MARKER),
     );
     if (!botComment) {

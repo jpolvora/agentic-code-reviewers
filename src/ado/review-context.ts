@@ -18,7 +18,21 @@ import type {
   ReviewContextResult,
 } from './types.js';
 
+const LEGACY_BOT_TAG_PREFIX = '[Cursor Reviewer]';
+
+function isRunnerComment(content: string): boolean {
+  if (!content) return false;
+  return isAgenticReviewerComment(content) || content.includes(LEGACY_BOT_TAG_PREFIX);
+}
+
+function extractRunnerBotTagLine(content: string): string | null {
+  const agenticTag = extractAgenticBotTagLine(content);
+  if (agenticTag) return agenticTag;
+  return content.includes(LEGACY_BOT_TAG_PREFIX) ? LEGACY_BOT_TAG_PREFIX : null;
+}
+
 export function getReviewSummaryFromComment(content: string, botTag: string): string {
+
   let summary = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
   summary = summary.replace(/```[\s\S]*?```/g, '');
   summary = summary.replaceAll(botTag, '');
@@ -63,8 +77,9 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
     }
 
     const rawContent = firstComment.content;
-    const isBot = isAgenticReviewerComment(rawContent);
-    const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
+    const isBot = isRunnerComment(rawContent);
+    const detectedBotTag = isBot ? extractRunnerBotTagLine(rawContent) : null;
+
     const summary = getReviewSummaryFromComment(rawContent, botTag);
 
     pending.push({
@@ -306,7 +321,8 @@ export function testReviewSummaryAlreadyPosted(
     }
 
     for (const comment of thread.comments) {
-      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) {
+      if (comment.isDeleted || !isRunnerComment(comment.content)) {
+
         continue;
       }
       if (!comment.content.includes(REVIEW_SUMMARY_MARKER)) {
