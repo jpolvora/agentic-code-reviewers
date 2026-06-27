@@ -74,7 +74,7 @@ export function formatRawEventForLog(raw: unknown): string {
   if (raw === undefined) return 'undefined';
   if (typeof raw === 'string') return raw;
   try {
-    return JSON.stringify(raw);
+    return JSON.stringify(raw, null, 2);
   } catch {
     return String(raw);
   }
@@ -231,7 +231,7 @@ export async function consumeOpencodeEventStream(options: OpencodeEventStreamOpt
   for await (const raw of events.stream) {
     if (options.signal.aborted) break;
     if (!isGlobalEvent(raw)) {
-      options.logger.warn(`OpenCode: evento ignorado (formato inesperado): ${formatRawEventForLog(raw)}`);
+      options.logger.warn(`OpenCode: evento ignorado (formato inesperado):\n${formatRawEventForLog(raw)}`);
       continue;
     }
     handleEvent(raw, options, streamState);

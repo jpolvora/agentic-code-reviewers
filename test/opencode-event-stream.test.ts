@@ -109,7 +109,7 @@ describe('opencode event-stream', () => {
     assert.equal(formatRawEventForLog('ping'), 'ping');
     assert.equal(
       formatRawEventForLog({ payload: { type: 'session.idle' } }),
-      '{"payload":{"type":"session.idle"}}',
+      '{\n  "payload": {\n    "type": "session.idle"\n  }\n}',
     );
   });
 
