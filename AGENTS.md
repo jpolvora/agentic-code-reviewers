@@ -84,7 +84,7 @@ O runner rastreia iterações pelo marcador `<!-- reviewer-round-state -->`. Ao 
 - Publique apenas `critical` (segurança ou quebra de invariantes de negócio).
 - O runner adicionará aviso de handoff para revisão humana na PR.
 
-O runner se autoexclui do diff por padrão (evita loops). Defina `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` para revisar o próprio codebase.
+O runner se autoexclui do diff por padrão (evita loops). Defina `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` para revisar o próprio codebase — inclui a pasta do runner no diff e mescla `**/*.yml`, `**/*.yaml`, `**/*.sh` aos includes da stack (salvo `INCLUDE_PATTERNS` explícito).
 
 ### Variáveis de ambiente
 

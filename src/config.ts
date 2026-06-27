@@ -228,6 +228,10 @@ export interface CliArgs {
 }
 
 const DEFAULT_INCLUDE = ['**/*.cs', '**/*.ts', '**/*.html', '*.cs', '*.ts', '*.html'];
+
+/** Globs extras no diff quando REVIEW_SELF=true (CI, scripts) — mesclados à stack se INCLUDE_PATTERNS não for explícito. */
+export const SELF_REVIEW_INCLUDE_EXTRA = ['**/*.yml', '**/*.yaml', '**/*.sh'] as const;
+
 const DEFAULT_MODEL = DEFAULT_CURSOR_REVIEWER_MODEL;
 
 const BASE_EXCLUDE = ['*/proxy/*', '*/bin/*', '*/obj/*', '*.md', '*.csproj', 'secret.txt'];
@@ -285,6 +289,21 @@ function parseCsvPatterns(value: string | undefined): string[] {
     .split(',')
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+/** Mescla padrões da stack com CI/scripts quando o runner revisa a si mesmo. */
+export function mergeIncludePatternsForSelfReview(
+  base: string[],
+  reviewSelf: boolean,
+): string[] {
+  if (!reviewSelf) return base;
+  const merged = [...base];
+  for (const pattern of SELF_REVIEW_INCLUDE_EXTRA) {
+    if (!merged.includes(pattern)) {
+      merged.push(pattern);
+    }
+  }
+  return merged;
 }
 
 function resolveExcludePatterns(repoRoot: string, runnerRoot: string): string[] {
@@ -733,6 +752,12 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     }
   } else {
     includePatterns = stackConfig.name === 'Custom' ? ['**/*'] : stackConfig.includePatterns;
+  }
+
+  const reviewSelf = parseBool(env.reviewSelf(), false);
+  const explicitIncludePatterns = Boolean(includePatternsVal && !includePatternsResetByFallback);
+  if (reviewSelf && !explicitIncludePatterns) {
+    includePatterns = mergeIncludePatternsForSelfReview(includePatterns, true);
   }
 
   const stackPromptPath = stackConfig.promptFileName

@@ -724,4 +724,35 @@ describe('loadConfig', () => {
       },
     );
   });
+
+  it('REVIEW_SELF=true mescla yml/yaml/sh nos includePatterns da stack', () => {
+    withEnv(
+      {
+        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true',
+        AGENTIC_CODE_REVIEWERS_STACK: 'TypeScript',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.ok(config.includePatterns.includes('**/*.ts'));
+        assert.ok(config.includePatterns.includes('**/*.yml'));
+        assert.ok(config.includePatterns.includes('**/*.yaml'));
+        assert.ok(config.includePatterns.includes('**/*.sh'));
+      },
+    );
+  });
+
+  it('REVIEW_SELF=true não altera INCLUDE_PATTERNS explícito', () => {
+    withEnv(
+      {
+        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true',
+        AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS: '**/*.py',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.deepEqual(config.includePatterns, ['**/*.py']);
+      },
+    );
+  });
 });
