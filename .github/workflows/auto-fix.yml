@@ -162,6 +162,19 @@ jobs:
             exit 0
           fi
 
+          BRANCH="${{ steps.pr-info.outputs.source_branch }}"
+          if [ "$CURSOR_EXPECTED" = "true" ] && [ "$OPENCODE_EXPECTED" = "true" ]; then
+            if [ "${{ steps.autofix-cursor.outcome }}" = "failure" ] && [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
+              git fetch origin "$BRANCH"
+              LOCAL=$(git rev-parse HEAD)
+              REMOTE=$(git rev-parse "origin/$BRANCH")
+              if [ "$LOCAL" != "$REMOTE" ]; then
+                echo "::error::cursor-sdk falhou e opencode não publicou commit pendente — PR/remoto inconsistentes."
+                exit 1
+              fi
+            fi
+          fi
+
           if [ "${{ steps.autofix-cursor.outcome }}" = "success" ] || [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
             exit 0
           fi

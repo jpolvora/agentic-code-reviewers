@@ -42,7 +42,8 @@ Se a resolução falhar (token, permissão), o commit local é preservado e o pu
 ### 4. Concorrência e Execução Sequencial (Sem sobreposição)
 
 - **`concurrency` por PR** no job (`auto-fix-<pr_number>`) — execuções sobrepostas enfileiradas.
-- **Engines sequenciais:** cursor-sdk → sync condicional (preserva commits locais não enviados) → opencode.
+- **Engines sequenciais:** cursor-sdk → sync condicional (preserva commits locais não enviados) → opencode. Se opencode não encontrar threads ativas, tenta **recovery push** do commit pendente do engine anterior.
+- **Gate final dual-engine:** falha se cursor-sdk falhou, opencode terminou em verde e HEAD local ≠ remoto.
 - **Resolução parcial:** só threads cuja linha teve conteúdo alterado.
 - **Falha explícita** se todos os engines configurados falharem.
 

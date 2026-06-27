@@ -332,6 +332,47 @@ describe('runAutoFixFlow', () => {
     assert.equal(content, 'linha 1\nlinha 2\nlinha 3');
   });
 
+  it('recovery: publica commit pendente quando não há threads ativas (dual-engine)', async () => {
+    const tmpDir = setupTempWorkspace();
+    execSync('git push -u origin master', { cwd: tmpDir, stdio: 'ignore' });
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2 alterada\nlinha 3');
+    execSync('git add file.txt && git commit -m "pending from prior engine"', {
+      cwd: tmpDir,
+      stdio: 'ignore',
+    });
+
+    const remoteBefore = execSync('git ls-remote origin refs/heads/master', {
+      cwd: tmpDir,
+      encoding: 'utf8',
+    })
+      .trim()
+      .split('\t')[0];
+
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = { activeThreads: [] } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+    } as any;
+    const engine = {
+      run: mock.fn(async () => {
+        throw new Error('engine não deve rodar sem threads');
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(engine.run.mock.callCount(), 0);
+    const remoteAfter = execSync('git ls-remote origin refs/heads/master', {
+      cwd: tmpDir,
+      encoding: 'utf8',
+    })
+      .trim()
+      .split('\t')[0];
+    assert.notEqual(remoteBefore, remoteAfter);
+    const localHead = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf8' }).trim();
+    assert.equal(localHead, remoteAfter);
+  });
+
   it('falha quando push falha após resolução bem-sucedida', async () => {
     const tmpDir = setupTempWorkspace();
     execSync('git remote remove origin', { cwd: tmpDir, stdio: 'ignore' });

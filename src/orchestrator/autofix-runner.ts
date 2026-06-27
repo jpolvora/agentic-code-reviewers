@@ -6,7 +6,7 @@ import type { PlatformProvider } from '../provider/types.js';
 import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
-import { commitAutoFixChanges, pushAutoFixChanges } from '../git/autofix-commit.js';
+import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
@@ -144,6 +144,21 @@ async function mapPool<T, R>(
   return buckets.flat();
 }
 
+/** Dual-engine sequencial: publica commit deixado pelo engine anterior quando threads já foram resolvidas. */
+async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Promise<void> {
+  if (config.dryRun || !isLocalAheadOfRemote(config.repoRoot)) {
+    return;
+  }
+
+  logger.section('Recovery: publicando commit pendente do engine anterior');
+  const pushed = await pushAutoFixChanges(config, logger);
+  if (!pushed) {
+    throw new Error(
+      'Recovery dual-engine: falha ao publicar commit local pendente (threads já resolvidas por engine anterior).',
+    );
+  }
+}
+
 export async function runAutoFixFlow(
   config: ReviewerConfig,
   reviewContext: ReviewContextResult,
@@ -154,6 +169,7 @@ export async function runAutoFixFlow(
   const activeThreads = reviewContext.activeThreads || [];
   if (activeThreads.length === 0) {
     logger.info('Nenhuma thread ativa/aberta para correção automática.');
+    await tryRecoverPendingPush(config, logger);
     return;
   }
 

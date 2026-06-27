@@ -27,6 +27,22 @@ export function buildAutoFixCommitMessage(config: ReviewerConfig): string {
   return 'fix(review): apply auto-fixes for active review threads';
 }
 
+/** HEAD local à frente de origin/<branch> (commit pendente de push). */
+export function isLocalAheadOfRemote(repoRoot: string): boolean {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
+    if (branch === 'HEAD') return false;
+    execSync(`git fetch origin ${branch}`, { cwd: repoRoot, stdio: 'ignore' });
+    const local = execSync('git rev-parse HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
+    const remote = execSync(`git rev-parse origin/${branch}`, { cwd: repoRoot, encoding: 'utf8' }).trim();
+    if (local === remote) return false;
+    execSync(`git merge-base --is-ancestor ${remote} ${local}`, { cwd: repoRoot, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Stage + commit local; não faz push (gate cooperativo: push após resolução de threads). */
 export async function commitAutoFixChanges(
   config: ReviewerConfig,

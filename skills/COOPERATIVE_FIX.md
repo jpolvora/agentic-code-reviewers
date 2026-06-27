@@ -47,6 +47,8 @@ Ordem **obrigatória** em ambos os runtimes:
 
 Se o passo 6 falhar (token, permissão, thread não encontrada): **não fazer push**. Deixe o commit local para inspeção ou push manual.
 
+**Dual-engine sequencial (CI):** se o engine anterior resolveu threads mas o push falhou, o engine seguinte (sem threads ativas) deve tentar **recovery push** do commit local pendente antes de encerrar.
+
 ---
 
 ## Resposta na thread (paridade com code review)
