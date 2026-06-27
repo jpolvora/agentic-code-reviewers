@@ -11,7 +11,7 @@ import {
   type SafeOutputOptions,
 } from './safe-outputs.js';
 import { normalizeFilePath, reviewDedupKey as pathLineDedupKey } from './utils.js';
-import { RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER } from '../git/markers.js';
+import { CLEAN_PR_SUMMARY_MESSAGE, RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER } from '../git/markers.js';
 import { testReviewSummaryAlreadyPosted } from './review-context.js';
 import type {
   ActiveThreadInfo,
@@ -100,35 +100,22 @@ export function parseCodeReviewResponse(
 
 export { isPublishableReview };
 
-export function getCodeReviewPostingPlan(
-  parsed: ParsedCodeReviewResponse,
-  hasExternalPendingThreads: boolean,
-): PostingPlan {
-  // `parsed.reviews` já passou pelo gate autoritativo em parseCodeReviewResponse
-  // (filterPublishableReviews). O filtro defensivo final fica em setPullRequestComments,
-  // no boundary de POST do ADO.
-  const reviews = parsed.reviews;
-  let summary = parsed.reviewSummary;
-
-  if (reviews.length > 0 && summary.trim()) {
-    if (parsed.hasCriticalReviews) {
-      console.warn('Policy: reviewSummary ignored because critical reviews are present.');
-      summary = '';
-    } else {
-      console.warn(
-        `Policy: agent returned reviews and reviewSummary together; keeping ${reviews.length} review(s), clearing reviewSummary.`,
-      );
-      summary = '';
-    }
-  }
-
-  const canPostSummary =
-    summary.trim().length > 0 && !parsed.hasCriticalReviews && reviews.length === 0 && !hasExternalPendingThreads;
-
+/** Plano de publicação de reviews (score ≥ scoreMin já aplicado em `parsed.reviews`). */
+export function getCodeReviewPostingPlan(parsed: ParsedCodeReviewResponse): Pick<PostingPlan, 'reviewsJson'> {
   return {
-    reviewsJson: JSON.stringify({ reviews }),
-    reviewSummary: summary,
-    postSummary: canPostSummary,
+    reviewsJson: JSON.stringify({ reviews: parsed.reviews }),
+  };
+}
+
+/**
+ * Comentário de resumo na PR — somente no fim do review, quando não restam threads
+ * ativas/pendentes do bot (auto-fix e convergência dependem de threads, não do JSON).
+ */
+export function shouldPostReviewSummary(hasBotPendingThreads: boolean): Pick<PostingPlan, 'reviewSummary' | 'postSummary'> {
+  const postSummary = !hasBotPendingThreads;
+  return {
+    reviewSummary: postSummary ? CLEAN_PR_SUMMARY_MESSAGE : '',
+    postSummary,
   };
 }
 

@@ -3,6 +3,7 @@ import {
   getCodeReviewPostingPlan,
   getNewReviewsFromPlan,
   parseCodeReviewResponse,
+  shouldPostReviewSummary,
   simulateThreadResolution,
   type SafeOutputOptions,
 } from './ado/post-comments.js';
@@ -313,7 +314,7 @@ async function main(): Promise<void> {
 
   const gatePendingBeforePost = filterGatePendingThreads(reviewContext.pendingThreads, config.botTag);
   const wouldPostReviewsPre = getNewReviewsFromPlan(
-    getCodeReviewPostingPlan(parsed, gatePendingBeforePost.length > 0).reviewsJson,
+    getCodeReviewPostingPlan(parsed).reviewsJson,
     reviewContext.existingKeys,
     config.scoreMin,
   );
@@ -344,7 +345,7 @@ async function main(): Promise<void> {
 
   const wouldPostReviews = escalate
     ? getNewReviewsFromPlan(
-        getCodeReviewPostingPlan(effectiveParsed, gatePendingBeforePost.length > 0).reviewsJson,
+        getCodeReviewPostingPlan(effectiveParsed).reviewsJson,
         reviewContext.existingKeys,
         config.scoreMin,
       )
@@ -406,8 +407,7 @@ async function main(): Promise<void> {
       reviewContext.pendingThreads = afterResolve.pendingThreads;
     }
 
-    const gatePendingBeforePost = filterGatePendingThreads(reviewContext.pendingThreads, config.botTag);
-    const postingPlan = getCodeReviewPostingPlan(effectiveParsed, gatePendingBeforePost.length > 0);
+    const postingPlan = getCodeReviewPostingPlan(effectiveParsed);
 
     logger.section('Publicando comentários na PR');
     const postedThreads = await provider.setPullRequestComments(
@@ -418,31 +418,28 @@ async function main(): Promise<void> {
     );
     postedReviews = postedThreads.map((item) => item.review);
 
-    const gateBeforeSummary = evaluateGate({
-      newReviews: postedReviews,
-      resolvedCount,
-      pendingThreads: gatePendingBeforePost,
-    });
-
-    if (postingPlan.postSummary && !gateBeforeSummary.shouldFail) {
-      logger.section('Publicando resumo final');
-      await provider.setPullRequestReviewSummary(
-        config.botTag,
-        postingPlan.reviewSummary,
-        reviewContext.allThreads,
-        (msg) => logger.info(msg),
-      );
-    } else if (postingPlan.reviewSummary.trim()) {
-      logger.info('Skipping final review summary (issues pendentes ou reviews novos).');
-    } else {
-      logger.info('Skipping final review summary (empty summary or critical issues remain).');
-    }
-
     const refreshedContext = await provider.getPullRequestReviewContext(
       config.botTag,
       (msg) => logger.debug(msg),
     );
     pendingThreads = refreshedContext.pendingThreads;
+
+    const gatePendingAfterPost = filterGatePendingThreads(pendingThreads, config.botTag);
+    const summaryPlan = shouldPostReviewSummary(gatePendingAfterPost.length > 0);
+
+    if (summaryPlan.postSummary) {
+      logger.section('Publicando resumo final');
+      await provider.setPullRequestReviewSummary(
+        config.botTag,
+        summaryPlan.reviewSummary,
+        refreshedContext.allThreads,
+        (msg) => logger.info(msg),
+      );
+    } else {
+      logger.info(
+        `Skipping final review summary (${gatePendingAfterPost.length} active/pending bot thread(s) remain).`,
+      );
+    }
 
     // Persiste o contador de rodadas (e o aviso de escalonamento) quando houve
     // alguma issue nesta rodada — garante a convergência do loop fix→review.

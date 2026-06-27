@@ -16,6 +16,12 @@ O ciclo de Auto-Fix envolve a coordenação de duas pipelines separadas: a **rev
    - Gera commit local, resolve threads e faz push (gate cooperativo — ver [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md)).
 5. **Re-avaliação (O Loop):** O *push* gerado pelo Auto-Fix re-aciona a pipeline de Code Review (passo 2). O revisor avalia o novo código. Se a thread foi consertada, ele a marca como resolvida. Caso contrário, deixa novos apontamentos.
 
+## Threads, score_min e resumo final
+
+- **Auto-fix só enxerga threads** na PR — achados precisam ser publicados como thread para entrar no loop.
+- **`AGENTIC_CODE_REVIEWERS_SCORE_MIN`** define o que vira thread: somente reviews com `score ≥ scoreMin` são publicados.
+- O **comentário de resumo** (“PR pronta para merge”) só é postado **no fim** de uma rodada de review, quando **não restam** threads ativas/pendentes do bot — sinalizando que o ciclo convergiu.
+
 ## Proteções do Sistema
 
 Um ciclo contínuo de máquina (avaliação e correção) levanta a preocupação com **loops infinitos** e **concorrência**. O sistema já foi desenhado com proteções contra esses cenários:

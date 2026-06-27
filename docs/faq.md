@@ -465,9 +465,9 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Como funciona a política `reviews` vs `reviewSummary`?
 
-**Resposta:** Se `reviews` e `reviewSummary` juntos → mantém reviews, limpa summary. Reviews com `critical` + summary → summary ignorado. Sem reviews, sem críticos, sem threads pendentes do bot → publica `reviewSummary` (thread **fechada**).
+**Resposta:** `score_min` define quais achados viram **threads** na PR (auto-fix lê só threads). O comentário de resumo é publicado **no final** do review, após resolver/publicar threads, quando **não restam** threads ativas/pendentes do bot — mensagem fixa (`CLEAN_PR_SUMMARY_MESSAGE`); texto do LLM ignorado.
 
-*Evidência:* `getCodeReviewPostingPlan` em `src/ado/post-comments.ts`.
+*Evidência:* `shouldPostReviewSummary` e `getCodeReviewPostingPlan` em `src/ado/post-comments.ts`; `src/index.ts` (refresh antes do resumo).
 
 ### O que aparece na build do Azure DevOps?
 

@@ -97,7 +97,8 @@ O runner publica threads na PR mas **não reprova a build** (exit 0). Desenvolve
 - **Dry-run:** simula sem POST real; exit 0
 - **Dedup:** chave `arquivoNormalizado\|line:N`
 - **Resolução:** match por `threadId` ou `fileName`+`lineNumber`
-- **ReviewSummary:** publicado só quando PR limpa (sem issues novas nem pendentes)
+- **Threads:** publicadas quando `score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6) — critério para auto-fix enxergar issues
+- **ReviewSummary:** publicado **no fim** do review, só quando **zero** threads ativas/pendentes do bot; mensagem fixa: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`
 
 | Exit code | Significado |
 |-----------|-------------|
@@ -423,7 +424,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 ```
 [Cursor Reviewer]
 <!-- review-summary -->
-Revisão concluída sem apontamentos.
+Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
 ```
 
 ---

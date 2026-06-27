@@ -253,14 +253,17 @@ Exit codes:
 
 ## Pós-parse: políticas de publicação
 
-`getCodeReviewPostingPlan`:
+**Threads de review:** `score_min` (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`) define o que vira thread — somente reviews com `score ≥ scoreMin` passam em `parseCodeReviewResponse` e são publicados via `setPullRequestComments`. Issues abaixo do limiar não viram thread (auto-fix não as enxerga).
+
+**Comentário de resumo (`shouldPostReviewSummary`):** avaliado **no fim** do review, após resolver threads e publicar novas, com refresh do contexto da PR:
 
 | Condição | Comportamento |
 |----------|---------------|
-| `reviews` + `reviewSummary` juntos | Mantém reviews; limpa summary |
-| Reviews com `critical` + summary | Summary ignorado |
-| Sem reviews, sem críticos, sem threads pendentes do bot | Publica `reviewSummary` (thread **closed**) |
-| Threads pendentes do bot | Não publica summary positivo |
+| Threads ativas/pendentes do bot após o refresh final | **Sem** comentário de resumo |
+| Zero threads ativas/pendentes do bot | Publica thread **closed** com mensagem padronizada em PT |
+| `reviewSummary` do LLM | **Ignorado** — runner nunca publica texto do agente |
+
+`getCodeReviewPostingPlan` monta apenas o `reviewsJson` para publicação.
 
 ### Dedup
 
@@ -368,7 +371,7 @@ Resumo positivo (PR limpa):
 [Cursor Reviewer]
 <!-- review-summary -->
 
-Revisão concluída sem apontamentos. ...
+Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
 ```
 
 ---
