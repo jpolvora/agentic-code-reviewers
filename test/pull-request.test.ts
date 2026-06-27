@@ -27,7 +27,8 @@ describe('buildPullRequestContextForLlm', () => {
 
     assert.ok(context.includes('**Pull Request ID:** #789'));
     assert.ok(context.includes('IDs numéricos de Work Items'));
-    assert.ok(context.includes('**Título:** Equipamentos Florestais'));
+    assert.ok(context.includes('<<<USER_PROVIDED_CONTENT>>>'));
+    assert.ok(context.includes('Equipamentos Florestais'));
     assert.ok(context.includes('Descrição curta'));
   });
 });

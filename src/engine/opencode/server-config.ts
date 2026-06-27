@@ -1,6 +1,8 @@
 import type { Config } from '@opencode-ai/sdk';
 import { env } from '../../env.js';
 import { resolveOpencodeHarnessInstructions } from './harness-instructions.js';
+import type { ReviewerConfig } from '../../config.js';
+import { buildOpencodeMcpInstructions } from '../../mcp/mcp-prompt.js';
 
 export type OpencodeLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
@@ -19,12 +21,13 @@ export function resolveServerLogLevel(): OpencodeLogLevel | undefined {
 }
 
 /** Config inline do servidor embutido (modelo, harness do projeto, sandbox read-only). */
-export function buildOpencodeServerConfig(model: string): Config {
+export function buildOpencodeServerConfig(model: string, config?: ReviewerConfig): Config {
   const logLevel = resolveServerLogLevel();
+  const mcpInstructions = config ? buildOpencodeMcpInstructions(config) : [];
   return {
     model,
     ...(logLevel ? { logLevel } : {}),
-    instructions: [...resolveOpencodeHarnessInstructions()],
+    instructions: [...resolveOpencodeHarnessInstructions(), ...mcpInstructions],
     permission: {
       edit: 'deny' as const,
       bash: 'deny' as const,

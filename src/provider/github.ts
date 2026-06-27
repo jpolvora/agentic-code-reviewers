@@ -9,7 +9,9 @@ import {
   isDuplicateReview,
   isPublishableReview,
   matchesResolvedItem,
+  type SafeOutputOptions,
 } from '../ado/post-comments.js';
+import { filterSafeOutputs } from '../ado/safe-outputs.js';
 import {
   buildRoundStateComment,
   ROUND_STATE_MARKER,
@@ -22,6 +24,7 @@ import {
   RESOLUTION_MARKER,
   REVIEW_SUMMARY_MARKER,
 } from '../git/markers.js';
+import { sanitizeUserProvidedContent } from '../agent/input-sanitization.js';
 import { GithubClient, isGithubIntegrationAccessError } from './github-client.js';
 import type { PlatformProvider } from './types.js';
 import type {
@@ -66,9 +69,11 @@ export class GithubProvider implements PlatformProvider {
         '',
         `> **Pull Request ID:** #${this.config.pullRequestId} — use **somente este número** ao referenciar a PR.`,
         '',
-        `**Título:** ${title}`,
-        body ? `\n**Descrição:**\n${body}` : '',
-      ].join('\n');
+        title ? sanitizeUserProvidedContent('Título da PR', title, 500) : '',
+        body ? sanitizeUserProvidedContent('Descrição da PR', body) : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
       log?.(`Iniciando revisão somente leitura da PR #${this.config.pullRequestId} sobre ${title}.`);
       return {
@@ -372,12 +377,16 @@ These issues were reported in a previous round and already resolved/closed. Do *
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
+    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]> {
     const posted: PostedReviewThread[] = [];
     const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
-    const reviews = (reviewsObject.reviews ?? []).filter((review) =>
+    let reviews = (reviewsObject.reviews ?? []).filter((review) =>
       isPublishableReview(review, this.config.scoreMin),
     );
+    if (safeOptions) {
+      reviews = filterSafeOutputs(reviews, safeOptions);
+    }
     const newReviews = reviews.filter((review) => !isDuplicateReview(review, existingKeys));
 
     if (newReviews.length === 0) {

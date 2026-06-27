@@ -78,6 +78,19 @@ Achados que violarem qualquer regra abaixo são descartados automaticamente:
 | `analysis` | Obrigatório com as 4 etapas da prova estruturada. |
 | `impactPaths` | Array com ao menos um arquivo lido que sustente a investigação. |
 
+### Safe Outputs (`src/ado/safe-outputs.ts`)
+
+Após `isPublishableReview`, o gate **Safe Outputs** (default ON via `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS`) aplica validação determinística adicional:
+
+| Regra | Descrição |
+|---|---|
+| Diff-line anchoring | `lineNumber` deve estar em linha alterada do diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
+| Protected paths | Bloqueia reviews referenciando CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
+| Severity ↔ score | Coerência obrigatória (`critical` 9–10, `warning` 6–8, `suggestion` 6–7) |
+| Analysis structure | Quatro seções numeradas (Evidência, Cenário, Proteção, Descarte) |
+| Size limits | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` (default 8000) |
+| Secrets / markdown | Bloqueia padrões de credencial e HTML/script perigoso |
+
 ### Rodadas e escalonamento
 O runner rastreia iterações pelo marcador `<!-- reviewer-round-state -->`. Ao exceder `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (padrão: 5):
 - Suprima achados `warning` e `suggestion`.
@@ -106,7 +119,7 @@ Todas as variáveis do runner usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exce
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir runner no diff (CI deste repo) |
 
-**Avançadas** (defaults OK — ver README § Configuração avançada): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
+**Avançadas** (defaults OK — ver README § Configuração avançada): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
 
 **Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
@@ -141,7 +154,9 @@ Lista completa: [`.env.example`](.env.example), [`README.md`](README.md), [`docs
 | `examples/consumer-github-workflow.yml` | Template copy-paste para consumidores GitHub. |
 | `src/agent/runner.ts` | Constrói o prompt e delega ao `ExecutionEngine` injetado. |
 | `src/provider/` | Interface `PlatformProvider` + implementações `AdoProvider` e `GithubProvider`. |
-| `src/ado/` | Gate (`gate.ts`), validação (`review-validation.ts`), formatação (`format-thread.ts`), rodadas (`round-state.ts`). |
+| `src/ado/` | Gate (`gate.ts`), validação (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatação (`format-thread.ts`), rodadas (`round-state.ts`). |
+| `src/orchestrator/` | Paralelismo in-process (`parallel-runner.ts`), merge (`merge-reviews.ts`), meta-reviewer opcional. |
+| `src/mcp/` | Ferramentas read-only de contexto (`review-tools.ts`) e injeção no prompt. |
 | `skills/stacks/` | Recomendações por stack em Markdown (carregadas pelo runner). |
 | `skills/SYSTEM_PROMPT.md` | Contrato JSON, score, severity, política de publicação. |
 | `skills/CODE_REVIEW.md` | Harness genérico de code review (injetado no prompt). |

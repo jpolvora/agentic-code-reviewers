@@ -11,6 +11,7 @@ import {
 } from '../ado/post-comments.js';
 import { parseRoundStateFromThreads, persistRoundState } from '../ado/round-state.js';
 import { emitPipelineReviewOutput } from '../ado/pipeline-logging.js';
+import type { SafeOutputOptions } from '../ado/safe-outputs.js';
 import type { PlatformProvider } from './types.js';
 import type {
   ActiveThreadInfo,
@@ -69,6 +70,7 @@ export class AdoProvider implements PlatformProvider {
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
+    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]> {
     return setPullRequestComments(
       this.ado,
@@ -78,6 +80,7 @@ export class AdoProvider implements PlatformProvider {
       existingKeys,
       log,
       this.config.scoreMin,
+      safeOptions,
     );
   }
 

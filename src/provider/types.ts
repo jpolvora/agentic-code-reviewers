@@ -8,6 +8,7 @@ import type {
   ReviewContextResult,
   PostedReviewThread,
 } from '../ado/types.js';
+import type { SafeOutputOptions } from '../ado/safe-outputs.js';
 import type { RoundStateLocation, RoundStateCommentInput } from '../ado/round-state.js';
 
 export interface PlatformProvider {
@@ -44,6 +45,7 @@ export interface PlatformProvider {
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
+    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]>;
 
   setPullRequestReviewSummary(

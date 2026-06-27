@@ -1,6 +1,7 @@
 
 import { AdoClient } from './client.js';
 import { stripHtml } from './utils.js';
+import { sanitizeUserProvidedContent } from '../agent/input-sanitization.js';
 import type { AdoWorkItemsResponse } from './types.js';
 
 export interface WorkItemSummary {
@@ -126,12 +127,12 @@ function formatWorkItemSection(workItem: { id: number; fields: Record<string, un
 
   const description = getFieldText(fields, 'System.Description');
   if (description) {
-    section += `\n\n**Description:**\n${description}`;
+    section += `\n\n${sanitizeUserProvidedContent(`Work Item #${workItem.id} — Description`, description)}`;
   }
 
   const acceptanceCriteria = getFieldText(fields, 'Microsoft.VSTS.Common.AcceptanceCriteria');
   if (acceptanceCriteria) {
-    section += `\n\n**Acceptance Criteria:**\n${acceptanceCriteria}`;
+    section += `\n\n${sanitizeUserProvidedContent(`Work Item #${workItem.id} — Acceptance Criteria`, acceptanceCriteria)}`;
   }
 
   return section;

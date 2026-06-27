@@ -2,6 +2,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import type { ReviewerConfig } from '../config.js';
 import type { DiffPromptSection } from '../git/diff-prompt.js';
 import type { LocalReviewGitContext } from '../git/diff.js';
+import { loadPromptModuleContents, selectPromptModuleIds } from './prompt-modules.js';
+import { buildMcpPromptSection, prefetchMcpObservations } from '../mcp/mcp-prompt.js';
 
 export interface PromptContext {
   workItemContext: string;
@@ -57,7 +59,7 @@ function buildDiffSection(diffSection: DiffPromptSection): string[] {
   ];
 }
 
-function buildExecutionContext(config: ReviewerConfig, context: PromptContext): string[] {
+export function buildExecutionContext(config: ReviewerConfig, context: PromptContext): string[] {
   const sourceRef = context.gitContext.sourceBranch;
   const targetRef = context.gitContext.targetBranch;
   const diffRange = context.gitContext.diffRange;
@@ -248,6 +250,25 @@ export function buildAgentPrompt(config: ReviewerConfig, context: PromptContext)
       stackPromptContent,
       '',
     );
+  }
+
+  const moduleIds = selectPromptModuleIds(context.diffStats.files, config.promptModules ?? []);
+  const moduleContents = loadPromptModuleContents(config.runnerRoot, moduleIds);
+  if (moduleContents.length > 0) {
+    sections.push(
+      '---',
+      '',
+      '# Diretivas por tipo de alteração',
+      '',
+      moduleContents.join('\n\n---\n\n'),
+      '',
+    );
+  }
+
+  const mcpObservations = prefetchMcpObservations(config, context);
+  const mcpSection = buildMcpPromptSection(config, mcpObservations);
+  if (mcpSection) {
+    sections.push('', mcpSection);
   }
 
   sections.push(

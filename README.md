@@ -174,6 +174,11 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread. |
+| `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-LLM (diff-line, protected paths, secrets). |
+| `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process por chunk de arquivos. |
+| `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Segunda passagem LLM para filtrar candidatos paralelos. |
+| `AGENTIC_CODE_REVIEWERS_MCP_ENABLED` | `false` | Injeta ferramentas MCP read-only no prompt. |
+| `AGENTIC_CODE_REVIEWERS_PROMPT_MODULES` | auto | Força módulos `skills/tasks/*` (ex. `security,performance`). |
 | `AGENTIC_CODE_REVIEWERS_STACK` | autodetect | Stack ou `Custom`. |
 | `AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT` | — | Prompt quando `stack=Custom`. |
 | `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | stack | Globs de inclusão (CSV). |
