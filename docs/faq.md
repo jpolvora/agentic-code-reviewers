@@ -144,9 +144,15 @@ flowchart TD
 
 ### Quais variáveis de ambiente são mais usadas?
 
-**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
+**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (fallback `GITHUB_TOKEN`/`GH_TOKEN`), `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
 
 *Evidência:* `src/config.ts`; `test/config.test.ts`.
+
+### Nomes legados `CURSOR_REVIEWER_*` ainda funcionam?
+
+**Resposta:** **Não.** O runner lê apenas `AGENTIC_CODE_REVIEWERS_*` (via `src/env.ts`). Macros ADO não expandidas como `$(CURSOR_REVIEWER_MODEL)` ainda caem no default — atualize variable groups e `.env` para os nomes canônicos. `AGENTIC_CODE_REVIEWERS_REPO_URL` e `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` existem só em `run.sh`/workflow GitHub; não passam por `env.ts`.
+
+*Evidência:* `src/env.ts`; `run.sh`; `.github/workflows/code-review.yml`.
 
 ### Qual a diferença entre `skills/` e `.agents/skills/`?
 

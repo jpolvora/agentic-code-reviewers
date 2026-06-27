@@ -88,24 +88,27 @@ O runner se autoexclui do diff por padrão (evita loops). Defina `AGENTIC_CODE_R
 
 ### Variáveis de ambiente
 
-Todas as variáveis do runner usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`** (sem prefixo; `OPENCODE_API_KEY` é lida por `run.sh`/CI). Leitura TypeScript: `src/env.ts` (`readEnv`, `ENV`, `env.*`).
+Todas as variáveis do runner usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`** (sem prefixo; `OPENCODE_API_KEY` é lida por `run.sh`/CI, **não** por `env.*`). Leitura TypeScript: `src/env.ts` (`readEnv`, `ENV`, `env.*`).
+
+> **Migração:** `CURSOR_REVIEWER_*` foi substituído por `AGENTIC_CODE_REVIEWERS_*`. `AGENTIC_CODE_REVIEWERS_REPO_URL` e `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` existem só em `run.sh`/workflow — removidos de `env.ts`.
 
 **Essenciais** (`.env.example`):
 
 | Variável | Default | Uso |
 |---|---|---|
 | `CURSOR_API_KEY` | — | Obrigatória com engine `cursor-sdk` |
-| `OPENCODE_API_KEY` | — | OpenCode Go em CI (`run.sh` → `auth.json`) |
+| `OPENCODE_API_KEY` | — | OpenCode Go em CI (`run.sh` → `auth.json`; não via `env.*`) |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | `cursor-sdk` \| `opencode` |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | ID Cursor ou `provider/model` |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor externo; **vazio = embutido** |
-| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` / `GITHUB_TOKEN` | — | Local; CI injeta token da plataforma |
+| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO local |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub local; fallback `GITHUB_TOKEN` / `GH_TOKEN` |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir runner no diff (CI deste repo) |
 
-**Avançadas** (defaults OK — ver README § Configuração avançada): OpenCode hostname/port/agent/bin/log, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, etc.
+**Avançadas** (defaults OK — ver README § Configuração avançada): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
 
-**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `RELEASE_BRANCH`, `LOCAL`, `USE_TSX`.
+**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
 **Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); não passa por `env.ts`.
 

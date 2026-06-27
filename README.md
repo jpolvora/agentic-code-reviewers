@@ -91,15 +91,15 @@ Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `se
 
 **Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `createEmbeddedOpencodeServer` (`opencode serve`) com harness read-only (`OPENCODE_CONFIG_CONTENT`: permissões `deny`, `instructions` do projeto). **Não reutiliza** um `opencode serve` alheio na porta — sempre spawn próprio com a config embutida (use `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` só para servidor externo explícito).
 
-Requer CLI `opencode` no `PATH` (ou `~/.opencode/bin` — `run.sh` exporta PATH após instalar em CI). Porta preferida `4096`; se ocupada, tenta sequência ou porta livre (`OPENCODE_PORT=0` = só porta efêmera).
+Requer CLI `opencode` no `PATH` (ou `~/.opencode/bin` — `run.sh` exporta PATH após instalar em CI). Porta preferida `4096`; se ocupada, tenta sequência ou porta livre (`AGENTIC_CODE_REVIEWERS_OPENCODE_PORT=0` = só porta efêmera).
 
-Durante o prompt, o runner assina SSE (`/global/event`): `[status]`, `[tool]`, `[reasoning]` (quando o modelo expõe; `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING`, default ON), `[assistant]` com `--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE` (default ON). Timeout alinhado a `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` via `AbortSignal` + fetch `undici` (`src/engine/opencode/fetch.ts`).
+Durante o prompt, o runner assina SSE (`/global/event`): `[status]`, `[tool]`, `[reasoning]` (quando o modelo expõe; `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING`, default ON), `[assistant]` com `--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE` (default ON). Timeout alinhado a `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` via `AbortSignal` + `undici.fetch` com `headersTimeout`/`bodyTimeout` iguais ao timeout configurado (`src/engine/opencode/fetch.ts`); sessões abortadas usam `cleanupClient` sem herdar o sinal de cancelamento.
 
 ```bash
 AGENTIC_CODE_REVIEWERS_ENGINE=opencode
 AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
-OPENCODE_API_KEY=sk-...                    # CI: run.sh grava auth.json
-# opcional: OPENCODE_HOSTNAME, OPENCODE_PORT (4096 | 0), OPENCODE_AGENT, OPENCODE_BIN
+OPENCODE_API_KEY=sk-...                    # CI: run.sh grava auth.json (não lido por env.ts)
+# opcional: AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME, _PORT (4096 | 0), _AGENT, _BIN
 # AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT=false
 # AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true
 # AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL=DEBUG
@@ -128,7 +128,9 @@ Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthro
 
 ## 🛠️ Configuração de variáveis de ambiente
 
-Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`**. Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
+Todas as variáveis do runner TypeScript usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`** (sem prefixo; `OPENCODE_API_KEY` é consumida por `run.sh`/CI, não por `env.*`). Leitura centralizada: `src/env.ts` (`readEnv`, `ENV`, `env.*`). Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
+
+> **Migração:** nomes legados `CURSOR_REVIEWER_*` **não são mais lidos**. Use `AGENTIC_CODE_REVIEWERS_*`. Macros ADO não expandidas (ex.: `$(CURSOR_REVIEWER_MODEL)`) continuam caindo no default — atualize pipelines para `AGENTIC_CODE_REVIEWERS_MODEL`, etc.
 
 Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example) — só o essencial):
 
@@ -146,7 +148,7 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
-| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub. Fallback: `GITHUB_TOKEN` ou `GH_TOKEN`. |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub local (`solve-pr`, publicação). Fallback: `GITHUB_TOKEN`, `GH_TOKEN`. |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff (CI deste repo). |
 
@@ -180,9 +182,9 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_DRY_RUN` | `false` | Preferir `--dry-run`. |
 | `AGENTIC_CODE_REVIEWERS_PR_ID` / `ADO_*` | CI auto | Overrides locais de contexto PR. |
 
-**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `RELEASE_BRANCH`, `LOCAL`, `USE_TSX`.
+**Só `run.sh`** (shell; não passam por `env.ts`): `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
-**Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); não é lida pelo runner TypeScript.
+**Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); controla a matrix do workflow — **não** é lida pelo runner TypeScript.
 
 ---
 
@@ -469,8 +471,9 @@ curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/rel
 | :--- | :--- |
 | `--local` / `AGENTIC_CODE_REVIEWERS_LOCAL=1` | Modo local (sem clone `release`) |
 | `--engine`, `-e` / `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` (default) ou `opencode` |
-| `AGENTIC_CODE_REVIEWERS_REPO_URL` | URL git do reviewer (modo remoto) |
-| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Branch dos artefatos (default: `release`) |
+| `AGENTIC_CODE_REVIEWERS_REPO_URL` | URL git do reviewer (modo remoto; só `run.sh`) |
+| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Branch dos artefatos (default: `release`; só `run.sh`) |
+| `AGENTIC_CODE_REVIEWERS_USE_TSX=true` | Força `npx tsx src/index.ts` em `--local` |
 | `OPENCODE_API_KEY` | Credencial OpenCode Go; `run.sh` instala CLI, exporta PATH e grava `auth.json` |
 
 Demais argumentos (`--dry-run`, `--stack`, `--gh`, `--pr-id`, …) são repassados ao `src/index.js` / `dist/index.js`.
