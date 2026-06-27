@@ -93,6 +93,16 @@ describe('env', () => {
     assert.equal(env.opencodeUrl(), 'http://127.0.0.1:4096');
   });
 
+  it('env.opencodeServerLog lê variável canônica', () => {
+    setEnv('AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG', 'false');
+    assert.equal(env.opencodeServerLog(), 'false');
+  });
+
+  it('env.opencodeLogLevel lê variável canônica', () => {
+    setEnv('AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL', 'DEBUG');
+    assert.equal(env.opencodeLogLevel(), 'DEBUG');
+  });
+
   it('env.githubToken prioriza AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN', () => {
     setEnv('AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN', 'gh_canonical');
     setEnv('GITHUB_TOKEN', 'gh_legacy');

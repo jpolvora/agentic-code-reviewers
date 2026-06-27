@@ -1,6 +1,5 @@
 import {
   createOpencodeClient,
-  createOpencodeServer,
   type AssistantMessage,
   type OpencodeClient,
   type Part,
@@ -10,11 +9,13 @@ import type { ReviewerConfig } from '../../config.js';
 import { env, ENV } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
+import { startOpencodeEventStream } from './event-stream.js';
 import { type OpencodeModelSelection, resolveOpencodeModelSelection } from './model.js';
 import {
   buildSessionPromptBody,
   shouldFallbackSessionPromptWithoutModel,
 } from './prompt-body.js';
+import { createEmbeddedOpencodeServer } from './server.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -67,15 +68,32 @@ function resolveAgentName(): string {
   return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
 }
 
+function resolveServerLogEnabled(): boolean {
+  const raw = env.opencodeServerLog()?.trim().toLowerCase();
+  if (raw === 'false' || raw === '0' || raw === 'off') return false;
+  return true;
+}
+
+function resolveServerLogLevel(): 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | undefined {
+  const raw = env.opencodeLogLevel()?.trim().toUpperCase();
+  if (raw === 'DEBUG' || raw === 'INFO' || raw === 'WARN' || raw === 'ERROR') {
+    return raw;
+  }
+  return resolveServerLogEnabled() ? 'INFO' : undefined;
+}
+
 /** Config inline do servidor embutido (modelo + sandbox read-only). */
 function buildOpencodeServerConfig(model: string) {
+  const logLevel = resolveServerLogLevel();
   return {
     model,
+    ...(logLevel ? { logLevel } : {}),
     permission: {
       edit: 'deny' as const,
       bash: 'deny' as const,
       webfetch: 'deny' as const,
-      external_directory: 'ask' as const,
+      external_directory: 'deny' as const,
+      doom_loop: 'deny' as const,
     },
   };
 }
@@ -148,15 +166,21 @@ async function createRuntime(
   const port = resolvePort();
   logger.info(`OpenCode: iniciando servidor embutido em ${hostname}:${port}`);
 
-  const server = await createOpencodeServer({
+  const logServerOutput = resolveServerLogEnabled();
+  const server = await createEmbeddedOpencodeServer({
     hostname,
     port,
     signal,
     timeout: 30_000,
     config: buildOpencodeServerConfig(model),
+    logServerOutput,
+    logger,
   });
 
   logger.info(`OpenCode server: ${server.url}`);
+  if (logServerOutput) {
+    logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
+  }
 
   return {
     client: createOpencodeClient({ baseUrl: server.url, directory }),
@@ -263,15 +287,30 @@ export async function runOpencodeStream(
 
     sessionId = await resolveSessionId(client, options, directory, logger);
 
-    const response = await sendSessionPrompt(
+    const eventStream = startOpencodeEventStream({
       client,
       sessionId,
       directory,
-      agentName,
-      options.prompt,
-      modelSelection,
       logger,
-    );
+      signal: abortController.signal,
+    });
+
+    logger.info('Enviando prompt ao agente OpenCode (aguarde — progresso via event stream)...');
+
+    let response: SessionPromptResponse;
+    try {
+      response = await sendSessionPrompt(
+        client,
+        sessionId,
+        directory,
+        agentName,
+        options.prompt,
+        modelSelection,
+        logger,
+      );
+    } finally {
+      eventStream.stop();
+    }
     const info = response.info;
     const fullText = extractTextFromParts(response.parts);
 
