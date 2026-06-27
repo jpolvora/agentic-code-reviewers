@@ -598,6 +598,7 @@ Para suportar novos ambientes de CI/CD e provedores Git:
 | Recurso | Caminho |
 |---------|---------|
 | Fluxo de análise e decisão | [`docs/flow-analysis.md`](docs/flow-analysis.md) |
+| Fluxo de Auto-Fix e Self-Healing | [`docs/auto-fix.md`](docs/auto-fix.md) |
 | FAQ | [`docs/faq.md`](docs/faq.md) |
 | Score e severidade | [`docs/score_calc.md`](docs/score_calc.md) |
 | Modelo de execução | [`docs/two-phase-execution-model.md`](docs/two-phase-execution-model.md) |

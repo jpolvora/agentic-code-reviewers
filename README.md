@@ -31,6 +31,7 @@ O revisor publica threads acionáveis nas linhas afetadas da PR. **Não altera a
 Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](docs/):
 
 *   **[Fluxo de Análise e Decisão](docs/flow-analysis.md):** Guia completo de ciclo de vida, do carregamento de contexto ao gate final.
+*   **[Fluxo de Auto-Fix e Self-Healing](docs/auto-fix.md):** Como configurar pipelines para corrigir código automaticamente e revalidar o review em um loop seguro.
 *   **[Perguntas Frequentes (FAQ)](docs/faq.md):** Dúvidas comuns de configuração, comportamento do bot e regras.
 *   **[Cálculo de Score e Severidade](docs/score_calc.md):** Rubrica detalhada do score (0–10) e severidades (`critical`, `warning`, `suggestion`).
 *   **[Modelo de Execução em Duas Fases](docs/two-phase-execution-model.md):** Detalhes sobre a arquitetura de triagem e investigação profunda em um único agente.

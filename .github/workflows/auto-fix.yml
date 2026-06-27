@@ -1,0 +1,119 @@
+name: Agentic Auto Fix
+
+on:
+  workflow_run:
+    workflows: ["Agentic Code Review"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Número da PR (obrigatório em execução manual)
+        required: true
+        type: string
+      source_branch:
+        description: Branch de origem (head ref)
+        required: true
+        type: string
+      target_branch:
+        description: Branch de destino (base ref)
+        required: false
+        default: main
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-fix:
+    name: Auto Fix (${{ matrix.engine }})
+    # Executa apenas se o workflow de Code Review foi bem-sucedido, ou se foi executado manualmente
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: cursor-sdk
+            model: composer-2.5
+            bot_tag: '[Cursor Reviewer]'
+          - engine: opencode
+            model: opencode-go/deepseek-v4-flash
+            bot_tag: '[Cursor Reviewer · OpenCode]'
+
+    steps:
+      - name: Get PR Info
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "pr_number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
+            echo "source_branch=${{ github.event.inputs.source_branch }}" >> $GITHUB_OUTPUT
+            echo "target_branch=${{ github.event.inputs.target_branch }}" >> $GITHUB_OUTPUT
+          else
+            PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+            HEAD_BRANCH="${{ github.event.workflow_run.pull_requests[0].head.ref }}"
+            BASE_BRANCH="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
+            
+            if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+              HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+              echo "Buscando PR para o commit $HEAD_SHA..."
+              PR_DATA=$(gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/pulls" -H "Accept: application/vnd.github.groot-preview+json" --jq '.[0]')
+              
+              PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+              HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.head.ref')
+              BASE_BRANCH=$(echo "$PR_DATA" | jq -r '.base.ref')
+            fi
+            
+            if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+              echo "::error::Não foi possível determinar o número da PR para Auto-Fix."
+              exit 1
+            fi
+            
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "source_branch=$HEAD_BRANCH" >> $GITHUB_OUTPUT
+            echo "target_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-info.outputs.source_branch }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Validate engine secret
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          if [ "${{ matrix.engine }}" = "cursor-sdk" ] && [ -z "$CURSOR_API_KEY" ]; then
+            echo "::error::Configure secret CURSOR_API_KEY em Settings → Secrets (engine cursor-sdk)."
+            exit 1
+          fi
+          if [ "${{ matrix.engine }}" = "opencode" ] && [ -z "$OPENCODE_API_KEY" ]; then
+            echo "::error::Configure secret OPENCODE_API_KEY em Settings → Secrets (engine opencode)."
+            exit 1
+          fi
+
+      - name: Run Auto-Fix (${{ matrix.engine }})
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
+          AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
+          CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
+          OPENCODE_API_KEY: ${{ matrix.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
+        run: |
+          bash run.sh --local --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --auto-fix
+        continue-on-error: true
