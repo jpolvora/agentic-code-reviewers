@@ -5,6 +5,7 @@
 # Secrets (por engine):
 #   cursor-sdk → CURSOR_API_KEY
 #   opencode   → OPENCODE_API_KEY
+# Opcional: AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN (PAT) — resolveReviewThread; default github.token
 name: Agentic Code Review
 
 on:
@@ -92,7 +93,7 @@ jobs:
 
       - name: Run reviewer (${{ matrix.engine }})
         env:
-          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}

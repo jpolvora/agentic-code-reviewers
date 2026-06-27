@@ -22,7 +22,7 @@ import {
   RESOLUTION_MARKER,
   REVIEW_SUMMARY_MARKER,
 } from '../git/markers.js';
-import { GithubClient } from './github-client.js';
+import { GithubClient, isGithubIntegrationAccessError } from './github-client.js';
 import type { PlatformProvider } from './types.js';
 import type {
   ActiveThreadInfo,
@@ -273,6 +273,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
 
     const llmResolved = filterValidResolvedItems(resolvedItems);
     let resolvedCount = 0;
+    let skippedIntegrationResolve = 0;
 
     for (const threadInfo of activeThreads) {
       if (threadInfo.hasResolutionReply && isActiveOrPendingStatus(threadInfo.status)) {
@@ -283,6 +284,15 @@ These issues were reported in a previous round and already resolved/closed. Do *
           );
           resolvedCount++;
         } catch (error) {
+          if (isGithubIntegrationAccessError(error)) {
+            skippedIntegrationResolve++;
+            log(
+              `Warning: GitHub denied resolveReviewThread for stuck thread ${threadInfo.threadId} ` +
+                `(integration token limitation). Configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN with a PAT ` +
+                `(repo / pull_requests:write) to enable thread resolution.`,
+            );
+            continue;
+          }
           log(`Error: failed to recover stuck thread ${threadInfo.threadId}: ${String(error)}`);
           throw error;
         }
@@ -320,9 +330,24 @@ These issues were reported in a previous round and already resolved/closed. Do *
         log(`Resolved thread ${threadInfo.threadId} (${threadInfo.filePath}:${threadInfo.lineNumber}).`);
         resolvedCount++;
       } catch (error) {
+        if (isGithubIntegrationAccessError(error)) {
+          skippedIntegrationResolve++;
+          log(
+            `Warning: GitHub denied resolveReviewThread for ${threadInfo.threadId} ` +
+              `(integration token limitation). Resolution reply may have been posted; ` +
+              `configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN with a PAT (repo / pull_requests:write).`,
+          );
+          continue;
+        }
         log(`Error: failed to resolve thread ${threadInfo.threadId}: ${String(error)}`);
         throw error;
       }
+    }
+
+    if (skippedIntegrationResolve > 0) {
+      log(
+        `Skipped ${skippedIntegrationResolve} thread resolution(s) due to GitHub integration token limits.`,
+      );
     }
 
     return resolvedCount;

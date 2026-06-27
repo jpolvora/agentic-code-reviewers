@@ -148,7 +148,7 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
-| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub local (`solve-pr`, publicação). Fallback: `GITHUB_TOKEN`, `GH_TOKEN`. |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub (`solve-pr`, publicação, **resolver threads**). Fallback: `GITHUB_TOKEN`, `GH_TOKEN`. Em CI, `github.token` publica comentários mas **não** fecha threads — veja [Resolução de threads](#resolução-automática-de-threads-github). |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff (CI deste repo). |
 
@@ -381,6 +381,20 @@ Cada job tem `concurrency` próprio (`review-<engine>-#N`), então re-runs de um
 
 Para adicionar uma nova engine ao CI, inclua uma entrada em `strategy.matrix.include` no workflow (modelo, bot tag e steps condicionais de setup).
 
+##### Resolução automática de threads (GitHub)
+
+Quando o agente confirma correções, o runner posta uma reply com `<!-- resolution-reply -->` e chama a mutação GraphQL `resolveReviewThread` para fechar a thread na PR.
+
+O `GITHUB_TOKEN` padrão do Actions (`github.token`) tem `pull-requests: write` e **publica** comentários, mas a GitHub API **rejeita** `resolveReviewThread` para tokens de integração — erro típico: `Resource not accessible by integration`. O runner trata isso como aviso (a pipeline não falha), porém a thread permanece aberta na UI.
+
+**Recomendado:** crie um secret `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` com um PAT (classic `repo` ou fine-grained **Pull requests: Read and write**). Os workflows [`code-review.yml`](.github/workflows/code-review.yml) e [`review-remote.yml`](.github/workflows/review-remote.yml) já preferem esse secret quando presente:
+
+```yaml
+AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+```
+
+Sem o PAT, resolva threads manualmente na PR ou use a skill [`solve-pr`](.agents/skills/solve-pr/SKILL.md) localmente com um token que tenha escopo de escrita.
+
 ##### Release e deploy (`release.yml`)
 
 Após merge em **`main`**, o workflow de release:
@@ -397,6 +411,12 @@ Após merge em **`main`**, o workflow de release:
 | :--- | :--- |
 | `CURSOR_API_KEY` | Job `cursor-sdk` |
 | `OPENCODE_API_KEY` | Job `opencode` |
+
+**Secret opcional (recomendado para GitHub):**
+
+| Secret | Uso |
+| :--- | :--- |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | PAT para `resolveReviewThread` quando o agente marca `resolvedThreads`. Sem ele, `github.token` continua publicando reviews, mas threads podem ficar abertas. Ver [Resolução de threads](#resolução-automática-de-threads-github). |
 
 #### Em repositórios consumidores
 
@@ -418,9 +438,11 @@ jobs:
     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      # opcional — resolve threads fechadas pelo agente (resolvedThreads):
+      AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
 ```
 
-Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/deepseek-v4-flash }` e o secret `OPENCODE_API_KEY`.
+Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/deepseek-v4-flash }` e o secret `OPENCODE_API_KEY`. O reusable workflow usa `secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token` internamente.
 
 **Opção B — `curl` + `run.sh`** (sem reusable workflow):
 
@@ -434,7 +456,7 @@ Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/de
       - name: Run remote reviewer
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
         run: |
           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
             --gh \

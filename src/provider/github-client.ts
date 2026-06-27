@@ -58,6 +58,12 @@ interface PrCommentsPageResponse {
   };
 }
 
+/** `GITHUB_TOKEN` em Actions costuma falhar em `resolveReviewThread` mesmo com `pull-requests: write`. */
+export function isGithubIntegrationAccessError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('Resource not accessible by integration');
+}
+
 export class GithubClient {
   constructor(
     readonly owner: string,

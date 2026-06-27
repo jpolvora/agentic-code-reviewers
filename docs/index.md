@@ -516,6 +516,19 @@ Rode com `--verbose` e inspecione a saída bruta do agente.
 AGENTIC_CODE_REVIEWERS_TIMEOUT_MS=1200000 npm run review -- --dry-run --engine opencode ...
 ```
 
+### `Resource not accessible by integration` ao resolver threads
+
+O `GITHUB_TOKEN` padrão do Actions **publica** comentários com `pull-requests: write`, mas a mutação GraphQL `resolveReviewThread` costuma ser **rejeitada** para tokens de integração — mesmo em threads criadas pelo próprio bot.
+
+O runner trata isso como aviso (não falha a pipeline): a reply de resolução pode ser postada, mas a thread permanece aberta na UI.
+
+**Para habilitar resolução automática**, configure um PAT (classic `repo` ou fine-grained `pull_requests: write`) como secret `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` no repositório. Os workflows `code-review.yml` e `review-remote.yml` usam esse secret quando presente; caso contrário caem em `github.token`.
+
+```yaml
+# .github/workflows/code-review.yml (já suportado)
+AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+```
+
 ### OpenCode para após `Sessão criada` sem progresso
 
 1. Confirme `opencode` no `PATH` e credenciais (`auth.json` ou `OPENCODE_API_KEY`)
