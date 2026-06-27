@@ -35,7 +35,7 @@ permissions:
   contents: read
 
 env:
-  EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.REVIEWER_EXECUTION_MODE || 'parallel' }}
+  EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || vars.REVIEWER_EXECUTION_MODE || 'parallel' }}
   PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   SOURCE_BRANCH: ${{ github.head_ref || github.event.inputs.source_branch }}
   TARGET_BRANCH: refs/heads/${{ github.event.pull_request.base.ref || github.event.inputs.target_branch }}
@@ -87,10 +87,10 @@ jobs:
       - name: Configure OpenCode Go credentials
         if: matrix.opencode_setup
         env:
-          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY || secrets.OPENCODE_GO_API_KEY }}
         run: |
-          if [ -z "$OPENCODE_GO_API_KEY" ]; then
-            echo "::error::Secret OPENCODE_GO_API_KEY não configurado. Adicione em Settings → Secrets → Actions."
+          if [ -z "$AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY" ]; then
+            echo "::error::Secret AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY (ou legado OPENCODE_GO_API_KEY) não configurado."
             exit 1
           fi
           mkdir -p ~/.local/share/opencode
@@ -99,23 +99,23 @@ jobs:
           const path = require('node:path');
           const authPath = path.join(process.env.HOME, '.local/share/opencode/auth.json');
           const auth = {
-            'opencode-go': { type: 'api', key: process.env.OPENCODE_GO_API_KEY },
+            'opencode-go': { type: 'api', key: process.env.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY },
           };
           fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
           NODE
 
       - name: Run Reviewer Agent (${{ matrix.engine }})
         env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURSOR_REVIEWER_ENGINE: ${{ matrix.engine }}
-          CURSOR_REVIEWER_MODEL: ${{ matrix.model }}
-          CURSOR_REVIEWER_BOT_TAG: ${{ matrix.bot_tag }}
-          CURSOR_REVIEWER_REVIEW_SELF: 'true'
-          CURSOR_REVIEWER_OPENCODE_HOSTNAME: 127.0.0.1
-          CURSOR_REVIEWER_OPENCODE_PORT: '4096'
-          CURSOR_REVIEWER_OPENCODE_AGENT: explore
-          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
+          AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
+          AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
+          AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME: 127.0.0.1
+          AGENTIC_CODE_REVIEWERS_OPENCODE_PORT: '4096'
+          AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT: explore
+          AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY || secrets.OPENCODE_GO_API_KEY }}
         run: |
           npx tsx src/index.ts --gh \
             --pr-id "$PR_NUMBER" \

@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { ENV, env } from '../env.js';
 import { evaluateSeedResponse, evaluateSeedResponseFromFile } from './evaluate-response.js';
 import { installSeedFixtures } from './install-fixtures.js';
 import { loadRunnerEnvFile } from './load-env.js';
@@ -85,9 +86,9 @@ async function main(): Promise<void> {
     const outputPath = options.outputFile ?? defaultOutput;
 
     if (!options.skipAgent) {
-      if (!process.env.CURSOR_API_KEY?.trim()) {
+      if (!env.cursorApiKey()?.trim()) {
         throw new Error(
-          'CURSOR_API_KEY ausente. npm run test:seed exige API key para dry-run com fixtures em disco.',
+          `${ENV.CURSOR_API_KEY} ausente. npm run test:seed exige API key para dry-run com fixtures em disco.`,
         );
       }
 

@@ -9,7 +9,7 @@
 | **Stacks tecnológicas** | ABP/Angular, PHP/Laravel, Next.js/React, TypeScript, Custom | Sim — adicione em `STACKS` + `skills/stacks/` |
 | **Providers LLM** | Cursor nativo, OpenCode (Zen, Go, LM Studio, …) | Via engine custom ou OpenCode |
 
-A execução do LLM é **plugável** via `CURSOR_REVIEWER_ENGINE`:
+A execução do LLM é **plugável** via `AGENTIC_CODE_REVIEWERS_ENGINE`:
 
 | Engine | Pacote | Quando usar |
 | :--- | :--- | :--- |
@@ -39,10 +39,10 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
 
 ## 🚀 Recursos Principais
 
-*   **🔌 Multi-engine agêntico (`cursor-sdk` | `opencode` | custom):** Mesmo orquestrador (`src/index.ts`), prompt e gate; troca só a camada de execução LLM via `CURSOR_REVIEWER_ENGINE`. Qualquer harness pode implementar `ExecutionEngine`. Métricas de tokens normalizadas entre adapters.
+*   **🔌 Multi-engine agêntico (`cursor-sdk` | `opencode` | custom):** Mesmo orquestrador (`src/index.ts`), prompt e gate; troca só a camada de execução LLM via `AGENTIC_CODE_REVIEWERS_ENGINE`. Qualquer harness pode implementar `ExecutionEngine`. Métricas de tokens normalizadas entre adapters.
 *   **🔌 Integração multiprovedor (Azure DevOps & GitHub):** Provedor inferido pelo CI ou forçado com `--ado` / `--gh`.
 *   **🧠 Memória Intra-PR e Agrupamento de Ocorrências (Anti Whack-a-mole):** O agente retém os padrões de erros passados da PR em seu contexto para caçar ativamente falhas recorrentes. Ao encontrar o mesmo erro espalhado pelo diff, ele agrupa as ocorrências (`relatedOccurrences`), sendo desdobradas pela pipeline em múltiplas threads sincronizadas publicadas de uma única vez.
-*   **🗂️ Seleção e Autodetecção de Stacks Tecnológicas:** Permite executar a revisão focando nas extensões de arquivos e com recomendações de boas práticas específicas da stack selecionada (via `--stack` ou env `CURSOR_REVIEWER_STACK`). Caso nenhuma stack seja configurada, o runner tenta autodetectar a tecnologia analisando os arquivos da raiz do projeto (ex.: presença de `artisan`, `next.config.js`, `tsconfig.json` ou arquivos `.sln`/`.csproj`), caindo para `ABP/Angular` como fallback. O log indica explicitamente de onde a definição da stack foi carregada.
+*   **🗂️ Seleção e Autodetecção de Stacks Tecnológicas:** Permite executar a revisão focando nas extensões de arquivos e com recomendações de boas práticas específicas da stack selecionada (via `--stack` ou env `AGENTIC_CODE_REVIEWERS_STACK`). Caso nenhuma stack seja configurada, o runner tenta autodetectar a tecnologia analisando os arquivos da raiz do projeto (ex.: presença de `artisan`, `next.config.js`, `tsconfig.json` ou arquivos `.sln`/`.csproj`), caindo para `ABP/Angular` como fallback. O log indica explicitamente de onde a definição da stack foi carregada.
 *   **📝 Sugestões Interativas:** 
     *   No **GitHub**, as correções sugeridas utilizam o formato nativo ` ```suggestion `, permitindo que o desenvolvedor aplique a correção na PR com um único clique.
     *   No **Azure DevOps**, que não suporta o recurso de sugestão interativa, as cercas são normalizadas automaticamente para blocos de código neutros (` ```csharp `, ` ```ts `, etc.), garantindo uma formatação limpa.
@@ -78,16 +78,16 @@ Agente local via `@cursor/sdk` com sandbox read-only, streaming e uso de tokens 
 
 ```bash
 # .env mínimo
-CURSOR_REVIEWER_ENGINE=cursor-sdk   # ou omita (default)
-CURSOR_REVIEWER_MODEL=composer-2.5
-CURSOR_API_KEY=cursor_...
+AGENTIC_CODE_REVIEWERS_ENGINE=cursor-sdk   # ou omita (default)
+AGENTIC_CODE_REVIEWERS_MODEL=composer-2.5
+AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY=cursor_...
 ```
 
 Modelos: IDs do Cursor (`composer-2.5`, `claude-sonnet-4-6`, etc.). Validação em `src/engine/cursor-sdk/model.ts`.
 
 ### `opencode`
 
-Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `session.prompt` (com `model: { providerID, modelID }` derivado de `CURSOR_REVIEWER_MODEL`) → resposta do agente. Se o servidor rejeitar o model explícito, o engine repete o prompt usando o default do host. Credenciais ficam no **servidor** (`~/.local/share/opencode/auth.json`), não no `.env` do reviewer.
+Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `session.prompt` (com `model: { providerID, modelID }` derivado de `AGENTIC_CODE_REVIEWERS_MODEL`) → resposta do agente. Se o servidor rejeitar o model explícito, o engine repete o prompt usando o default do host. Credenciais ficam no **servidor** (`~/.local/share/opencode/auth.json`), não no `.env` do reviewer.
 
 **Modo A — servidor já em execução** (recomendado em dev):
 
@@ -97,29 +97,31 @@ opencode serve --hostname=127.0.0.1 --port=43147
 ```
 
 ```bash
-CURSOR_REVIEWER_ENGINE=opencode
-CURSOR_REVIEWER_MODEL=opencode-go/deepseek-v4-flash
-CURSOR_REVIEWER_OPENCODE_URL=http://127.0.0.1:43147
+AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
 ```
 
 **Modo B — servidor embutido** (o runner sobe `opencode serve` via SDK; requer CLI `opencode` no `PATH`):
 
 ```bash
-CURSOR_REVIEWER_ENGINE=opencode
-CURSOR_REVIEWER_MODEL=opencode-go/deepseek-v4-flash
-# opcional: CURSOR_REVIEWER_OPENCODE_HOSTNAME, CURSOR_REVIEWER_OPENCODE_PORT
+AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+# opcional: AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME, AGENTIC_CODE_REVIEWERS_OPENCODE_PORT
 ```
 
 Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthropic/claude-sonnet-4-6`). Liste com `opencode models <provider>`.
 
 > [!NOTE]
-> `CURSOR_API_KEY` continua obrigatória no `loadConfig` mesmo com `opencode`; use um valor válido ou placeholder se só rodar via OpenCode local.
+> `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` continua obrigatória no `loadConfig` mesmo com `opencode`; use um valor válido ou placeholder se só rodar via OpenCode local.
 
 ---
 
 ## 🛠️ Configuração de variáveis de ambiente
 
-Crie um arquivo `.env` na raiz do projeto com as chaves necessárias (veja [.env.example](.env.example)):
+Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**. Nomes legados (`CURSOR_REVIEWER_*`, `CURSOR_API_KEY`, `SCORE_MIN`) ainda funcionam como fallback. Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
+
+Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example)):
 
 ```bash
 cp .env.example .env
@@ -127,26 +129,29 @@ cp .env.example .env
 
 | Variável | Padrão | Descrição |
 | :--- | :--- | :--- |
-| `CURSOR_API_KEY` | — | Chave do Cursor (Integrations / Service Account). Obrigatória no bootstrap; usada pelo engine `cursor-sdk`. |
-| `CURSOR_REVIEWER_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
-| `CURSOR_REVIEWER_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor (`composer-2.5`). **`opencode`:** `provider/model` (`anthropic/claude-sonnet-4-6`). |
-| `CURSOR_REVIEWER_OPENCODE_URL` | — | URL do servidor OpenCode existente (ex.: `http://127.0.0.1:43147`). Alias: `OPENCODE_SERVER_URL`. |
-| `CURSOR_REVIEWER_OPENCODE_HOSTNAME` | `127.0.0.1` | Host ao subir servidor embutido (`opencode` sem URL externa). |
-| `CURSOR_REVIEWER_OPENCODE_PORT` | `4096` | Porta do servidor embutido. |
-| `CURSOR_REVIEWER_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão (read-only; ex.: `explore`, `build`). |
-| `AZURE_DEVOPS_EXT_PAT` | — | PAT ADO (Code Read/Write + Work Items Read) para testes locais. |
-| `GITHUB_TOKEN` / `GH_TOKEN` | — | Token GitHub (REST/GraphQL). |
-| `CURSOR_REVIEWER_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
-| `CURSOR_REVIEWER_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários da PR. |
-| `CURSOR_REVIEWER_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano (`0` desativa). |
-| `SCORE_MIN` | `6` | Score mínimo (inclusive) para publicar issue como thread na PR. Issues com `score >= SCORE_MIN` entram como threads acionáveis. **Opcional** — omitir mantém o comportamento histórico (limiar 6). |
-| `CURSOR_REVIEWER_TIMEOUT_MS` | `600000` | Timeout da sessão (ambas engines). |
-| `CURSOR_REVIEWER_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk` (`false` só para debug). |
-| `CURSOR_REVIEWER_REPO_ROOT` | auto | Raiz do repositório alvo. |
-| `CURSOR_REVIEWER_REVIEW_SELF` | `false` | Incluir o próprio runner no diff (dev). |
-| `CURSOR_REVIEWER_STACK` | `ABP/Angular` | Stack ativa ou autodetecção. |
-| `CURSOR_REVIEWER_CUSTOM_PROMPT` | — | Prompt/arquivo quando `stack=Custom`. |
-| `CURSOR_REVIEWER_INCLUDE_PATTERNS` | — | Globs de inclusão (CSV), sobrescreve a stack. |
+| `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | — | Chave do Cursor. Obrigatória no bootstrap. |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL do servidor OpenCode existente. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY` | — | Chave OpenCode Go (CI / auth.json). |
+| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub (fallback: `GITHUB_TOKEN` / `GH_TOKEN`). |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
+| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
+| `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread. |
+| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão. |
+| `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
+| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | auto | Raiz do repositório alvo. |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff. |
+| `AGENTIC_CODE_REVIEWERS_STACK` | `ABP/Angular` | Stack ativa ou autodetecção. |
+| `AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT` | — | Prompt quando `stack=Custom`. |
+| `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | — | Globs de inclusão (CSV). |
+| `AGENTIC_CODE_REVIEWERS_REPO_URL` | GitHub | URL clonada pelo `run.sh`. |
+| `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | `parallel` | CI: `parallel` ou `sequential`. |
 
 ---
 
@@ -171,13 +176,13 @@ npm run review -- [argumentos]
 *   `--stack <NOME>` ou `--stack=<NOME>` : Define a stack tecnológica ativa para o review (`ABP/Angular`, `PHP/Laravel`, `Next.js/React`, `TypeScript`, `Custom`).
 *   `--custom-prompt <VAL>` : Caminho do arquivo ou string de prompt quando a stack é `Custom` (requerido para `--stack=Custom`).
 *   `--include-patterns <VAL>` : Lista separada por vírgulas de padrões glob de inclusão (ex.: `**/*.py,**/*.go`). Sobrescreve o padrão de arquivos a incluir no diff.
-*   `--model <id>` : Modelo LLM — ID Cursor no engine `cursor-sdk` (`composer-2.5`) ou `provider/model` no `opencode` (`opencode-go/deepseek-v4-flash`). Sobrescreve `CURSOR_REVIEWER_MODEL`.
-*   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `CURSOR_REVIEWER_ENGINE`.
-*   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6.
+*   `--model <id>` : Modelo LLM — ID Cursor no engine `cursor-sdk` (`composer-2.5`) ou `provider/model` no `opencode` (`opencode-go/deepseek-v4-flash`). Sobrescreve `AGENTIC_CODE_REVIEWERS_MODEL`.
+*   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `AGENTIC_CODE_REVIEWERS_ENGINE`.
+*   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6.
 
-> Engine também pode ser definida por `CURSOR_REVIEWER_ENGINE` no ambiente; `--engine` tem precedência.
+> Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência.
 
-> **Compatibilidade:** `SCORE_MIN` e `--score-min` são opt-in. Sem configurá-los, o gate permanece **6–10** (mesmo comportamento de versões anteriores). Não é necessário alterar pipelines ADO/GitHub já em produção.
+> **Compatibilidade:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` e `--score-min` são opt-in. Sem configurá-los, o gate permanece **6–10** (mesmo comportamento de versões anteriores). Nomes legados (`SCORE_MIN`, `CURSOR_REVIEWER_*`) ainda funcionam.
 
 ---
 
@@ -201,7 +206,7 @@ npm run review -- [argumentos]
    └─ Fase 2: Investigação ──► Prova/refuta com tools (read, grep, rules locais)
         │
         ▼
-[Gate de Validação] ──► Filtra reviews inválidos ou com score < SCORE_MIN (default: 6)
+[Gate de Validação] ──► Filtra reviews inválidos ou com score < AGENTIC_CODE_REVIEWERS_SCORE_MIN (default: 6)
         │
         ▼
 [Publicação na PR]
@@ -221,7 +226,7 @@ O **Agentic Code Reviewers** permite focar a análise em arquivos elegíveis esp
 ### ⚙️ Como Definir a Stack
 Você pode definir a stack de três formas (em ordem de prioridade):
 1.  **Parâmetro CLI:** `--stack=<nome-da-stack>` (ex.: `--stack=PHP/Laravel`).
-2.  **Variável de Ambiente:** `CURSOR_REVIEWER_STACK=<nome-da-stack>`.
+2.  **Variável de Ambiente:** `AGENTIC_CODE_REVIEWERS_STACK=<nome-da-stack>`.
 3.  **Autodetecção Automática:** Caso não seja especificada nenhuma das opções anteriores.
 
 ### 🎨 Stack Customizada (`Custom`) e Prompt Customizado
@@ -229,8 +234,8 @@ Você pode definir a stack de três formas (em ordem de prioridade):
 Se você precisa rodar o revisor em um projeto cuja tecnologia/stack não está pré-definida nas opções padrão, ou se deseja ter total controle das diretrizes de revisão da stack, você pode utilizar a stack `Custom`.
 
 Quando a stack `Custom` é selecionada, o runner:
-1. **Requer** que você informe um prompt customizado via `--custom-prompt` (ou pela variável `CURSOR_REVIEWER_CUSTOM_PROMPT`).
-2. Adota, por padrão, a inclusão de todos os arquivos (`**/*`) no diff de revisão, a menos que seja definido o parâmetro `--include-patterns` (ou a variável `CURSOR_REVIEWER_INCLUDE_PATTERNS`).
+1. **Requer** que você informe um prompt customizado via `--custom-prompt` (ou pela variável `AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT`).
+2. Adota, por padrão, a inclusão de todos os arquivos (`**/*`) no diff de revisão, a menos que seja definido o parâmetro `--include-patterns` (ou a variável `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS`).
 
 #### Exemplos de Linhas de Comando:
 
@@ -251,9 +256,9 @@ Quando a stack `Custom` é selecionada, o runner:
 
 * **Exemplo 4: Utilizando variáveis de ambiente (comum em arquivos de Pipeline/GitHub Actions):**
   ```bash
-  export CURSOR_REVIEWER_STACK="Custom"
-  export CURSOR_REVIEWER_CUSTOM_PROMPT="./config/reviewer-prompt.md"
-  export CURSOR_REVIEWER_INCLUDE_PATTERNS="**/*.rs,**/*.toml"
+  export AGENTIC_CODE_REVIEWERS_STACK="Custom"
+  export AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT="./config/reviewer-prompt.md"
+  export AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS="**/*.rs,**/*.toml"
   npm run review -- --dry-run
   ```
 
@@ -270,7 +275,7 @@ Quando ativada, a estratégia de autodetecção analisa a raiz do repositório (
 
 ### 🔄 Fallback e Segurança
 *   **Fallback Padrão:** Se nenhuma tecnologia for autodetectada ou especificada, o runner adota a stack `ABP/Angular` (mantendo 100% de compatibilidade com o comportamento original).
-*   **Tratamento de Macros ADO:** Caso a variável de ambiente `CURSOR_REVIEWER_STACK` contiver uma macro não expandida do Azure DevOps (como `$(CURSOR_REVIEWER_STACK)`), ela será resolvida automaticamente para a stack padrão.
+*   **Tratamento de Macros ADO:** Caso a variável de ambiente `AGENTIC_CODE_REVIEWERS_STACK` contiver uma macro não expandida do Azure DevOps (como `$(AGENTIC_CODE_REVIEWERS_STACK)`), ela será resolvida automaticamente para a stack padrão.
 *   **Seed Tests:** Ao rodar a suíte local com a flag `--seed-test`, o runner força a execução na stack `ABP/Angular` para garantir a detecção correta das fixtures C#/.NET.
 
 ### 🔌 Como Estender e Adicionar Nova Stack
@@ -281,18 +286,17 @@ A arquitetura é modular e extensível. Para adicionar suporte a uma nova stack 
 
 ---
 
-### Skills locais do `agentic-code-reviewers`
+### Skills locais do runner (`.agents/skills/`)
 
-As skills em `.agents/skills/` deste repositório são locais ao runner. Invocáveis no Cursor com `/code-review-self`, `/megabrain` ou `/solve-pr` quando anexadas à conversa:
+Skills para o **Cursor/IDE** — distintas dos prompts em `skills/` que o runner embute em CI. Roteamento completo: [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão).
 
-| Skill | Quando usar |
-| :--- | :--- |
-| `code-review-self` | Revisar diff/PR localmente pelo agente do IDE, espelhando `src/index.ts` em modo somente-leitura |
-| `megabrain` | Revisão iterativa com threads numeradas; follow-up após commits de correção |
-| `solve-pr` | Implementar correções das threads abertas do bot e republicar na PR |
+| Skill | Invocação | Quando usar |
+| :--- | :--- | :--- |
+| `code-review-self` | `/code-review-self` | Dry-run local espelhando `src/index.ts` sem `@cursor/sdk` |
+| `megabrain` | `/megabrain` | Revisão iterativa com `[Thread #N]` |
+| `solve-pr` | `/solve-pr` | Corrigir threads do bot no GitHub e republicar |
 
-> [!TIP]
-> Para obter mais informações sobre outras diretrizes e skills genéricas reutilizáveis (como `code-review` ou `fix-pr`), consulte o repositório centralizado [workflow-skills](https://github.com/jpolvora/workflow-skills).
+Prompts de runtime (`skills/SYSTEM_PROMPT.md`, `skills/CODE_REVIEW.md`, `skills/stacks/`) são carregados automaticamente pelo runner — não requerem invocação manual.
 
 ---
 
@@ -303,7 +307,7 @@ As skills em `.agents/skills/` deste repositório são locais ao runner. Invocá
 Utilize o template pronto do projeto: [`azure-pipelines-cursor-code-review.yml`](azure-pipelines-cursor-code-review.yml). 
 
 1. Copie o arquivo para a raiz do seu repositório Git alvo.
-2. Certifique-se de criar um **Variable Group** (ex: `vg-agentic-code-reviewers`) no Azure DevOps contendo a variável secreta `CURSOR_API_KEY`.
+2. Certifique-se de criar um **Variable Group** (ex: `vg-agentic-code-reviewers`) no Azure DevOps contendo a variável secreta `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`.
 3. Garanta que o **Build Service** da sua pipeline tenha permissão de **Contribute to pull requests** nas configurações do repositório.
 4. Habilite a opção **Allow scripts to access the OAuth token** nas configurações de execução do job da pipeline.
 5. Configure uma branch policy de **Build Validation** apontando para esta pipeline.
@@ -354,9 +358,9 @@ Após merge em **`main`**, o workflow de release:
 
 | Secret | Job |
 | :--- | :--- |
-| `CURSOR_API_KEY` | Ambos (validação no bootstrap) |
+| `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | Ambos (validação no bootstrap; legado: `CURSOR_API_KEY`) |
 | `GITHUB_TOKEN` | Automático no workflow (`permissions`) |
-| `OPENCODE_GO_API_KEY` | Apenas `review-opencode` — chave API do provider **OpenCode Go** (a mesma de `~/.local/share/opencode/auth.json` local) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY` | Apenas `review-opencode` (legado: `OPENCODE_GO_API_KEY`) |
 
 O job OpenCode instala o CLI (`curl -fsSL https://opencode.ai/install | bash`), grava `auth.json` no runner e sobe o servidor **embutido** na porta `4096` (sem `opencode serve` manual).
 
@@ -391,9 +395,9 @@ jobs:
 
       - name: Run Reviewer Agent (cursor-sdk)
         env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURSOR_REVIEWER_ENGINE: cursor-sdk
+          AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
         run: |
           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- \
             --gh --pr-id ${{ github.event.pull_request.number }}
@@ -417,7 +421,7 @@ curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/mai
 | :--- | :--- | :--- |
 | `--engine ENGINE` | `cursor`, `cursor-sdk`, `opencode` | `cursor-sdk` |
 | `-e ENGINE` | atalho para `--engine` | — |
-| `CURSOR_REVIEWER_ENGINE` | env equivalente | `cursor-sdk` |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | env equivalente | `cursor-sdk` |
 
 ```bash
 # Dry-run com engine padrão (cursor-sdk)
@@ -428,7 +432,7 @@ curl -fsSL .../run.sh | bash -s -- --engine opencode --dry-run
 ```
 
 > [!IMPORTANT]
-> `CURSOR_API_KEY` é obrigatória no bootstrap. Pipelines com `cursor-sdk` precisam de chave válida; com `opencode`, exporte também `CURSOR_REVIEWER_ENGINE`, `CURSOR_REVIEWER_MODEL` e `CURSOR_REVIEWER_OPENCODE_URL` (credenciais LLM no servidor OpenCode).
+> `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` é obrigatória no bootstrap. Pipelines com `cursor-sdk` precisam de chave válida; com `opencode`, exporte também `AGENTIC_CODE_REVIEWERS_ENGINE`, `AGENTIC_CODE_REVIEWERS_MODEL` e `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` (credenciais LLM no servidor OpenCode).
 
 ### 📋 Principais opções de linha de comando (forwarded arguments)
 
@@ -437,7 +441,7 @@ Todos os argumentos passados após `--` são repassados ao indexador do Agentic 
 | Parâmetro | Descrição |
 | :--- | :--- |
 | `--engine`, `-e` | Engine: `cursor`, `cursor-sdk` ou `opencode` |
-| `CURSOR_REVIEWER_ENGINE` | (env) equivalente a `--engine` |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | (env) equivalente a `--engine` |
 | `--dry-run` | Executa o review simulado sem publicar threads ou comentários na PR (útil para testes locais). |
 | `--verbose` | Exibe logs detalhados de depuração sobre o diff git, tokens e carregamento de regras. |
 | `--gh` / `--ado` | Força a plataforma de destino como **GitHub** ou **Azure DevOps**, respectivamente (autodetectado em ambientes CI). |
@@ -457,7 +461,7 @@ Todos os argumentos passados após `--` são repassados ao indexador do Agentic 
 #### 1. Dry-run com Cursor SDK (TypeScript)
 Analisa o diff local contra a branch `master` usando boas práticas de TypeScript sem publicar nada:
 ```bash
-export CURSOR_API_KEY="sua_chave_aqui"
+export AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY="sua_chave_aqui"
 curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --dry-run --stack typescript
 ```
 
@@ -468,15 +472,15 @@ curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/mai
 opencode serve --port 43147
 
 # Terminal 2
-export CURSOR_REVIEWER_ENGINE=opencode
-export CURSOR_REVIEWER_MODEL=opencode-go/deepseek-v4-flash
-export CURSOR_REVIEWER_OPENCODE_URL=http://127.0.0.1:43147
+export AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+export AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+export AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
 npm run review:local
 ```
 
 #### 3. Diff local vs `develop` + uncommitted
 ```bash
-export CURSOR_API_KEY="sua_chave_aqui"
+export AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY="sua_chave_aqui"
 curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --dry-run --target-branch refs/heads/develop --include-uncommitted
 ```
 
@@ -485,7 +489,7 @@ Para executar remotamente na pipeline do GitHub Actions enviando os dados da PR:
 ```yaml
 - name: Run Reviewer Agent
   env:
-    CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+    AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   run: |
     curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --gh --pr-id ${{ github.event.pull_request.number }}
@@ -497,7 +501,7 @@ Executa remotamente especificando a organização e projeto:
 - script: |
     curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --ado --org "MinhaOrg" --project "MeuProjeto" --repo "MeuRepo" --pr-id $(System.PullRequest.PullRequestId)
   env:
-    CURSOR_API_KEY: $(CURSOR_API_KEY)
+    AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: $(AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY)
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
   displayName: 'Executar Agentic Code Reviewers via cURL'
 ```
@@ -509,7 +513,7 @@ Executa remotamente especificando a organização e projeto:
 ### Pré-requisitos
 
 *   Node.js **22.13+**
-*   **Engine `cursor-sdk`:** `CURSOR_API_KEY` no `.env`
+*   **Engine `cursor-sdk`:** `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` no `.env`
 *   **Engine `opencode`:** CLI [OpenCode](https://opencode.ai/) instalado; servidor em execução **ou** porta livre para modo embutido; credenciais em `~/.local/share/opencode/auth.json`
 
 ### Comandos Úteis

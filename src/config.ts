@@ -7,6 +7,7 @@ import {
 import { assertOpencodeModel, DEFAULT_OPENCODE_MODEL } from './engine/opencode/model.js';
 import type { ReviewerEngineName } from './engine/types.js';
 import { detectSourceBranchRef } from './git/diff.js';
+import { ENV, ENV_PREFIX, env } from './env.js';
 import { ProjectValidationError, resolveProject } from './project.js';
 
 export interface StackConfig {
@@ -249,7 +250,7 @@ function parseEngine(value: string | undefined): ReviewerEngineName {
 
 function resolveReviewerModel(engine: ReviewerEngineName, cliModel?: string): string {
   const raw = resolveOptionalEnv(
-    cliModel ?? process.env.CURSOR_REVIEWER_MODEL,
+    cliModel ?? env.model(),
     engine === 'opencode' ? DEFAULT_OPENCODE_MODEL : DEFAULT_MODEL,
   );
   return engine === 'opencode' ? assertOpencodeModel(raw) : assertSupportedCursorReviewerModelId(raw);
@@ -289,7 +290,7 @@ function parseCsvPatterns(value: string | undefined): string[] {
 function resolveExcludePatterns(repoRoot: string, runnerRoot: string): string[] {
   const patterns = [...BASE_EXCLUDE];
 
-  const reviewSelf = parseBool(process.env.CURSOR_REVIEWER_REVIEW_SELF, false);
+  const reviewSelf = parseBool(env.reviewSelf(), false);
   if (!reviewSelf) {
     const relPath = relative(repoRoot, runnerRoot);
     if (relPath && !relPath.startsWith('..') && !isAbsolute(relPath)) {
@@ -300,7 +301,7 @@ function resolveExcludePatterns(repoRoot: string, runnerRoot: string): string[] 
     }
   }
 
-  patterns.push(...parseCsvPatterns(process.env.CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS));
+  patterns.push(...parseCsvPatterns(env.extraExcludePatterns()));
 
   return patterns;
 }
@@ -469,8 +470,8 @@ export function resolvePullRequestIdSource(cli: CliArgs, pullRequestId: number):
   if (process.env.SYSTEM_PULLREQUEST_PULLREQUESTID?.trim()) {
     return 'SYSTEM_PULLREQUEST_PULLREQUESTID';
   }
-  if (process.env.CURSOR_REVIEWER_PR_ID?.trim()) {
-    return 'CURSOR_REVIEWER_PR_ID';
+  if (env.prId()) {
+    return ENV.PR_ID;
   }
   if (process.env.GITHUB_REF?.includes('refs/pull/')) {
     return 'GITHUB_REF';
@@ -484,8 +485,7 @@ function resolveProvider(cli: CliArgs): 'azuredevops' | 'github' {
 
   if (
     process.env.GITHUB_ACTIONS === 'true' ||
-    process.env.GITHUB_TOKEN ||
-    process.env.GH_TOKEN ||
+    env.githubToken() ||
     process.env.GITHUB_REPOSITORY
   ) {
     return 'github';
@@ -494,7 +494,7 @@ function resolveProvider(cli: CliArgs): 'azuredevops' | 'github' {
   if (
     process.env.TF_BUILD === 'true' ||
     process.env.SYSTEM_COLLECTIONURI ||
-    process.env.CURSOR_REVIEWER_ADO_ORG
+    env.adoOrg()
   ) {
     return 'azuredevops';
   }
@@ -536,7 +536,7 @@ function resolveTargetBranch(cli: CliArgs): string {
   const configured =
     cli.targetBranch?.trim() ||
     process.env.SYSTEM_PULLREQUEST_TARGETBRANCH?.trim() ||
-    resolveOptionalEnv(process.env.CURSOR_REVIEWER_TARGET_BRANCH, 'refs/heads/master');
+    resolveOptionalEnv(env.targetBranch(), 'refs/heads/master');
 
   return normalizeBranchRef(configured);
 }
@@ -550,13 +550,13 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   }
 
   const moduleUrl = import.meta.url;
-  const repoRootOverride = cli.repoRoot ?? process.env.CURSOR_REVIEWER_REPO_ROOT;
+  const repoRootOverride = cli.repoRoot ?? env.repoRoot();
   const resolvedProject = resolveProject(moduleUrl, repoRootOverride);
   const repoRoot = resolvedProject.repoRoot;
 
-  const cursorApiKey = process.env.CURSOR_API_KEY?.trim();
+  const cursorApiKey = env.cursorApiKey();
   if (!cursorApiKey) {
-    throw new Error('CURSOR_API_KEY é obrigatório. Veja .env.example');
+    throw new Error(`${ENV.CURSOR_API_KEY} é obrigatório. Veja .env.example`);
   }
 
   const sourceBranch = resolveSourceBranch(cli, repoRoot);
@@ -573,7 +573,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
 
   const organization = isAdo
     ? (cli.organization ??
-       process.env.CURSOR_REVIEWER_ADO_ORG ??
+       env.adoOrg() ??
        extractOrgFromCollectionUri(process.env.SYSTEM_COLLECTIONURI ?? ''))
     : (cli.organization ??
        process.env.GITHUB_REPOSITORY_OWNER ??
@@ -581,11 +581,11 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
        '');
 
   const adoProject = isAdo
-    ? (cli.project ?? process.env.SYSTEM_TEAMPROJECT ?? process.env.CURSOR_REVIEWER_ADO_PROJECT ?? '')
+    ? (cli.project ?? process.env.SYSTEM_TEAMPROJECT ?? env.adoProject() ?? '')
     : '';
 
   const repositoryName = isAdo
-    ? (cli.repository ?? process.env.BUILD_REPOSITORY_NAME ?? process.env.CURSOR_REVIEWER_ADO_REPO ?? '')
+    ? (cli.repository ?? process.env.BUILD_REPOSITORY_NAME ?? env.adoRepo() ?? '')
     : (cli.repository ??
        (process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/')[1] : '') ??
        '');
@@ -593,9 +593,9 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   let rawPullRequestId = cli.pullRequestId;
   if (rawPullRequestId == null) {
     if (isAdo) {
-      rawPullRequestId = Number(process.env.SYSTEM_PULLREQUEST_PULLREQUESTID ?? process.env.CURSOR_REVIEWER_PR_ID ?? 0);
+      rawPullRequestId = Number(process.env.SYSTEM_PULLREQUEST_PULLREQUESTID ?? env.prId() ?? 0);
     } else {
-      rawPullRequestId = Number(process.env.CURSOR_REVIEWER_PR_ID ?? 0);
+      rawPullRequestId = Number(env.prId() ?? 0);
       if (rawPullRequestId <= 0 && process.env.GITHUB_REF) {
         const match = process.env.GITHUB_REF.match(/refs\/pull\/(\d+)\//);
         if (match) {
@@ -610,14 +610,14 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   const pullRequestIdSource = resolvePullRequestIdSource(cli, pullRequestId);
 
   const adoAccessToken = isAdo
-    ? (process.env.SYSTEM_ACCESSTOKEN?.trim() ?? process.env.AZURE_DEVOPS_EXT_PAT?.trim() ?? '')
-    : (process.env.GITHUB_TOKEN?.trim() ?? process.env.GH_TOKEN?.trim() ?? process.env.SYSTEM_ACCESSTOKEN?.trim() ?? '');
+    ? (process.env.SYSTEM_ACCESSTOKEN?.trim() ?? env.azureDevOpsPat() ?? '')
+    : (env.githubToken() ?? process.env.SYSTEM_ACCESSTOKEN?.trim() ?? '');
 
-  const dryRun = cli.dryRun ?? parseBool(process.env.CURSOR_REVIEWER_DRY_RUN, false);
-  const seedTest = cli.seedTest ?? parseBool(process.env.CURSOR_REVIEWER_SEED_TEST, false);
+  const dryRun = cli.dryRun ?? parseBool(env.dryRun(), false);
+  const seedTest = cli.seedTest ?? parseBool(env.seedTest(), false);
   const includeUncommitted =
     cli.includeUncommitted ??
-    (parseBool(process.env.CURSOR_REVIEWER_INCLUDE_UNCOMMITTED, false) || seedTest);
+    (parseBool(env.includeUncommitted(), false) || seedTest);
 
   const hasContext = isAdo
     ? Boolean(organization && adoProject && repositoryName && pullRequestId > 0)
@@ -626,8 +626,8 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   if (hasContext && !adoAccessToken) {
     throw new Error(
       isAdo
-        ? 'Token ADO ausente. Na pipeline use SYSTEM_ACCESSTOKEN; localmente use AZURE_DEVOPS_EXT_PAT. Para dry-run sem consultar threads da PR, omita org/project/repo/pr-id.'
-        : 'Token GitHub ausente. Use GITHUB_TOKEN ou GH_TOKEN para permitir o acesso à API do GitHub.'
+        ? `Token ADO ausente. Na pipeline use SYSTEM_ACCESSTOKEN; localmente use ${ENV.AZURE_DEVOPS_PAT}. Para dry-run sem consultar threads da PR, omita org/project/repo/pr-id.`
+        : `Token GitHub ausente. Use ${ENV.GITHUB_TOKEN}, GITHUB_TOKEN ou GH_TOKEN para permitir o acesso à API do GitHub.`
     );
   }
 
@@ -641,10 +641,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     stackName = 'ABP/Angular';
     stackSource = 'fallback';
   } else {
-    const rawEnv = process.env.CURSOR_REVIEWER_STACK?.trim() ?? '';
+    const rawEnv = env.stack()?.trim() ?? '';
     const isEnvSet = rawEnv && !isUnexpandedPipelineMacro(rawEnv);
     if (isEnvSet) {
-      stackName = resolveOptionalEnv(process.env.CURSOR_REVIEWER_STACK, 'ABP/Angular');
+      stackName = resolveOptionalEnv(env.stack(), 'ABP/Angular');
       stackSource = 'env';
     } else {
       const detected = detectStack(repoRoot);
@@ -660,10 +660,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
 
   let stackConfig = getStackConfig(stackName);
   let customPromptContent: string | undefined;
-  const rawCustomPrompt = cli.customPrompt ?? process.env.CURSOR_REVIEWER_CUSTOM_PROMPT?.trim() ?? '';
+  const rawCustomPrompt = cli.customPrompt ?? env.customPrompt()?.trim() ?? '';
   const customPromptVal = rawCustomPrompt && !isUnexpandedPipelineMacro(rawCustomPrompt) ? rawCustomPrompt : '';
 
-  const rawIncludePatterns = cli.includePatterns ?? process.env.CURSOR_REVIEWER_INCLUDE_PATTERNS?.trim() ?? '';
+  const rawIncludePatterns = cli.includePatterns ?? env.includePatterns()?.trim() ?? '';
   const includePatternsVal = rawIncludePatterns && !isUnexpandedPipelineMacro(rawIncludePatterns) ? rawIncludePatterns : '';
 
   let customStackError: Error | null = null;
@@ -674,14 +674,14 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     try {
       if (stackConfig.name === 'Custom' && !customPromptVal) {
         throw new Error(
-          'A stack "Custom" requer a definição do parâmetro --custom-prompt ou da variável de ambiente CURSOR_REVIEWER_CUSTOM_PROMPT.',
+          `A stack "Custom" requer a definição do parâmetro --custom-prompt ou da variável de ambiente ${ENV.CUSTOM_PROMPT}.`,
         );
       }
 
       if (customPromptVal) {
         if (stackConfig.name !== 'Custom') {
           throw new Error(
-            '--custom-prompt / CURSOR_REVIEWER_CUSTOM_PROMPT só é permitido com --stack=Custom.',
+            `--custom-prompt / ${ENV.CUSTOM_PROMPT} só é permitido com --stack=Custom.`,
           );
         }
         customPromptContent = resolveCustomPromptContent(customPromptVal, repoRoot);
@@ -744,15 +744,15 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
       )
     : null;
 
-  const engine = parseEngine(cli.engine ?? process.env.CURSOR_REVIEWER_ENGINE);
+  const engine = parseEngine(cli.engine ?? env.engine());
 
   return {
     repoRoot,
     cursorApiKey,
     engine,
     model: resolveReviewerModel(engine, cli.model),
-    botTag: cli.botTag ?? process.env.CURSOR_REVIEWER_BOT_TAG ?? '[Cursor Reviewer]',
-    verbose: cli.verbose ?? parseBool(process.env.CURSOR_REVIEWER_VERBOSE, true),
+    botTag: cli.botTag ?? env.botTag() ?? '[Cursor Reviewer]',
+    verbose: cli.verbose ?? parseBool(env.verbose(), true),
     dryRun,
     includeUncommitted,
     seedTest,
@@ -771,11 +771,11 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     systemPromptPath: resolvedProject.systemPromptPath,
     projectName: resolvedProject.projectName,
     version: resolvedProject.version,
-    maxRounds: parseNonNegativeInt(process.env.CURSOR_REVIEWER_MAX_ROUNDS, DEFAULT_MAX_ROUNDS),
+    maxRounds: parseNonNegativeInt(env.maxRounds(), DEFAULT_MAX_ROUNDS),
     scoreMin: parseScoreMin(
       cli.scoreMin != null && Number.isFinite(cli.scoreMin)
         ? cli.scoreMin
-        : process.env.SCORE_MIN,
+        : env.scoreMin(),
     ),
     stack: stackConfig.name,
     stackPromptPath,
@@ -815,20 +815,20 @@ Pré-requisitos do projeto alvo (obrigatórios — o script encerra se ausentes)
   skills/CODE_REVIEW.md
   skills/SYSTEM_PROMPT.md
 
-Variáveis: CURSOR_API_KEY, CURSOR_REVIEWER_ENGINE (default: cursor-sdk),
-  CURSOR_REVIEWER_TARGET_BRANCH (default: refs/heads/master),
-  SCORE_MIN (default: 6), CURSOR_REVIEWER_INCLUDE_UNCOMMITTED, CURSOR_REVIEWER_SEED_TEST,
-  CURSOR_REVIEWER_REVIEW_SELF, CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS, ...
+Variáveis (prefixo ${ENV_PREFIX}): ${ENV.CURSOR_API_KEY}, ${ENV.ENGINE} (default: cursor-sdk),
+  ${ENV.TARGET_BRANCH} (default: refs/heads/master),
+  ${ENV.SCORE_MIN} (default: 6), ${ENV.INCLUDE_UNCOMMITTED}, ${ENV.SEED_TEST},
+  ${ENV.REVIEW_SELF}, ${ENV.EXTRA_EXCLUDE_PATTERNS}, ...
 
 Branches:
   - Source: sempre a branch da PR (SYSTEM_PULLREQUEST_SOURCEBRANCH na pipeline; branch git atual localmente)
-  - Target: CURSOR_REVIEWER_TARGET_BRANCH ou --target-branch (default: refs/heads/master)
+  - Target: ${ENV.TARGET_BRANCH} ou --target-branch (default: refs/heads/master)
 
 Exemplo local:
   npm run review -- --dry-run
 
 Exemplo local com target customizado:
-  CURSOR_REVIEWER_TARGET_BRANCH=refs/heads/develop npm run review -- --dry-run
+  ${ENV.TARGET_BRANCH}=refs/heads/develop npm run review -- --dry-run
 `);
 }
 

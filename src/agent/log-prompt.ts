@@ -1,4 +1,5 @@
 import { isAzurePipeline } from '../ado/pipeline-logging.js';
+import { env } from '../env.js';
 import type { Logger } from '../logger.js';
 
 export const PROMPT_START_MARKER = 'Inicio Prompt:';
@@ -24,7 +25,7 @@ export function useAnsiColors(): boolean {
   }
   if (isAzurePipeline()) {
     // Agentes ADO recentes renderizam ANSI; desligável via env.
-    return process.env.CURSOR_REVIEWER_PROMPT_COLOR?.trim().toLowerCase() !== 'false';
+    return env.promptColor()?.trim().toLowerCase() !== 'false';
   }
   return process.stdout.isTTY === true;
 }

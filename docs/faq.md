@@ -1,8 +1,6 @@
 # FAQ — Agentic Code Reviewers
 
-> **Formato:** cada item usa **pergunta** (`### …?`) + **Resposta** + *Evidência* quando aplicável.  
-> **Ordem:** sequência de execução do runner (`src/index.ts`).  
-> **Complementa:** [`flow-analysis.md`](flow-analysis.md) · [`score_calc.md`](score_calc.md) · [`../README.md`](../README.md)
+> **Variáveis:** nomenclatura canônica `AGENTIC_CODE_REVIEWERS_*` (ver [`AGENTS.md`](../AGENTS.md)). Legado `SCORE_MIN`, `CURSOR_REVIEWER_*` ainda funciona como fallback.
 
 ---
 
@@ -41,7 +39,7 @@
 
 ### Quem decide se um achado é válido?
 
-**Resposta:** Duas camadas — (1) **agente LLM:** triagem, investigação, score, JSON; (2) **TypeScript:** gate score `SCORE_MIN`–10 (default 6–10), campos obrigatórios, dedup (`review-validation.ts`, `post-comments.ts`).
+**Resposta:** Duas camadas — (1) **agente LLM:** triagem, investigação, score, JSON; (2) **TypeScript:** gate score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 (default 6–10), campos obrigatórios, dedup (`review-validation.ts`, `post-comments.ts`).
 
 *Evidência:* `docs/flow-analysis.md`; `parseCodeReviewResponse`.
 
@@ -63,7 +61,7 @@
 
 ### O que o reviewer **não** faz?
 
-**Resposta:** Não faz auto-fix, commit ou push; não resolve thread só porque a linha sumiu do diff; não publica nits abaixo de `SCORE_MIN` (default: score &lt; 6); não bloqueia a pipeline; não trata threads de humanos/outros bots como pendentes do bot.
+**Resposta:** Não faz auto-fix, commit ou push; não resolve thread só porque a linha sumiu do diff; não publica nits abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: score &lt; 6); não bloqueia a pipeline; não trata threads de humanos/outros bots como pendentes do bot.
 
 *Evidência:* `README.md`; `skills/SYSTEM_PROMPT.md`.
 
@@ -103,7 +101,7 @@ flowchart TD
 | 5 | [**§7**](#7-user-story-task-e-contexto-ado) | **Work items (US/Task), descrição PR, threads** | `work-items.ts`, `pull-request.ts`, `review-context.ts` |
 | 6 | [§8](#8-montagem-do-prompt-system_prompt-vs-runtime) | Monta prompt único e chama agente | `src/agent/prompt.ts` |
 | 7 | [§9–§10](#9-agente-cursor-sdk) | Agente executa Fase 1 + Fase 2 | `runner.ts`, `stream.ts` |
-| 8 | [§12](#12-resposta-json-e-parser) | Extrai JSON; filtra score ≥ SCORE_MIN (default 6) | `parser/`, `post-comments.ts` |
+| 8 | [§12](#12-resposta-json-e-parser) | Extrai JSON; filtra score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) | `parser/`, `post-comments.ts` |
 | 9 | [§13](#13-orçamento-de-rodadas-e-escalonamento) | Escalonamento (opcional) | `round-state.ts` |
 | 10 | [§14](#14-publicação-no-azure-devops) | Resolve threads → posta novas → summary | `post-comments.ts` |
 | 11 | [§16](#16-pipeline-ci-e-códigos-de-saída) | Resumo COM/SEM ISSUES | `gate.ts` |
@@ -128,13 +126,13 @@ flowchart TD
 
 ### Como configurar o modelo LLM?
 
-**Resposta:** Prioridade: (1) CLI `--model <id>`; (2) env `CURSOR_REVIEWER_MODEL`; (3) default por engine (`composer-2.5` em `cursor-sdk`, `anthropic/claude-sonnet-4-6` em `opencode`). Validação: `cursor-sdk` → enum em `src/engine/cursor-sdk/model.ts`; `opencode` → formato `provider/model` em `src/engine/opencode/model.ts`. Macro ADO não expandida → default.
+**Resposta:** Prioridade: (1) CLI `--model <id>`; (2) env `AGENTIC_CODE_REVIEWERS_MODEL`; (3) default por engine (`composer-2.5` em `cursor-sdk`, `anthropic/claude-sonnet-4-6` em `opencode`). Validação: `cursor-sdk` → enum em `src/engine/cursor-sdk/model.ts`; `opencode` → formato `provider/model` em `src/engine/opencode/model.ts`. Macro ADO não expandida → default.
 
-*Evidência:* `src/config.ts` (`CURSOR_REVIEWER_ENGINE`, `resolveReviewerModel`); `src/engine/`.
+*Evidência:* `src/config.ts` (`AGENTIC_CODE_REVIEWERS_ENGINE`, `resolveReviewerModel`); `src/engine/`.
 
 ### O que é obrigatório para rodar?
 
-**Resposta:** Sempre `CURSOR_API_KEY`. PAT/OAuth só se precisar de ADO (US/Task, threads, publicação).
+**Resposta:** Sempre `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`. PAT/OAuth só se precisar de ADO (US/Task, threads, publicação).
 
 ### Preciso de PAT local?
 
@@ -146,13 +144,21 @@ flowchart TD
 
 ### Quais variáveis de ambiente são mais usadas?
 
-**Resposta:** `CURSOR_API_KEY` (obrig.), `CURSOR_REVIEWER_MODEL`, `AZURE_DEVOPS_EXT_PAT`, `CURSOR_REVIEWER_TARGET_BRANCH`, `CURSOR_REVIEWER_MAX_ROUNDS` (default 5), `CURSOR_REVIEWER_TIMEOUT_MS`, `CURSOR_REVIEWER_REPO_ROOT`, `CURSOR_REVIEWER_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
+**Resposta:** `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` (obrig.), `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
 
 *Evidência:* `src/config.ts`; `test/config.test.ts`.
 
+### Qual a diferença entre `skills/` e `.agents/skills/`?
+
+**Resposta:** Duas camadas:
+- **`skills/`** — prompts embutidos pelo runner em **toda** execução CI/local (`SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, `stacks/`). Montados por `buildAgentPrompt()`.
+- **`.agents/skills/`** — skills do **Cursor/IDE** invocadas manualmente (`/code-review-self`, `/megabrain`, `/solve-pr`).
+
+Use o runner em produção; use skills IDE para dry-run sem SDK, threads conversacionais ou auto-fix no GitHub. Roteamento: [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão).
+
 ### Como funciona a seleção de Stacks Tecnológicas?
 
-**Resposta:** Permite focar o review em determinadas extensões de arquivos e carregar recomendações de arquitetura/segurança adequadas. É configurada explicitamente via flag CLI `--stack` ou env `CURSOR_REVIEWER_STACK`. Se a stack informada for desconhecida, ocorre um erro fail-fast. Caso a variável contiver uma macro não-expandida do ADO (como `$(CURSOR_REVIEWER_STACK)`), o runner resolve automaticamente para o default. Se nenhuma stack ou env for informada, o runner tentará autodetectar a stack do projeto.
+**Resposta:** Permite focar o review em determinadas extensões de arquivos e carregar recomendações de arquitetura/segurança adequadas. É configurada explicitamente via flag CLI `--stack` ou env `AGENTIC_CODE_REVIEWERS_STACK`. Se a stack informada for desconhecida, ocorre um erro fail-fast. Caso a variável contiver uma macro não-expandida do ADO (como `$(AGENTIC_CODE_REVIEWERS_STACK)`), o runner resolve automaticamente para o default. Se nenhuma stack ou env for informada, o runner tentará autodetectar a stack do projeto.
 
 *Evidência:* `src/config.ts`; `test/config.test.ts`.
 
@@ -320,7 +326,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Quais opções locais o agente usa?
 
-**Resposta:** `cwd` = `repoRoot`; `settingSources: ['project']` (harness via tools); sandbox read-only default (`CURSOR_REVIEWER_SANDBOX=false` desativa); `enableAgentRetries: true`.
+**Resposta:** `cwd` = `repoRoot`; `settingSources: ['project']` (harness via tools); sandbox read-only default (`AGENTIC_CODE_REVIEWERS_SANDBOX=false` desativa); `enableAgentRetries: true`.
 
 *Evidência:* `buildLocalOptions` em `src/engine/cursor-sdk/stream.ts`.
 
@@ -332,13 +338,13 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Qual o timeout padrão?
 
-**Resposta:** **10 minutos** (`CURSOR_REVIEWER_TIMEOUT_MS`). Ao estourar, chama `run.cancel()`.
+**Resposta:** **10 minutos** (`AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`). Ao estourar, chama `run.cancel()`.
 
 *Evidência:* `DEFAULT_TIMEOUT_MS` em `src/engine/cursor-sdk/stream.ts` e `src/engine/opencode/stream.ts`.
 
 ### Qual modelo LLM é usado?
 
-**Resposta:** Default **`composer-2.5`**. Prioridade: `--model` > `CURSOR_REVIEWER_MODEL` > default. Detalhes: [§4](#4-configuração-e-pré-requisitos).
+**Resposta:** Default **`composer-2.5`**. Prioridade: `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default. Detalhes: [§4](#4-configuração-e-pré-requisitos).
 
 *Evidência:* `src/engine/cursor-sdk/model.ts`, `src/engine/opencode/model.ts`; `src/config.ts`.
 
@@ -358,7 +364,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### O que é a Fase 2 — Investigação?
 
-**Resposta:** Por candidato, **provar com tools** antes de publicar: (2.1) ler rules + skill `code-review`; (2.2) expandir contexto (entidade, AppService, EF, Angular, testes); (2.3) **4 provas obrigatórias** em `analysis` + `impactPaths`; (2.4) atribuir severity/score; filtrar score &lt; `SCORE_MIN` (default 6); (2.5) generalizar por classe (`grep`/`glob` por ocorrências irmãs). Sem as 4 provas → **não entra** em `reviews`.
+**Resposta:** Por candidato, **provar com tools** antes de publicar: (2.1) ler rules + skill `code-review`; (2.2) expandir contexto (entidade, AppService, EF, Angular, testes); (2.3) **4 provas obrigatórias** em `analysis` + `impactPaths`; (2.4) atribuir severity/score; filtrar score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6); (2.5) generalizar por classe (`grep`/`glob` por ocorrências irmãs). Sem as 4 provas → **não entra** em `reviews`.
 
 *Evidência:* `src/agent/prompt.ts` § Fase 2; `.agents/skills/code-review/SKILL.md`.
 
@@ -374,19 +380,19 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Existe fórmula de cálculo do score?
 
-**Resposta:** **Não.** O agente **atribui** score (0–10) e severity qualitativamente. O TypeScript só aceita **SCORE_MIN–10** para publicação (default **6–10**). Documentação completa: [`score_calc.md`](score_calc.md).
+**Resposta:** **Não.** O agente **atribui** score (0–10) e severity qualitativamente. O TypeScript só aceita **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** para publicação (default **6–10**). Documentação completa: [`score_calc.md`](score_calc.md).
 
-*Evidência:* `src/ado/review-validation.ts` — `DEFAULT_SCORE_MIN = 6`; `src/config.ts` — `SCORE_MIN` / `--score-min`; `skills/SYSTEM_PROMPT.md`.
+*Evidência:* `src/ado/review-validation.ts` — `DEFAULT_SCORE_MIN = 6`; `src/config.ts` — `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min`; `skills/SYSTEM_PROMPT.md`.
 
 ### Quais scores são publicados?
 
-**Resposta:** Com o default (`SCORE_MIN=6`): 0–5 → não publica; 6–8 → `warning` ou `suggestion`; 9–10 → `critical`. Com `SCORE_MIN` menor (ex.: `4`), scores 4–5 também podem virar thread se passarem no gate completo.
+**Resposta:** Com o default (`AGENTIC_CODE_REVIEWERS_SCORE_MIN=6`): 0–5 → não publica; 6–8 → `warning` ou `suggestion`; 9–10 → `critical`. Com `AGENTIC_CODE_REVIEWERS_SCORE_MIN` menor (ex.: `4`), scores 4–5 também podem virar thread se passarem no gate completo.
 
 *Evidência:* `src/ado/review-validation.ts`; [`score_calc.md`](score_calc.md).
 
-### Como configurar o limiar de publicação (`SCORE_MIN`)?
+### Como configurar o limiar de publicação (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`)?
 
-**Resposta:** Opcional. Env `SCORE_MIN=N` ou CLI `--score-min N` (precedência: CLI &gt; env &gt; default `6`). **Omitir** ambos mantém pipelines existentes intactas — sem breaking change.
+**Resposta:** Opcional. Env `AGENTIC_CODE_REVIEWERS_SCORE_MIN=N` ou CLI `--score-min N` (precedência: CLI &gt; env &gt; default `6`). **Omitir** ambos mantém pipelines existentes intactas — sem breaking change.
 
 *Evidência:* `src/config.ts` (`parseScoreMin`, `loadConfig`); `README.md`.
 
@@ -416,7 +422,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Como funciona o escalonamento?
 
-**Resposta:** Contador em thread geral (`<!-- reviewer-round-state -->`). `currentRound = rodadasAnteriores + 1`. Se `currentRound > maxRounds` **e** há issues abertas: publica **só** `critical`; suprime novos `warning`/`suggestion`; avisa **revisão humana recomendada**. Default `maxRounds`: **5** (`CURSOR_REVIEWER_MAX_ROUNDS`; `0` desabilita).
+**Resposta:** Contador em thread geral (`<!-- reviewer-round-state -->`). `currentRound = rodadasAnteriores + 1`. Se `currentRound > maxRounds` **e** há issues abertas: publica **só** `critical`; suprime novos `warning`/`suggestion`; avisa **revisão humana recomendada**. Default `maxRounds`: **5** (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; `0` desabilita).
 
 *Evidência:* `src/ado/round-state.ts`; `src/index.ts` ~261–283; `src/config.ts` — `DEFAULT_MAX_ROUNDS = 5`.
 
@@ -426,7 +432,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Quando uma review vira thread?
 
-**Resposta:** Quando passa em `isPublishableReview` (score ≥ `SCORE_MIN`, default 6, campos OK) **e** não é duplicata na mesma linha.
+**Resposta:** Quando passa em `isPublishableReview` (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6, campos OK) **e** não é duplicata na mesma linha.
 
 *Evidência:* `src/ado/post-comments.ts` — `setPullRequestComments`, `isDuplicateReview`.
 
@@ -516,7 +522,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Reviewer aponta o próprio código (diretório do runner) — por quê?
 
-**Resposta:** Exclude ativo por padrão (anti self-review). `CURSOR_REVIEWER_REVIEW_SELF=true` só para desenvolver o runner.
+**Resposta:** Exclude ativo por padrão (anti self-review). `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` só para desenvolver o runner.
 
 *Evidência:* `src/config.ts` — padrões exclude.
 
@@ -574,17 +580,18 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 | Como o prompt é montado? | System Prompt + CODE_REVIEW + contexto + diff + rules + ADO + workflow 2 fases (`prompt.ts`). |
 | O agente lê o repo? | **Sim** — tools com `settingSources: ['project']` e sandbox read-only. |
 | Quantas fases de análise? | **Duas** na mesma execução: triagem → investigação. |
-| Como o score é calculado? | **Atribuição qualitativa** pelo LLM; gate `SCORE_MIN`–10 no TypeScript (default 6) ([`score_calc.md`](score_calc.md)). |
-| O que vira thread? | Review com score ≥ `SCORE_MIN` (default 6), campos OK, linha não duplicada. |
-| Como abaixar o limiar de threads? | `SCORE_MIN=4` ou `--score-min 4` (opt-in; omitir = default 6). |
+| Como o score é calculado? | **Atribuição qualitativa** pelo LLM; gate `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 no TypeScript (default 6) ([`score_calc.md`](score_calc.md)). |
+| O que vira thread? | Review com score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6), campos OK, linha não duplicada. |
+| Como abaixar o limiar de threads? | `AGENTIC_CODE_REVIEWERS_SCORE_MIN=4` ou `--score-min 4` (opt-in; omitir = default 6). |
 | Por que sumiu um warning na rodada 4? | Escalonamento `MAX_ROUNDS` — só `critical` segue sendo publicado. |
 | Posso testar localmente? | `npm run review -- --dry-run` na raiz do repositório (ou no submódulo, se instalado em `scripts/agentic-code-reviewers/`). |
 | Onde customizar critérios? | Repo alvo: `.agents/skills/code-review/`; runner: `skills/SYSTEM_PROMPT.md`. |
+| Skills IDE vs runtime? | Runtime: `skills/` (CI); IDE: `.agents/skills/` — ver [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão). |
 | Work items no review? | Se vinculados à PR + token ADO — etapa [§7](#7-user-story-task-e-contexto-ado), **não** no `SYSTEM_PROMPT.md`. |
 | US/Task faz parte do system prompt? | **Não** — conteúdo dinâmico da API ADO, append no prompt composto ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)). |
-| Como configurar o modelo? | `--model` > `CURSOR_REVIEWER_MODEL` > default `composer-2.5`; IDs em `model.ts`. |
+| Como configurar o modelo? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; IDs em `model.ts`. |
 | Modelo inválido na pipeline? | Macro ADO vazia cai no default; ID inexistente no enum → exit 1 na subida. |
-| Preciso de PAT local? | Só para ADO (threads/work items/publicação); dry-run básico: só `CURSOR_API_KEY`. |
+| Preciso de PAT local? | Só para ADO (threads/work items/publicação); dry-run básico: só `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY`. |
 
 ---
 
