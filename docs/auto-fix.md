@@ -31,11 +31,18 @@ O revisor controla quantas rodadas de revisão/correção já ocorreram utilizan
 Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudanças concretas no código, o script de validação de Git (`git status --porcelain`) detectará que a *working tree* está limpa. Neste caso, o agente termina silenciosamente sem fazer o commit e push. **Sem o push, o loop se encerra automaticamente.**
 
 ### 3. Concorrência e Execução Sequencial (Sem sobreposição)
-Para evitar que múltiplos agentes corram em paralelo sobre a mesma branch (causando falhas de push *non-fast-forward* ou re-resolvendo as mesmas threads indevidamente), a pipeline de Auto-Fix executa as ferramentas sequencialmente em um único job:
-1. **Primeiro**: Executa o agente `cursor-sdk`.
-2. **Sincronização**: Realiza um reset rígido (`git fetch` + `git reset --hard`) trazendo os commits e as correções eventualmente aplicadas pelo Cursor SDK para o workspace local.
-3. **Segundo**: Executa o agente `opencode` a partir do estado atualizado.
-Isso garante a ordem correta, evita conflitos de concorrência e assegura que as threads resolvidas em etapas anteriores não sejam reprocessadas.
+Para evitar que múltiplos agentes corram em paralelo sobre a mesma branch (causando falhas de push *non-fast-forward* ou re-resolvendo as mesmas threads indevidamente):
+
+- **`concurrency` por PR** no job (`auto-fix-<pr_number>`) — execuções sobrepostas do auto-fix na mesma PR ficam enfileiradas (`cancel-in-progress: false`).
+- **Engines sequenciais** dentro do job:
+  1. **Primeiro**: agente `cursor-sdk` (`--auto-fix`).
+  2. **Sincronização**: `git fetch` + `git reset --hard origin/<branch>` — incorpora commits do passo anterior.
+  3. **Segundo**: agente `opencode` a partir do estado atualizado.
+- **Resolução parcial de threads**: só threads cuja **linha teve conteúdo alterado** pelos replacements são fechadas (evita falso positivo em intervals amplos do subagente).
+- **Falha explícita**: se todos os engines **configurados** falharem (timeout, API key, push), o workflow reporta erro — não conclui silenciosamente em verde.
+
+### 4. Gatilho após review manual
+O job aceita `workflow_run` bem-sucedido independentemente do evento original (`pull_request` ou `workflow_dispatch`), para que re-runs manuais do code review também disparem auto-fix quando configurado.
 
 ## Configuração Necessária (GitHub Actions)
 

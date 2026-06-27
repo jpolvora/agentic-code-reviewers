@@ -25,7 +25,8 @@
 | 15 | [Threads, dedup e resolução](#15-threads-dedup-e-resolução) | `review-context` |
 | 16 | [Pipeline e exit codes](#16-pipeline-ci-e-códigos-de-saída) | `gate` |
 | 17 | [Troubleshooting](#17-troubleshooting) | — |
-| 18 | [Mapa de evidências](#18-mapa-de-evidências-no-código) | — |
+| 18 | [Auto-Fix e self-healing](#18-auto-fix-e-self-healing) | `--auto-fix`, `auto-fix.yml` |
+| 19 | [Mapa de evidências](#19-mapa-de-evidências-no-código) | — |
 
 ---
 
@@ -55,15 +56,17 @@
 
 ### O que o reviewer faz?
 
-**Resposta:** (1) Prepara git e diff; (2) filtra `.cs`/`.ts`/`.html`; (3) coleta work items e threads ADO; (4) executa agente em duas fases; (5) parseia JSON e aplica gate; (6) publica/resolve threads; (7) emite resumo COM/SEM ISSUES.
+**Resposta:** (1) Prepara git e diff; (2) filtra arquivos elegíveis da stack; (3) coleta work items e threads; (4) executa agente em duas fases (**read-only**); (5) parseia JSON e aplica gate (`scoreMin` + Safe Outputs); (6) publica/resolve threads; (7) emite resumo COM/SEM ISSUES. Opcionalmente, CI dispara **auto-fix** em workflow separado (`--auto-fix`).
 
 *Evidência:* módulos listados em `src/index.ts` (ver [§3](#3-linha-do-tempo-ordem-de-execução)).
 
 ### O que o reviewer **não** faz?
 
-**Resposta:** Não faz auto-fix, commit ou push; não resolve thread só porque a linha sumiu do diff; não publica nits abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: score &lt; 6); não bloqueia a pipeline; não trata threads de humanos/outros bots como pendentes do bot.
+**Resposta:** O fluxo **padrão de review** não altera código, não faz commit/push e não resolve thread só porque a linha sumiu do diff. Não publica nits abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: score &lt; 6); não bloqueia a pipeline; não trata threads de humanos/outros bots como pendentes do bot.
 
-*Evidência:* `README.md`; `skills/SYSTEM_PROMPT.md`.
+**Exceção — modo auto-fix:** com `--auto-fix` ou workflow `auto-fix.yml`, o runner **aplica** correções, commit/push e resolve threads parcialmente — ver [§18](#18-auto-fix-e-self-healing).
+
+*Evidência:* `skills/SYSTEM_PROMPT.md` (read-only); `src/orchestrator/autofix-runner.ts`.
 
 ---
 
@@ -398,9 +401,21 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Como configurar o limiar de publicação (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`)?
 
-**Resposta:** Opcional. Env `AGENTIC_CODE_REVIEWERS_SCORE_MIN=N` ou CLI `--score-min N` (precedência: CLI &gt; env &gt; default `6`). **Omitir** ambos mantém pipelines existentes intactas — sem breaking change.
+**Resposta:** Opcional. Env `AGENTIC_CODE_REVIEWERS_SCORE_MIN=N` ou CLI `--score-min N` (precedência: CLI &gt; env &gt; default `6`). **Omitir** ambos mantém pipelines existentes intactas — sem breaking change. O valor é injetado no prompt (`buildExecutionContext`, Fase 2.4), aplicado em `isPublishableReview` e em Safe Outputs (`severity-score`).
 
-*Evidência:* `src/config.ts` (`parseScoreMin`, `loadConfig`); `README.md`.
+*Evidência:* `src/config.ts`; `src/agent/prompt.ts`; `src/ado/safe-outputs.ts`; `README.md`.
+
+### O `score_min` vale igual para cursor-sdk e opencode?
+
+**Resposta:** **Sim.** Ambas as engines usam o mesmo `config.scoreMin` via `buildAgentPrompt` e `parseCodeReviewResponse`. Não há limiar separado por engine.
+
+*Evidência:* `src/agent/runner.ts`; `src/index.ts`.
+
+### Por que um review score 5 não virou thread com `SCORE_MIN=4`?
+
+**Resposta:** Verifique: (1) `severity`/`score` consistentes no Safe Outputs; (2) `analysis` com 4 seções numeradas; (3) linha no diff (`REQUIRE_DIFF_LINE`); (4) path protegido; (5) agente omitiu no JSON (filtro prompt). Logs: `Policy: N review(s) descartado(s)` e `Safe Outputs: N review(s) descartado(s)`.
+
+*Evidência:* `post-comments.ts`; `safe-outputs.ts`.
 
 ---
 
@@ -424,7 +439,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Por que existe escalonamento de rodadas?
 
-**Resposta:** Evitar loop infinito **fix-pr ↔ reviewer** quando issues residuais persistem após várias rodadas.
+**Resposta:** Evitar loop infinito **correção ↔ reviewer** (manual, `solve-pr`, auto-fix CI) quando issues residuais persistem após várias rodadas.
 
 ### Como funciona o escalonamento?
 
@@ -522,9 +537,9 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Threads não aparecem na PR — o que verificar?
 
-**Resposta:** Score ≥ 6? Campos obrigatórios? Dedup na mesma linha? Dry-run ativo? Build Service com “Contribute to pull requests”? OAuth token habilitado na pipeline?
+**Resposta:** Score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6, não fixo 6 se configurado)? Campos obrigatórios? Safe Outputs (diff-line, analysis)? Dedup na mesma linha? Dry-run ativo? Build Service com “Contribute to pull requests”? OAuth token habilitado na pipeline?
 
-*Evidência:* `review-validation.ts`, `post-comments.ts`, `README.md` § “Pré-requisitos no Azure DevOps”.
+*Evidência:* `review-validation.ts`, `safe-outputs.ts`, `post-comments.ts`, `README.md` § “Pré-requisitos no Azure DevOps”.
 
 ### Reviewer aponta o próprio código (diretório do runner) — por quê?
 
@@ -546,7 +561,53 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ---
 
-## 18. Mapa de evidências no código
+## 18. Auto-Fix e self-healing
+
+### O reviewer corrige código automaticamente?
+
+**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit/push e resolvem threads cuja linha foi de fato alterada.
+
+*Evidência:* `src/index.ts` (`config.autoFix`); `src/orchestrator/autofix-runner.ts`; [`auto-fix.md`](auto-fix.md).
+
+### Qual a diferença entre auto-fix (CI) e skill `solve-pr`?
+
+**Resposta:** **Auto-fix CI** — acionado por `workflow_run` após code review; usa `run.sh --auto-fix` com engines configuradas. **`solve-pr`** — skill IDE (`.agents/skills/solve-pr/`) para operador local: busca threads GitHub, corrige, commit/push manualmente. Ambos exigem token com escrita na PR.
+
+*Evidência:* `AGENTS.md` § Skills routing.
+
+### Por que o loop review → fix → review parou após a primeira correção?
+
+**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) auto-fix falhou silenciosamente — verifique logs do step “Fail if all configured auto-fix engines failed”.
+
+*Evidência:* [`auto-fix.md`](auto-fix.md); `.github/workflows/auto-fix.yml`.
+
+### O auto-fix resolve todas as threads de um arquivo de uma vez?
+
+**Resposta:** **Não necessariamente.** Só threads cujo **conteúdo na linha** mudou após os replacements são marcadas como resolvidas. Threads dentro de um intervalo amplo mas sem alteração na linha permanecem abertas.
+
+*Evidência:* `isThreadLineModified` em `autofix-runner.ts`; `test/autofix.test.ts`.
+
+### Posso rodar auto-fix localmente?
+
+**Resposta:** Sim, com contexto de PR e token:
+
+```bash
+npm run review -- --gh --pr-id 42 --source-branch feat/x --target-branch main --auto-fix
+```
+
+Use `--dry-run` no runner de review para validar threads sem publicar; auto-fix respeita `dryRun` (simula commit/resolução).
+
+*Evidência:* `src/config.ts` — `--auto-fix`; `autofix-runner.ts`.
+
+### O que um agente/desenvolvedor deve atualizar ao mudar o runner?
+
+**Resposta:** Toda alteração de comportamento exige **testes** (`npm test`) **e** documentação em sync no mesmo PR: `AGENTS.md`, `README.md`, `docs/` afetados (`faq.md`, `index.md`, `flow-analysis.md`, `score_calc.md`, `auto-fix.md`), `skills/` se prompts/gates mudarem, `.env.example` se env vars mudarem, workflows/exemplos se CI mudar. Ver [`AGENTS.md`](../AGENTS.md) § Definition of Done.
+
+*Evidência:* `AGENTS.md` — Invariant Behavior (Developer Agent).
+
+---
+
+## 19. Mapa de evidências no código
 
 ### Onde encontrar no código cada tema documentado?
 
@@ -563,6 +624,8 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 | Rules pré-mapeadas | `src/project/rules-map.ts` |
 | Parser JSON | `src/parser/review-response.ts` |
 | Gate score | `src/ado/review-validation.ts` |
+| Safe Outputs | `src/ado/safe-outputs.ts` |
+| Auto-fix | `src/orchestrator/autofix-runner.ts`, `src/git/autofix-commit.ts` |
 | Post ADO | `src/ado/post-comments.ts` |
 | Formato thread | `src/ado/format-thread.ts` |
 | Contexto threads | `src/ado/review-context.ts` |
@@ -581,8 +644,10 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 | Pergunta | Resposta curta |
 |----------|----------------|
-| O bot corrige código? | **Não** — só publica threads. |
-| Bloqueia merge? | **Não** — exit 0 com issues. |
+| O bot corrige código? | **Review padrão: não.** Modo `--auto-fix` / `auto-fix.yml`: **sim** (commit + push). |
+| Bloqueia merge? | **Não** — exit 0 com issues (ruleset GitHub pode exigir threads resolvidas). |
+| Auto-fix vs solve-pr? | CI: `auto-fix.yml` + `--auto-fix`. Local IDE: skill `/solve-pr`. |
+| score_min por engine? | **Não** — mesmo `config.scoreMin` para cursor-sdk e opencode. |
 | Como o prompt é montado? | System Prompt + CODE_REVIEW + contexto + diff + rules + ADO + workflow 2 fases (`prompt.ts`). |
 | O agente lê o repo? | **Sim** — tools com `settingSources: ['project']` e sandbox read-only. |
 | Quantas fases de análise? | **Duas** na mesma execução: triagem → investigação. |
@@ -591,6 +656,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 | Como abaixar o limiar de threads? | `AGENTIC_CODE_REVIEWERS_SCORE_MIN=4` ou `--score-min 4` (opt-in; omitir = default 6). |
 | Por que sumiu um warning na rodada 4? | Escalonamento `MAX_ROUNDS` — só `critical` segue sendo publicado. |
 | Posso testar localmente? | `npm run review -- --dry-run` na raiz do repositório (ou no submódulo, se instalado em `scripts/agentic-code-reviewers/`). |
+| Como contribuir ao runner? | Fork → implemente → `npm test` → atualize docs (`AGENTS.md` § Definition of Done) → PR. |
 | Onde customizar critérios? | Repo alvo: `.agents/skills/code-review/`; runner: `skills/SYSTEM_PROMPT.md`. |
 | Skills IDE vs runtime? | Runtime: `skills/` (CI); IDE: `.agents/skills/` — ver [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão). |
 | Work items no review? | Se vinculados à PR + token ADO — etapa [§7](#7-user-story-task-e-contexto-ado), **não** no `SYSTEM_PROMPT.md`. |
@@ -605,6 +671,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 | Documento | Conteúdo |
 |-----------|----------|
+| [`auto-fix.md`](auto-fix.md) | Ciclo self-healing, PAT, proteções |
 | [`flow-analysis.md`](flow-analysis.md) | Fluxo técnico completo |
 | [`score_calc.md`](score_calc.md) | Score e severidade |
 | [`two-phase-execution-model.md`](two-phase-execution-model.md) | Modelo das duas fases |

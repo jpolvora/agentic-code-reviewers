@@ -18,8 +18,12 @@ permissions:
 jobs:
   review:
     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+    with:
+      score_min: '6'   # opcional; omitir = default 6 (precedência: input > env no runner)
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      # recomendado — publicar reviews e resolver threads (resolvedThreads / auto-fix):
+      # AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
 
 # ── Opção B: curl direto (sem reusable workflow) ─────────────────────────
 #
