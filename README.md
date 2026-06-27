@@ -58,7 +58,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
 *   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
     *   **`megabrain`** — Revisão com threads persistentes (`[Thread #1]`, `[Thread #2]`, …); em rodadas seguintes avalia se cada thread foi `RESOLVED` ou permanece `UNRESOLVED`.
-    *   **`solve-pr`** — Automatiza o ciclo de correção: busca threads do bot no GitHub, aplica fixes, commit/push e aguarda nova rodada do reviewer.
+    *   **`solve-pr`** — Automatiza o ciclo cooperativo: busca todas as threads abertas no GitHub, aplica fixes, commit/push e aguarda nova rodada do reviewer.
 
 ---
 
@@ -360,7 +360,7 @@ Skills para o **Cursor/IDE** — distintas dos prompts em `skills/` que o runner
 | :--- | :--- | :--- |
 | `code-review-self` | `/code-review-self` | Dry-run local espelhando `src/index.ts` sem `@cursor/sdk` |
 | `megabrain` | `/megabrain` | Revisão iterativa com `[Thread #N]` |
-| `solve-pr` | `/solve-pr` | Corrigir threads do bot no GitHub e republicar |
+| `solve-pr` | `/solve-pr` | Corrigir threads abertas no GitHub e republicar |
 
 Prompts de runtime (`skills/SYSTEM_PROMPT.md`, `skills/CODE_REVIEW.md`, `skills/stacks/`) são carregados automaticamente pelo runner — não requerem invocação manual.
 

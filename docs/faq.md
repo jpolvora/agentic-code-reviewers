@@ -571,7 +571,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Qual a diferença entre auto-fix (CI) e skill `solve-pr`?
 
-**Resposta:** **Auto-fix CI** — acionado por `workflow_run` após code review; usa `run.sh --auto-fix` com engines configuradas. **`solve-pr`** — skill IDE (`.agents/skills/solve-pr/`) para operador local: busca threads GitHub, corrige, commit/push manualmente. Ambos exigem token com escrita na PR.
+**Resposta:** **Auto-fix CI** — acionado por `workflow_run` após code review; usa `run.sh --auto-fix` com engines configuradas; corrige somente threads do bot. **`solve-pr`** — skill IDE (`.agents/skills/solve-pr/`) para operador local: busca **todas** as threads abertas da PR, corrige, commit/push manualmente. Ambos exigem token com escrita na PR.
 
 *Evidência:* `AGENTS.md` § Skills routing.
 

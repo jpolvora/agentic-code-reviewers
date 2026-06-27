@@ -1,6 +1,6 @@
 ---
 name: solve-pr
-description: Skill agêntica para buscar threads ativas do bot na PR (GitHub), corrigir issues de code review com o mesmo gate cooperativo do Auto-Fix CI, validar, commit, resolver threads e push — modo IDE independente do runner --auto-fix.
+description: Skill agêntica para buscar threads abertas da PR (GitHub), corrigir issues de code review com gate cooperativo, validar, commit, resolver threads e push — loop code-review → fix → commit → code-review.
 ---
 
 # Skill `solve-pr` — correção cooperativa de PR (IDE)
@@ -11,8 +11,16 @@ Runtime **IDE** complementar ao **Auto-Fix CI** (`--auto-fix` / `auto-fix.yml`).
 |---|-------------|----------------|
 | Gatilho | `workflow_run` / `--auto-fix` | `/solve-pr` manual |
 | Correção | Subagente JSON + replacements | Agente IDE (edição direta) |
-| Threads | `PlatformProvider` | Scripts GraphQL |
+| Threads | Bot (`PlatformProvider`) | **Todas** as threads abertas (GraphQL) |
 | Push | Após resolução OK | Após resolução OK |
+
+## Loop cooperativo
+
+```
+code review → developer fix → commit → resolve threads → push → code review → …
+```
+
+`solve-pr` lista **todas** as review threads não resolvidas da PR — bot, humano ou outro reviewer. Não filtra por `AGENTIC_CODE_REVIEWERS_BOT_TAG`.
 
 ---
 
@@ -20,13 +28,12 @@ Runtime **IDE** complementar ao **Auto-Fix CI** (`--auto-fix` / `auto-fix.yml`).
 
 - Repositório GitHub; branch da PR checked out.
 - Token com escrita: `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (preferido) ou `GITHUB_TOKEN` / `GH_TOKEN`.
-- Opcional: `AGENTIC_CODE_REVIEWERS_BOT_TAG` (default `[Cursor Reviewer]`) para filtrar threads do bot.
 
 ---
 
 ## Fluxo (gate cooperativo)
 
-### 1. Recuperar threads ativas do bot
+### 1. Recuperar threads abertas
 
 ```bash
 node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID>
@@ -34,7 +41,7 @@ node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID>
 node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID> --json
 ```
 
-Saída inclui `threadId`, `filePath`, `lineNumber`, `summary` — mesmo contexto que o Auto-Fix injeta no subagente.
+Saída inclui `threadId`, `filePath`, `lineNumber`, `summary` — qualquer thread aberta na PR.
 
 ### 2. Investigar e corrigir (paridade com Auto-Fix)
 
@@ -84,15 +91,14 @@ Se novas threads aparecerem, reinicie do passo 1.
 
 ## Comportamento cooperativo com code review
 
-- Threads publicadas pelo reviewer usam score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, severity e `analysis` estruturado — use o **comentário da thread** como spec da correção.
-- Respostas de resolução usam o mesmo marcador que o runner (`<!-- resolution-reply -->`) para a próxima rodada reconhecer histórico.
+- Use o **comentário da thread** como spec da correção (severity, analysis, suggested fix).
+- Respostas de resolução usam `<!-- resolution-reply -->` para a próxima rodada reconhecer histórico.
 - Não re-levante issues já resolvidas sem nova evidência (mesma política do reviewer).
 
 ---
 
 ## O que não fazer
 
-- Não resolver threads de humanos/outros bots.
 - Não push antes de resolver threads tentadas.
 - Não refatorar código adjacente à issue.
 - Não criar `implementation_plan.md` obrigatório — plano mental ou notas curtas bastam.

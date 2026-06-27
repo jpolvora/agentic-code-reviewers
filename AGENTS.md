@@ -208,7 +208,7 @@ The CI agent does **not** read `.agents/skills/` automatically — only what the
 |---|---|---|---|
 | [`code-review-self`](.agents/skills/code-review-self/SKILL.md) | `/code-review-self` | Read-only | `src/index.ts` — triage, gate, rounds, identical JSON |
 | [`megabrain`](.agents/skills/megabrain/SKILL.md) | `/megabrain` | Read-only | Iterative review with `[Thread #N]`; evaluates `RESOLVED`/`UNRESOLVED` |
-| [`solve-pr`](.agents/skills/solve-pr/SKILL.md) | `/solve-pr` | Read + write | Fetches GitHub threads → fix → commit/push → new CI round |
+| [`solve-pr`](.agents/skills/solve-pr/SKILL.md) | `/solve-pr` | Read + write | Fetches all open GitHub threads → fix → commit/push → new CI round |
 
 **Routing — which to use?**
 
@@ -216,7 +216,7 @@ The CI agent does **not** read `.agents/skills/` automatically — only what the
 PR in CI (ADO/GitHub)      → automatic runner (npm run review / workflow)
 Local dry-run without SDK  → code-review-self
 Follow-up after fixes      → megabrain (human threads) or runner (bot threads)
-Fix bot-published threads  → solve-pr (GitHub) or manual dev
+Fix review threads locally      → solve-pr (GitHub) or manual dev
 ```
 
 | Scenario | Skill / path |
@@ -224,7 +224,7 @@ Fix bot-published threads  → solve-pr (GitHub) or manual dev
 | Validate gate and prompt before merge | `code-review-self` + `npm test` |
 | Conversational review with stable IDs | `megabrain` |
 | Bot published threads; want auto-fix in CI | `auto-fix.yml` + `--auto-fix` (see `skills/COOPERATIVE_FIX.md`) |
-| Bot published threads; want auto-fix locally | `/solve-pr` (same cooperative contract as Auto-Fix CI) |
+| Open review threads; want local fix cycle | `/solve-pr` (same cooperative gate as Auto-Fix CI) |
 | Production / pipeline | No IDE skill — runner + `skills/` only |
 
 #### Adding or Modifying an IDE Skill
@@ -281,6 +281,6 @@ See [Skills — Routing and Management](#skills--routing-and-management) above. 
 |---|---|
 | `code-review-self` | Read-only agentic review via IDE, without `@cursor/sdk`. |
 | `megabrain` | Numbered threads (`[Thread #N]`); follow-up across commits. |
-| `solve-pr` | Active GitHub threads → fix → commit/push → awaits runner. |
+| `solve-pr` | Open GitHub threads → fix → commit/push → awaits runner. |
 
 When adding or modifying skills, update this file, `README.md`, and `docs/index.md`.

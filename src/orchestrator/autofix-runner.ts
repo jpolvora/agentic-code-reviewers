@@ -6,7 +6,7 @@ import type { PlatformProvider } from '../provider/types.js';
 import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
-import { commitAutoFixChanges, pushAutoFixChanges } from '../git/autofix-commit.js';
+import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
@@ -144,6 +144,21 @@ async function mapPool<T, R>(
   return buckets.flat();
 }
 
+/** Dual-engine sequencial: publica commit deixado pelo engine anterior quando threads já foram resolvidas. */
+async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Promise<void> {
+  if (config.dryRun || !isLocalAheadOfRemote(config.repoRoot)) {
+    return;
+  }
+
+  logger.section('Recovery: publicando commit pendente do engine anterior');
+  const pushed = await pushAutoFixChanges(config, logger);
+  if (!pushed) {
+    throw new Error(
+      'Recovery dual-engine: falha ao publicar commit local pendente (threads já resolvidas por engine anterior).',
+    );
+  }
+}
+
 export async function runAutoFixFlow(
   config: ReviewerConfig,
   reviewContext: ReviewContextResult,
@@ -154,6 +169,7 @@ export async function runAutoFixFlow(
   const activeThreads = reviewContext.activeThreads || [];
   if (activeThreads.length === 0) {
     logger.info('Nenhuma thread ativa/aberta para correção automática.');
+    await tryRecoverPendingPush(config, logger);
     return;
   }
 
@@ -270,13 +286,6 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         }
 
         const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
-        
-        if (config.dryRun) {
-          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
-        } else {
-          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
-          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
-        }
 
         const localResolvedItems: ResolvedThreadItem[] = [];
 
@@ -301,6 +310,20 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
               `Thread ${thread.threadId} na linha ${thread.lineNumber} de ${filePath} não foi afetada pelas substituições e continuará aberta.`,
             );
           }
+        }
+
+        if (localResolvedItems.length === 0) {
+          logger.warn(
+            `Arquivo ${filePath} teria alterações sem threads resolvíveis — correção descartada.`,
+          );
+          return undefined;
+        }
+
+        if (config.dryRun) {
+          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
+        } else {
+          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
+          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
         return { relativePath, resolvedItems: localResolvedItems };
@@ -351,5 +374,10 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
   }
 
   logger.section('Push das alterações (após resolução)');
-  await pushAutoFixChanges(config, logger);
+  const pushed = await pushAutoFixChanges(config, logger);
+  if (!pushed) {
+    throw new Error(
+      'Gate cooperativo: push falhou após resolução de threads — PR e remoto podem estar inconsistentes.',
+    );
+  }
 }

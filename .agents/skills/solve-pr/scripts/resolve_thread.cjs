@@ -1,7 +1,6 @@
 const fs = require('fs');
 
 const RESOLUTION_MARKER = '<!-- resolution-reply -->';
-const DEFAULT_BOT_TAG = '[Cursor Reviewer]';
 
 function loadDotEnv() {
   if (!fs.existsSync('.env')) return;
@@ -25,16 +24,9 @@ function resolveToken() {
   );
 }
 
-function buildResolutionBody(note, botTag) {
+function buildResolutionBody(note) {
   const explanation = note?.trim() || 'Issue corrigida na iteração atual.';
-  return [
-    botTag,
-    RESOLUTION_MARKER,
-    '',
-    'Issue addressed in the current iteration. Marking as resolved.',
-    '',
-    explanation,
-  ].join('\n');
+  return [RESOLUTION_MARKER, '', explanation].join('\n');
 }
 
 async function main() {
@@ -42,7 +34,6 @@ async function main() {
 
   const threadId = process.argv[2];
   const note = process.argv[3];
-  const botTag = process.env.AGENTIC_CODE_REVIEWERS_BOT_TAG || DEFAULT_BOT_TAG;
 
   if (!threadId) {
     console.error('Usage: node resolve_thread.cjs <THREAD_ID> "<resolution note>"');
@@ -57,7 +48,7 @@ async function main() {
     process.exit(1);
   }
 
-  const body = buildResolutionBody(note, botTag);
+  const body = buildResolutionBody(note);
 
   const query = `
     mutation ResolveAndReply($threadId: ID!, $body: String!) {

@@ -81,15 +81,28 @@ jobs:
 
       - run: npm ci
 
-      - name: Check Cursor SDK configuration
+      - name: Detect configured auto-fix engines
+        id: engines
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
-          if [ -z "${{ secrets.CURSOR_API_KEY }}" ]; then
+          if [ -n "$CURSOR_API_KEY" ]; then
+            echo "cursor=true" >> $GITHUB_OUTPUT
+          else
+            echo "cursor=false" >> $GITHUB_OUTPUT
             echo "::warning::CURSOR_API_KEY não configurada. O passo do Auto-Fix com cursor-sdk será ignorado."
+          fi
+          if [ -n "$OPENCODE_API_KEY" ]; then
+            echo "opencode=true" >> $GITHUB_OUTPUT
+          else
+            echo "opencode=false" >> $GITHUB_OUTPUT
+            echo "::warning::OPENCODE_API_KEY não configurada. O passo do Auto-Fix com opencode será ignorado."
           fi
 
       - name: Run Auto-Fix (cursor-sdk)
         id: autofix-cursor
-        if: ${{ secrets.CURSOR_API_KEY != '' }}
+        if: steps.engines.outputs.cursor == 'true'
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
@@ -105,20 +118,23 @@ jobs:
         continue-on-error: true
 
       - name: Sync Git Repository (Fetch and Hard Reset)
-        # Sincroniza o workspace com a branch remota para incluir qualquer commit que o passo anterior tenha feito e enviado.
+        if: steps.engines.outputs.cursor == 'true' && steps.engines.outputs.opencode == 'true'
         run: |
-          git fetch origin ${{ steps.pr-info.outputs.source_branch }}
-          git reset --hard origin/${{ steps.pr-info.outputs.source_branch }}
-
-      - name: Check OpenCode configuration
-        run: |
-          if [ -z "${{ secrets.OPENCODE_API_KEY }}" ]; then
-            echo "::warning::OPENCODE_API_KEY não configurada. O passo do Auto-Fix com opencode será ignorado."
+          BRANCH="${{ steps.pr-info.outputs.source_branch }}"
+          git fetch origin "$BRANCH"
+          LOCAL=$(git rev-parse HEAD)
+          REMOTE=$(git rev-parse "origin/$BRANCH")
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "Workspace já sincronizado com origin/$BRANCH."
+          elif git merge-base --is-ancestor "$REMOTE" "$LOCAL" 2>/dev/null; then
+            echo "::notice::Preservando commits locais não enviados (gate cooperativo)."
+          else
+            git reset --hard "origin/$BRANCH"
           fi
 
       - name: Run Auto-Fix (opencode)
         id: autofix-opencode
-        if: ${{ secrets.OPENCODE_API_KEY != '' }}
+        if: steps.engines.outputs.opencode == 'true'
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: opencode
@@ -138,12 +154,25 @@ jobs:
         run: |
           CURSOR_EXPECTED=false
           OPENCODE_EXPECTED=false
-          if [ -n "${{ secrets.CURSOR_API_KEY }}" ]; then CURSOR_EXPECTED=true; fi
-          if [ -n "${{ secrets.OPENCODE_API_KEY }}" ]; then OPENCODE_EXPECTED=true; fi
+          if [ "${{ steps.engines.outputs.cursor }}" = "true" ]; then CURSOR_EXPECTED=true; fi
+          if [ "${{ steps.engines.outputs.opencode }}" = "true" ]; then OPENCODE_EXPECTED=true; fi
 
           if [ "$CURSOR_EXPECTED" = "false" ] && [ "$OPENCODE_EXPECTED" = "false" ]; then
             echo "::warning::Nenhum engine de auto-fix configurado."
             exit 0
+          fi
+
+          BRANCH="${{ steps.pr-info.outputs.source_branch }}"
+          if [ "$CURSOR_EXPECTED" = "true" ] && [ "$OPENCODE_EXPECTED" = "true" ]; then
+            if [ "${{ steps.autofix-cursor.outcome }}" = "failure" ] && [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
+              git fetch origin "$BRANCH"
+              LOCAL=$(git rev-parse HEAD)
+              REMOTE=$(git rev-parse "origin/$BRANCH")
+              if [ "$LOCAL" != "$REMOTE" ]; then
+                echo "::error::cursor-sdk falhou e opencode não publicou commit pendente — PR/remoto inconsistentes."
+                exit 1
+              fi
+            fi
           fi
 
           if [ "${{ steps.autofix-cursor.outcome }}" = "success" ] || [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
