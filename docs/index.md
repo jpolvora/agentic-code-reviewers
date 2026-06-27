@@ -77,7 +77,7 @@ Se a ref target não existir localmente, fetch mínimo de `origin/{target}` (`--
 
 | Variável | Default | Descrição |
 |----------|---------|-----------|
-| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Inclui o próprio runner no review |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Inclui o runner no diff; mescla `*.yml`, `*.yaml`, `*.sh` nos includes da stack |
 | `AGENTIC_CODE_REVIEWERS_EXTRA_EXCLUDE_PATTERNS` | — | Globs extras separados por vírgula |
 
 > Nomes legados (`CURSOR_REVIEWER_*`, `CURSOR_API_KEY`, `SCORE_MIN`) continuam funcionando como fallback.

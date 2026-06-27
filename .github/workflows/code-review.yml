@@ -55,7 +55,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: ${{ env.EXECUTION_MODE == 'sequential' && 1 || 10 }}
+      # env.* não é válido em strategy — repetir a expressão de EXECUTION_MODE inline
+      max-parallel: ${{ (github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || vars.REVIEWER_EXECUTION_MODE || 'parallel') == 'sequential' && 1 || 10 }}
       matrix:
         include:
           - engine: cursor-sdk
