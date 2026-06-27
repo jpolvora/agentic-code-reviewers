@@ -98,7 +98,7 @@ jobs:
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
-          AGENTIC_CODE_REVIEWERS_SCORE_MIN: '6'
+          AGENTIC_CODE_REVIEWERS_SCORE_MIN: '1'
           CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
           OPENCODE_API_KEY: ${{ matrix.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
         run: |
