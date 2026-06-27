@@ -41,3 +41,4 @@ coverage/
 output*.txt
 .tmp-*
 output.seed-test.tmp.txt
+.agents/skills/solve-pr/*.txt

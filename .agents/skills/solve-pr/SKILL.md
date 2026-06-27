@@ -42,15 +42,8 @@ Execute a suíte de testes locais para certificar-se de que todo o código compi
 npm test
 ```
 
-### Passo 6: Responder e Resolver as Threads no GitHub
-Após comprovar que a solução funciona e os testes passam, responda com uma nota explicativa da correção e marque as threads afetadas como resolvidas (fechadas) no GitHub. Use o script utilitário `resolve_thread.cjs`:
-```bash
-node .agents/skills/solve-pr/scripts/resolve_thread.cjs <THREAD_ID> "Nota explicando como a issue foi resolvida"
-```
-Isso evita que o revisor analise novamente e alerte sobre um problema que já foi corrigido.
-
-### Passo 7: Commit, Push e Disparo de Nova Rodada
-Com as threads resolvidas e o código validado:
+### Passo 6: Commit Local (sem push)
+Com o código validado, faça o commit local — **sem push**:
 1. Adicione os arquivos modificados ao stage do Git:
    ```bash
    git add <arquivos-modificados>
@@ -59,10 +52,22 @@ Com as threads resolvidas e o código validado:
    ```bash
    git commit -m "fix(config): resolve issues identified in review threads of PR #<PR_ID>"
    ```
-3. Envie as modificações para a branch remota para disparar a nova rodada do pipeline automatizado:
-   ```bash
-   git push origin <sua-branch>
-   ```
 
-### Passo 8: Aguardar a Próxima Rodada
+### Passo 7: Resolver as Threads no GitHub (gate obrigatório)
+Responda com uma nota explicativa da correção e marque **todas** as threads afetadas como resolvidas no GitHub. Use o script utilitário `resolve_thread.cjs`:
+```bash
+node .agents/skills/solve-pr/scripts/resolve_thread.cjs <THREAD_ID> "Nota explicando como a issue foi resolvida"
+```
+
+> [!CAUTION]
+> **Gate obrigatório:** se qualquer thread falhar ao resolver (erro de permissão, token inválido, etc.), **NÃO execute `git push`**. Notifique o usuário com a lista de threads que falharam e aguarde instrução. O usuário decidirá se faz o push manualmente.
+
+### Passo 8: Push (somente após threads resolvidas)
+**Somente** se todas as threads foram resolvidas com sucesso no Passo 7:
+```bash
+git push origin <sua-branch>
+```
+Se houve falha na resolução de threads, o fluxo **para aqui** — o usuário fará o push quando estiver pronto.
+
+### Passo 9: Aguardar a Próxima Rodada
 Acompanhe os logs da execução e aguarde até que o bot de code review publique os resultados da nova rodada. Se novos problemas forem levantados ou persistirem, reinicie o ciclo a partir do **Passo 1**.
