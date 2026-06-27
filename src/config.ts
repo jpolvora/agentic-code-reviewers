@@ -230,6 +230,7 @@ export interface ReviewerConfig {
   generateCommitMessage: boolean;
   generatePrDescription: boolean;
   artifactsOnly: boolean;
+  autoFix: boolean;
 }
 
 export interface CliArgs {
@@ -257,6 +258,7 @@ export interface CliArgs {
   generateCommitMessage?: boolean;
   generatePrDescription?: boolean;
   artifactsOnly?: boolean;
+  autoFix?: boolean;
 }
 
 const DEFAULT_INCLUDE = ['**/*.cs', '**/*.ts', '**/*.html', '*.cs', '*.ts', '*.html'];
@@ -412,6 +414,10 @@ function parseArgs(argv: string[]): CliArgs {
     }
     if (arg === '--artifacts-only') {
       args.artifactsOnly = true;
+      continue;
+    }
+    if (arg === '--auto-fix') {
+      args.autoFix = true;
       continue;
     }
 
@@ -807,6 +813,13 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     includePatterns = mergeIncludePatternsForSelfReview(includePatterns, true);
   }
 
+  const autoFix = cli.autoFix ?? parseBool(env.autoFix(), false);
+  if (autoFix && pullRequestId <= 0) {
+    throw new Error(
+      'O modo auto-fix requer o ID de uma Pull Request (--pr-id ou AGENTIC_CODE_REVIEWERS_PR_ID).',
+    );
+  }
+
   const stackPromptPath = stackConfig.promptFileName
     ? resolve(
         resolvedProject.runnerRoot,
@@ -866,6 +879,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     generateCommitMessage: cli.generateCommitMessage ?? false,
     generatePrDescription: cli.generatePrDescription ?? false,
     artifactsOnly: cli.artifactsOnly ?? false,
+    autoFix,
   };
 }
 
@@ -898,6 +912,7 @@ Opções:
   --generate-commit-message  Gera mensagem de commit convencional (stdout)
   --generate-pr-description  Gera descrição de PR (stdout)
   --artifacts-only       Gera artefatos sem executar review
+  --auto-fix             Executa correção automática de threads ativas usando subagentes
 
 Pré-requisitos do projeto alvo (obrigatórios — o script encerra se ausentes):
   skills/CODE_REVIEW.md

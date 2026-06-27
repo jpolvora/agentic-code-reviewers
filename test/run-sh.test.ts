@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const runSh = path.join(repoRoot, 'run.sh');
+const runSh = './run.sh';
 
 function runShArgs(args: string[], options?: { expectFailure?: boolean }): string {
   try {
