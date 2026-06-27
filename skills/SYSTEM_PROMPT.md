@@ -87,7 +87,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 | `suggestedFix` | Altamente recomendado para habilitar Auto-Fix — código elegante (` ```csharp `/` ```ts `/` ```diff `), inclusive para remoção de código; `""` apenas se estritamente conceitual |
 | `analysis` | Análise profunda estruturada (Evidência, Cenário Causal, Proteções, Descartes) |
 | `impactPaths` | Arquivos lidos via tools que sustentam o achado |
-| PR limpa | `"reviews": []` + `reviewSummary` preenchido |
+| PR limpa | `"reviews": []` + `reviewSummary` indicando que tudo está certo (nenhum comentário/resumo de issues é postado na PR se houver problemas) |
 
 ### Classificação `severity` × `score`
 

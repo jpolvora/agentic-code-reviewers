@@ -334,8 +334,9 @@ Leia rodada via `fetch_threads.cjs --json` (GitHub) ou API ADO. Se `currentRound
 
 ## 11. Plano de postagem (`getCodeReviewPostingPlan`)
 
-- Se `reviews.length > 0` ou `hasCriticalReviews` → `reviewSummary` é **limpo** (nunca comentários + resumo juntos).
-- Resumo positivo só se `reviews` vazio, sem critical, sem threads pendentes.
+- O sumário de review só é publicado quando a PR está totalmente limpa (sem novos reviews e sem threads pendentes do bot).
+- Quando publicado, o sumário usa a mensagem padrão de sucesso em português: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`.
+- Se houver novos reviews ou pendências, nenhum sumário geral é publicado na PR.
 - Dedup contra `existingKeys` antes de publicar.
 
 ---

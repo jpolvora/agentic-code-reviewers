@@ -266,4 +266,49 @@ describe('getPullRequestReviewContext', () => {
 
     assert.ok(context.contextForLlm.includes('- Erro com abreviação ex.: HTTP/REST e arquivo config.json.'));
   });
+
+  describe('getCodeReviewPostingPlan summary policy', () => {
+    it('retorna postSummary=true e mensagem padrão de sucesso quando a PR está limpa e sem pendências', () => {
+      const parsed = parseCodeReviewResponse({
+        reviews: [],
+        resolvedThreads: [],
+        reviewSummary: 'Algum sumário retornado pelo LLM que deve ser ignorado',
+      });
+      const plan = getCodeReviewPostingPlan(parsed, false);
+      assert.equal(plan.postSummary, true);
+      assert.equal(
+        plan.reviewSummary,
+        'Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀',
+      );
+    });
+
+    it('retorna postSummary=false e reviewSummary vazio quando há novos reviews', () => {
+      const parsed = parseCodeReviewResponse({
+        reviews: [
+          validReview({
+            fileName: '/src/Foo.cs',
+            lineNumber: 10,
+            severity: 'warning',
+            score: 7,
+          }),
+        ],
+        resolvedThreads: [],
+        reviewSummary: 'Algum sumário',
+      });
+      const plan = getCodeReviewPostingPlan(parsed, false);
+      assert.equal(plan.postSummary, false);
+      assert.equal(plan.reviewSummary, '');
+    });
+
+    it('retorna postSummary=false e reviewSummary vazio quando há threads externas pendentes', () => {
+      const parsed = parseCodeReviewResponse({
+        reviews: [],
+        resolvedThreads: [],
+        reviewSummary: 'Algum sumário',
+      });
+      const plan = getCodeReviewPostingPlan(parsed, true);
+      assert.equal(plan.postSummary, false);
+      assert.equal(plan.reviewSummary, '');
+    });
+  });
 });

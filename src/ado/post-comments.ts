@@ -108,27 +108,18 @@ export function getCodeReviewPostingPlan(
   // (filterPublishableReviews). O filtro defensivo final fica em setPullRequestComments,
   // no boundary de POST do ADO.
   const reviews = parsed.reviews;
-  let summary = parsed.reviewSummary;
-
-  if (reviews.length > 0 && summary.trim()) {
-    if (parsed.hasCriticalReviews) {
-      console.warn('Policy: reviewSummary ignored because critical reviews are present.');
-      summary = '';
-    } else {
-      console.warn(
-        `Policy: agent returned reviews and reviewSummary together; keeping ${reviews.length} review(s), clearing reviewSummary.`,
-      );
-      summary = '';
-    }
-  }
-
-  const canPostSummary =
-    summary.trim().length > 0 && !parsed.hasCriticalReviews && reviews.length === 0 && !hasExternalPendingThreads;
+  
+  // A PR está limpa se não houver novos reviews (novos problemas) e nenhuma thread externa pendente (problemas antigos ativos)
+  const isClean = reviews.length === 0 && !hasExternalPendingThreads;
+  
+  const summary = isClean
+    ? 'Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀'
+    : '';
 
   return {
     reviewsJson: JSON.stringify({ reviews }),
     reviewSummary: summary,
-    postSummary: canPostSummary,
+    postSummary: isClean,
   };
 }
 
