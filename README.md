@@ -53,7 +53,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
     *   **Azure DevOps:** Emite logging commands (`##vso[task.logissue]`) e anexa um resumo markdown rico na tela de build (`##vso[task.uploadsummary]`).
     *   **GitHub:** Anexa um resumo markdown completo da revisão diretamente na página do workflow via `GITHUB_STEP_SUMMARY`.
 *   **📦 Execução Remota via cURL:** Permite rodar o reviewer remotamente baixando apenas o script `run.sh` da branch `release`, dispensando o clone completo do repositório ou a presença de dependências de desenvolvimento.
-*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit/push na branch da PR e re-dispara code review. Proteções: resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
+*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit, **build de validação**, resolução de threads, push na branch da PR e re-dispara code review. Proteções: build pós-commit, resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
 *   **📏 Limiar de publicação (`score_min`) end-to-end:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min` (precedência CLI > env > default **6**) controla quais achados viram threads — injetado no prompt, gate TypeScript (`isPublishableReview`) e Safe Outputs (`severity-score`). Mesmo valor para `cursor-sdk` e `opencode`.
 *   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
@@ -178,6 +178,7 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread (prompt + gate + Safe Outputs). |
 | `AGENTIC_CODE_REVIEWERS_AUTO_FIX` | `false` | Ativa modo auto-fix (`--auto-fix`). |
+| `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND` | auto (`npm run build` se `package.json` tem `scripts.build`) | Build pós-commit antes de resolver threads/push; string vazia desabilita. |
 | `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-LLM (diff-line, protected paths, secrets). |
 | `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process por chunk de arquivos. |
 | `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Segunda passagem LLM para filtrar candidatos paralelos. |

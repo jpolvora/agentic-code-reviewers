@@ -7,6 +7,7 @@ import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
 import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
+import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
@@ -180,6 +181,14 @@ async function mapPool<T, R>(
 async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Promise<void> {
   if (config.dryRun || !isLocalAheadOfRemote(config.repoRoot)) {
     return;
+  }
+
+  logger.section('Recovery: validando build antes de publicar commit pendente');
+  const buildOk = await runAutoFixBuild(config, logger);
+  if (!buildOk) {
+    throw new Error(
+      'Recovery dual-engine: build falhou — push do commit local pendente abortado.',
+    );
   }
 
   logger.section('Recovery: publicando commit pendente do engine anterior');
@@ -370,11 +379,21 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
     return;
   }
 
-  // commit local → fechar threads com explicação detalhada → push
+  // commit local → build → fechar threads com explicação detalhada → push
   logger.section('Consolidando alterações com Git (commit local)');
   const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles);
   if (!commitSuccess) {
-    logger.info('Commit local não realizado; abortando resolução e push.');
+    logger.info('Commit local não realizado; abortando build, resolução e push.');
+    return;
+  }
+
+  logger.section('Validando build após commit local');
+  const buildOk = await runAutoFixBuild(config, logger);
+  if (!buildOk) {
+    logger.warn(
+      'Gate cooperativo: build falhou — resolução e push abortados. Commit local preservado; ' +
+        'corrija o build manualmente (skill solve-pr).',
+    );
     return;
   }
 

@@ -6,7 +6,7 @@ Você é um **Desenvolvedor de Software Sênior** encarregado de corrigir issues
 
 1. **Ler** cada thread aberta com atenção — analise profundamente a descrição completa (causa raiz, impacto, contexto).
 2. **Corrigir** o que for necessário com patches mínimos no arquivo indicado.
-3. O runner **comita**, **fecha cada thread corrigida** com sua explicação detalhada e faz **push** na branch da PR.
+3. O runner **comita**, **valida build**, **fecha cada thread corrigida** com sua explicação detalhada e faz **push** na branch da PR.
 
 ## Entrada
 
@@ -62,4 +62,4 @@ Você receberá:
 | `explanation` | Texto **detalhado** postado ao fechar a thread (causa raiz + correção) |
 | `startLine` / `endLine` | 1-based, inclusive, no arquivo **atual** |
 
-O runner comita após aplicar replacements, fecha cada thread em `resolvedThreads` com sua explicação e faz push.
+O runner comita após aplicar replacements, valida build, fecha cada thread em `resolvedThreads` com sua explicação e faz push.

@@ -416,6 +416,7 @@ describe('runAutoFixFlow', () => {
       dryRun: false,
       autoFix: true,
       pullRequestId: 42,
+      autoFixBuildCommand: null,
     } as any;
     const reviewContext = {
       fileReviewThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
@@ -437,6 +438,43 @@ describe('runAutoFixFlow', () => {
       /push falhou após resolução/,
     );
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+  });
+
+  it('aborta resolução e push quando build falha após commit', async () => {
+    const tmpDir = setupTempWorkspace();
+    const remoteUrl = execSync('git remote get-url origin', { cwd: tmpDir, encoding: 'utf8' }).trim();
+    const remoteHeadBefore = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
+
+    const config = {
+      repoRoot: tmpDir,
+      runnerRoot: tmpDir,
+      dryRun: false,
+      autoFix: true,
+      pullRequestId: 77,
+      autoFixBuildCommand: process.platform === 'win32' ? 'cmd /c exit 1' : 'false',
+    } as any;
+    const reviewContext = {
+      fileReviewThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText: agentJson({
+          replacements: [{ startLine: 1, endLine: 1, replacementContent: 'linha 1 alterada' }],
+          resolvedThreads: [{ threadId: '1', explanation: 'Detalhe da correção aplicada.' }],
+        }),
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
+    const localLog = execSync('git log -1 --oneline', { cwd: tmpDir, encoding: 'utf8' });
+    assert.match(localLog, /fix\(review\): resolve issues from review threads of PR #77/);
+    const remoteHeadAfter = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
+    assert.equal(remoteHeadBefore, remoteHeadAfter, 'push não deve ocorrer quando build falha');
   });
 
   it('aborta push quando resolução de threads falha (gate cooperativo)', async () => {

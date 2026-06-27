@@ -172,6 +172,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `examples/consumer-github-workflow.yml` | Copy-paste template for GitHub consumers. |
 | `src/orchestrator/autofix-runner.ts` | Auto-fix flow: threads abertas com arquivo+linha (`fileReviewThreads`), subagents per file, cooperative resolve |
 | `src/git/autofix-commit.ts` | Consolidated commit and push after auto-fix |
+| `src/git/autofix-build.ts` | Post-commit build gate before thread resolution/push |
 | `skills/AUTO_FIX.md` | Auto-fix subagent prompt (surgical fixes, JSON replacements) |
 | `skills/COOPERATIVE_FIX.md` | Shared fix contract (Auto-Fix CI ↔ solve-pr IDE, no code coupling) |
 | `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |

@@ -66,6 +66,7 @@ export const ENV = {
   ADO_REPO: primaryKey('ADO_REPO'),
   PROMPT_COLOR: primaryKey('PROMPT_COLOR'),
   AUTO_FIX: primaryKey('AUTO_FIX'),
+  AUTO_FIX_BUILD_COMMAND: primaryKey('AUTO_FIX_BUILD_COMMAND'),
 } as const;
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
@@ -119,4 +120,5 @@ export const env = {
   adoRepo: () => readEnv('ADO_REPO'),
   promptColor: () => readEnv('PROMPT_COLOR'),
   autoFix: () => readEnv('AUTO_FIX'),
+  autoFixBuildCommand: () => readEnv('AUTO_FIX_BUILD_COMMAND'),
 } as const;

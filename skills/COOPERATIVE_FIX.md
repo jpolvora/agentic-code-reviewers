@@ -38,11 +38,12 @@ Não fechar thread sem correção correspondente listada explicitamente (`resolv
 2. Analisar profundamente cada descrição
 3. Aplicar correções cirúrgicas
 4. git add + commit local
-5. Fechar cada thread corrigida com comentário detalhado (causa raiz + o que mudou)
-6. git push — somente se as resoluções tentadas tiverem sucesso
+5. Executar build de validação (`npm run build` ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`)
+6. Fechar cada thread corrigida com comentário detalhado (causa raiz + o que mudou)
+7. git push — somente se build e resoluções tentadas tiverem sucesso
 ```
 
-Se o passo 5 falhar: **não fazer push**. Commit local preservado para inspeção manual.
+Se o passo 5 ou 6 falhar: **não fazer push**. Commit local preservado para inspeção manual.
 
 **Dual-engine sequencial (CI):** se o engine anterior resolveu threads mas o push falhou, o engine seguinte tenta **recovery push** do commit local pendente.
 

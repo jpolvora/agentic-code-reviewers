@@ -565,7 +565,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### O reviewer corrige código automaticamente?
 
-**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit/push e resolvem threads cuja linha foi de fato alterada.
+**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit local, **build de validação**, resolução de threads e push.
 
 *Evidência:* `src/index.ts` (`config.autoFix`); `src/orchestrator/autofix-runner.ts`; [`auto-fix.md`](auto-fix.md).
 

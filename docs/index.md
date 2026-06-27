@@ -168,12 +168,12 @@ Detalhes: [`score_calc.md`](score_calc.md) · [`faq.md`](faq.md) § 11.
 
 ### Auto-Fix e self-healing
 
-Modo **`--auto-fix`** / `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true` — correção automática de threads ativas (commit + push + resolução parcial). **Review padrão permanece read-only**; auto-fix é ramo separado em `src/index.ts`.
+Modo **`--auto-fix`** / `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true` — correção automática de threads ativas (commit → build → resolução → push). **Review padrão permanece read-only**; auto-fix é ramo separado em `src/index.ts`.
 
 | Componente | Arquivo |
 |------------|---------|
 | Orquestrador | `src/orchestrator/autofix-runner.ts` |
-| Commit/push | `src/git/autofix-commit.ts` |
+| Commit/push | `src/git/autofix-commit.ts`, `src/git/autofix-build.ts` |
 | Prompt subagente | `skills/AUTO_FIX.md` |
 | CI GitHub | `.github/workflows/auto-fix.yml` |
 | Skill IDE (manual) | `.agents/skills/solve-pr/` |

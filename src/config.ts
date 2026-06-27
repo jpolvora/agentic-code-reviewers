@@ -8,6 +8,7 @@ import { assertOpencodeModel, DEFAULT_OPENCODE_MODEL } from './engine/opencode/m
 import type { ReviewerEngineName } from './engine/types.js';
 import { buildBotTag } from './bot-tag.js';
 import { detectSourceBranchRef } from './git/diff.js';
+import { resolveAutoFixBuildCommand } from './git/autofix-build.js';
 import { ENV, ENV_PREFIX, env } from './env.js';
 import {
   buildDefaultProtectedPatterns,
@@ -233,6 +234,8 @@ export interface ReviewerConfig {
   generatePrDescription: boolean;
   artifactsOnly: boolean;
   autoFix: boolean;
+  /** Comando de build pós-commit no auto-fix; null = ignorar (sem script ou env vazio). */
+  autoFixBuildCommand: string | null;
 }
 
 export interface CliArgs {
@@ -877,6 +880,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     generatePrDescription: cli.generatePrDescription ?? false,
     artifactsOnly: cli.artifactsOnly ?? false,
     autoFix,
+    autoFixBuildCommand: resolveAutoFixBuildCommand(
+      repoRoot,
+      env.autoFixBuildCommand(),
+    ),
   };
 }
 
