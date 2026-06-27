@@ -17,7 +17,12 @@ import {
 } from './prompt-body.js';
 import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
-import { createOpencodeFetch, isHeadersTimeoutError, withAbortSignal } from './fetch.js';
+import {
+  closeAllOpencodeAgents,
+  createOpencodeFetch,
+  isHeadersTimeoutError,
+  withAbortSignal,
+} from './fetch.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -389,5 +394,6 @@ export async function runOpencodeStream(
     }
 
     runtime?.close();
+    await closeAllOpencodeAgents().catch(() => {});
   }
 }

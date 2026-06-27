@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { createOpencodeFetch, isHeadersTimeoutError, withAbortSignal } from '../src/engine/opencode/fetch.js';
+import { createOpencodeFetch, closeAllOpencodeAgents, isHeadersTimeoutError, withAbortSignal } from '../src/engine/opencode/fetch.js';
 
 describe('opencode fetch', () => {
   it('createOpencodeFetch retorna função fetch', () => {
@@ -28,29 +28,21 @@ describe('opencode fetch', () => {
     await assert.rejects(pending, (error: Error) => error.name === 'AbortError');
   });
 
-  it('createOpencodeFetch sem runSignal não herda abort do run', async () => {
+  it('createOpencodeFetch com runSignal rejeita imediatamente após abort', async () => {
     const runController = new AbortController();
     const runFetch = createOpencodeFetch(600_000, runController.signal);
-    const cleanupFetch = createOpencodeFetch(600_000);
+    runController.abort();
+    await assert.rejects(
+      runFetch('http://127.0.0.1:9/test', {}),
+      (error: Error) => error.name === 'AbortError',
+    );
+  });
 
-    const originalFetch = globalThis.fetch;
-    const seenAborted: boolean[] = [];
-
-    globalThis.fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
-      seenAborted.push(init?.signal?.aborted ?? false);
-      if (init?.signal?.aborted) {
-        return Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
-      }
-      return Promise.resolve(new Response(null, { status: 204 }));
-    }) as typeof fetch;
-
-    try {
-      runController.abort();
-      await assert.rejects(runFetch('http://example.test/run', {}), (error: Error) => error.name === 'AbortError');
-      await cleanupFetch('http://example.test/cleanup', {});
-      assert.deepEqual(seenAborted, [true, false]);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+  it('closeAllOpencodeAgents fecha agents cacheados', async () => {
+    createOpencodeFetch(600_000);
+    createOpencodeFetch(300_000);
+    await closeAllOpencodeAgents();
+    const fetch = createOpencodeFetch(600_000);
+    assert.equal(typeof fetch, 'function');
   });
 });

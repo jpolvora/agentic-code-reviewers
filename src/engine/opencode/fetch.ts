@@ -1,4 +1,4 @@
-import { Agent } from 'undici';
+import { Agent, fetch as undiciFetch } from 'undici';
 
 const HEADERS_TIMEOUT_CODES = new Set(['UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
 
@@ -15,6 +15,15 @@ function agentForTimeout(timeoutMs: number): Agent {
     agents.set(timeoutMs, agent);
   }
   return agent;
+}
+
+export async function closeAllOpencodeAgents(): Promise<void> {
+  const closePromises: Promise<void>[] = [];
+  for (const agent of agents.values()) {
+    closePromises.push(agent.close());
+  }
+  agents.clear();
+  await Promise.all(closePromises);
 }
 
 export function isHeadersTimeoutError(error: unknown): boolean {
@@ -77,10 +86,10 @@ export function createOpencodeFetch(timeoutMs: number, runSignal?: AbortSignal):
 
   return (input, init) => {
     const signal = mergeAbortSignals(runSignal, init?.signal ?? undefined);
-    return globalThis.fetch(input, {
+    return undiciFetch(input as Parameters<typeof undiciFetch>[0], {
       ...init,
       signal,
       dispatcher: agent,
-    } as unknown as RequestInit);
+    } as Parameters<typeof undiciFetch>[1]) as ReturnType<typeof fetch>;
   };
 }
