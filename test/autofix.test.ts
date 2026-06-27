@@ -65,6 +65,20 @@ describe('applyReplacements', () => {
     }, /Substituição fora dos limites/);
   });
 
+  it('lança erro para linhas não-inteiras', () => {
+    const original = 'linha 1\nlinha 2';
+    const replacements = [
+      {
+        startLine: 1.9,
+        endLine: 2.1,
+        replacementContent: 'erro',
+      },
+    ];
+    assert.throws(() => {
+      applyReplacements(original, replacements);
+    }, /Intervalo inválido/);
+  });
+
   it('lança erro para substituições sobrepostas', () => {
     const original = 'linha 1\nlinha 2\nlinha 3\nlinha 4';
     const replacements = [
@@ -86,9 +100,19 @@ describe('runAutoFixFlow', () => {
     section: () => {},
   } as any;
 
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    while (tempDirs.length) {
+      const dir = tempDirs.pop()!;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   function setupTempWorkspace() {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-test-'));
     const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-remote-'));
+    tempDirs.push(tmpDir, remoteDir);
     fs.mkdirSync(path.join(tmpDir, 'skills'));
     fs.writeFileSync(path.join(tmpDir, 'skills', 'AUTO_FIX.md'), 'dummy prompt');
     fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2\nlinha 3');

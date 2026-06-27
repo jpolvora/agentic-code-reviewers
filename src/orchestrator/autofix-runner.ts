@@ -15,6 +15,21 @@ export interface Replacement {
   replacementContent: string;
 }
 
+const AUTOFIX_CONCURRENCY = 3;
+
+export function validateReplacements(replacements: Replacement[]): void {
+  for (const rep of replacements) {
+    if (
+      !Number.isInteger(rep.startLine) ||
+      !Number.isInteger(rep.endLine) ||
+      rep.startLine < 1 ||
+      rep.endLine < rep.startLine
+    ) {
+      throw new Error(`Intervalo inválido: ${rep.startLine}-${rep.endLine}`);
+    }
+  }
+}
+
 export function assertNonOverlapping(replacements: Replacement[]): void {
   const sorted = [...replacements].sort((a, b) => a.startLine - b.startLine);
   for (let i = 1; i < sorted.length; i++) {
@@ -27,6 +42,7 @@ export function assertNonOverlapping(replacements: Replacement[]): void {
 }
 
 export function applyReplacements(content: string, replacements: Replacement[]): string {
+  validateReplacements(replacements);
   assertNonOverlapping(replacements);
   const lines = content.split(/\r?\n/);
   const hasCarriageReturn = content.includes('\r\n');
@@ -50,6 +66,18 @@ export function applyReplacements(content: string, replacements: Replacement[]):
   }
 
   return lines.join(separator);
+}
+
+async function mapPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  const queue = [...items];
+  await Promise.all(
+    Array.from({ length: Math.min(limit, queue.length) }, async () => {
+      while (queue.length) {
+        const item = queue.shift();
+        if (item !== undefined) await fn(item);
+      }
+    }),
+  );
 }
 
 export async function runAutoFixFlow(
@@ -89,8 +117,7 @@ export async function runAutoFixFlow(
   const modifiedFiles: string[] = [];
   const filePaths = Array.from(threadsByFile.keys());
 
-  await Promise.all(
-    filePaths.map(async (filePath) => {
+  await mapPool(filePaths, AUTOFIX_CONCURRENCY, async (filePath) => {
       const threads = threadsByFile.get(filePath)!;
       const relativePath = filePath.replace(/^\/+/,'');
       const fullFilePath = path.resolve(config.repoRoot, relativePath);
@@ -194,7 +221,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
 
           if (isModified) {
             resolvedItems.push({
-              threadId: (Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId)) as any,
+              threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
               fileName: thread.filePath,
               lineNumber: thread.lineNumber,
               note: config.dryRun ? `${explanation} (simulado)` : explanation,
@@ -208,8 +235,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
       } catch (err: any) {
         logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err.message}`);
       }
-    }),
-  );
+  });
 
   if (resolvedItems.length === 0) {
     logger.info('Nenhuma correção foi aplicada com sucesso.');
