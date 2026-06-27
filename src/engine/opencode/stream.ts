@@ -9,7 +9,7 @@ import type { ReviewerConfig } from '../../config.js';
 import { env, ENV } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
-import { startOpencodeEventStream } from './event-stream.js';
+import { startOpencodeEventStream, OpencodeStreamInactivityError } from './event-stream.js';
 import { type OpencodeModelSelection, resolveOpencodeModelSelection } from './model.js';
 import {
   buildSessionPromptBody,
@@ -286,6 +286,7 @@ export async function runOpencodeStream(
       logger,
       verbose: config.verbose,
       signal: abortController.signal,
+      fatalAbort: abortController,
     });
 
     logger.info('Enviando prompt ao agente OpenCode (aguarde — progresso via event stream)...');
@@ -332,7 +333,17 @@ export async function runOpencodeStream(
       metrics: assistantMessageToMetrics(info),
     };
   } catch (error) {
+    if (error instanceof OpencodeStreamInactivityError) {
+      process.exitCode = 1;
+      throw error;
+    }
+
     if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      const reason = abortController.signal.reason;
+      if (reason instanceof OpencodeStreamInactivityError) {
+        process.exitCode = 1;
+        throw reason;
+      }
       if (runtime?.client && sessionId) {
         await runtime.client.session.abort({ path: { id: sessionId }, query: { directory } }).catch(() => {});
       }
