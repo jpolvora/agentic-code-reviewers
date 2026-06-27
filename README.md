@@ -174,7 +174,7 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; `[assistant]` no SSE (`--quiet` desativa). |
 | `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão (10 min). |
 | `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
-| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM; define a tag nos comentários (`Agentic Code Reviewer {engine}`) |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread (prompt + gate + Safe Outputs). |
 | `AGENTIC_CODE_REVIEWERS_AUTO_FIX` | `false` | Ativa modo auto-fix (`--auto-fix`). |
@@ -229,9 +229,8 @@ npm run review -- [argumentos]
 *   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
 *   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6. Injetado no prompt e aplicado pelo gate TypeScript + Safe Outputs (mesmo valor em `cursor-sdk` e `opencode`).
 *   `--auto-fix` : Modo correção automática — lê threads ativas do bot, aplica fixes via subagentes, commit/push e resolve threads (requer contexto de PR e token com escrita). Equivalente a `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`. **Mutuamente exclusivo** com o fluxo de review padrão na mesma invocação.
-*   `--bot-tag <VAL>` : Tag inserida no comentário do bot (default: `[Cursor Reviewer]`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_BOT_TAG`.
 
-> Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência.
+> Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência. A tag nos comentários da PR é derivada automaticamente: `Agentic Code Reviewer {engine}`.
 
 > **Nota:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` e `--score-min` são opt-in. Sem configurá-los, o gate permanece **6–10**.
 
@@ -409,10 +408,10 @@ Os checks de code review (`continue-on-error: true`) **não** bloqueiam o merge 
 
 Dispara **somente** em PRs com destino **`main`**. Um check por engine via matrix — por padrão **em paralelo**:
 
-| Check na PR | Engine | Modelo | Bot tag |
+| Check na PR | Engine | Modelo | Tag nos comentários |
 | :--- | :--- | :--- | :--- |
-| **Review (cursor-sdk)** | `@cursor/sdk` | `composer-2.5` | `[Cursor Reviewer]` |
-| **Review (opencode)** | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `[Cursor Reviewer · OpenCode]` |
+| **Review (cursor-sdk)** | `@cursor/sdk` | `composer-2.5` | `Agentic Code Reviewer cursor-sdk` |
+| **Review (opencode)** | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `Agentic Code Reviewer opencode` |
 
 **Modo de execução**
 

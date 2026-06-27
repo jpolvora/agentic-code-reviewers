@@ -399,7 +399,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 **Issue (thread active):**
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 
 🛑 **CRITICAL:** Descrição objetiva...
 
@@ -422,7 +422,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 **Resumo positivo (thread closed):**
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
 Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
 ```
@@ -507,7 +507,6 @@ Pipeline: SUCESSO (exit 0)
 | `--source-branch REF` | Branch source |
 | `--target-branch REF` | Branch target (default: `refs/heads/master`) |
 | `--org`, `--project`, `--repo`, `--pr-id` | Contexto ADO |
-| `--bot-tag TAG` | Tag do bot |
 | `--model ID` | Modelo Cursor |
 | `--engine NAME` | Engine: `cursor-sdk`, `cursor` ou `opencode` |
 | `--repo-root PATH` | Raiz do repositório alvo |

@@ -15,7 +15,9 @@ import {
 } from '../src/git/markers.js';
 import type { ActiveThreadInfo, CodeReviewItem, ResolvedThreadItem } from '../src/ado/types.js';
 
-const BOT = '[Cursor Reviewer]';
+import { buildBotTag } from '../src/bot-tag.js';
+
+const BOT = buildBotTag('cursor-sdk');
 
 function validReview(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
   return {

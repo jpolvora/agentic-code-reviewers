@@ -159,6 +159,13 @@ async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Pr
   }
 }
 
+export function getAutoFixThreads(reviewContext: ReviewContextResult): ActiveThreadInfo[] {
+  if (reviewContext.openReviewThreads != null) {
+    return reviewContext.openReviewThreads;
+  }
+  return reviewContext.activeThreads ?? [];
+}
+
 export async function runAutoFixFlow(
   config: ReviewerConfig,
   reviewContext: ReviewContextResult,
@@ -166,9 +173,9 @@ export async function runAutoFixFlow(
   engine: ExecutionEngine,
   logger: Logger,
 ): Promise<void> {
-  const activeThreads = reviewContext.activeThreads || [];
+  const activeThreads = getAutoFixThreads(reviewContext);
   if (activeThreads.length === 0) {
-    logger.info('Nenhuma thread ativa/aberta para correção automática.');
+    logger.info('Nenhuma thread de review aberta (com arquivo/linha) para correção automática.');
     await tryRecoverPendingPush(config, logger);
     return;
   }

@@ -39,10 +39,6 @@ on:
         description: Modelo LLM (vazio = default da engine)
         type: string
         default: ''
-      bot_tag:
-        description: Tag do bot nos comentários da PR
-        type: string
-        default: '[Cursor Reviewer]'
       runner_repository:
         description: Repositório do runner (owner/repo)
         type: string
@@ -112,7 +108,6 @@ jobs:
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ inputs.engine }}
-          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ inputs.bot_tag }}
           AGENTIC_CODE_REVIEWERS_SCORE_MIN: ${{ inputs.score_min }}
           AGENTIC_CODE_REVIEWERS_REPO_URL: https://github.com/${{ inputs.runner_repository }}.git
           AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH: ${{ inputs.runner_ref }}

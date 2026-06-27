@@ -15,7 +15,7 @@ function minimalConfig(skillPath: string, systemPromptPath: string): ReviewerCon
     cursorApiKey: 'test',
     engine: 'cursor-sdk',
     model: 'composer-2.5',
-    botTag: '[Cursor Reviewer]',
+    botTag: 'Agentic Code Reviewer cursor-sdk',
     verbose: false,
     dryRun: true,
     includeUncommitted: false,

@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { formatEngineMetricsMarkdownLines } from '../agent/metrics-display.js';
+import { BOT_TAG_PREFIX } from '../bot-tag.js';
 import type { CodeReviewItem, GateEvaluation } from './types.js';
 
 /**
@@ -48,7 +49,7 @@ export function formatLogIssueCommand(review: CodeReviewItem): string {
     'columnnumber=1',
   ].join(';');
   const scoreTag = review.score != null ? ` (score ${review.score}/10)` : '';
-  const message = `[Cursor Reviewer] ${review.severity}${scoreTag}: ${firstLine(review.comment)}`;
+  const message = `${BOT_TAG_PREFIX} ${review.severity}${scoreTag}: ${firstLine(review.comment)}`;
   return `##vso[task.logissue ${props}]${message}`;
 }
 
@@ -60,7 +61,7 @@ export function buildReviewSummaryMarkdown(
   metrics?: Record<string, number>,
 ): string {
   const lines: string[] = [];
-  lines.push('# Cursor Reviewer');
+  lines.push(`# ${BOT_TAG_PREFIX}`);
   lines.push('');
   lines.push(`- **Modo:** ${dryRun ? 'DRY-RUN' : 'PIPELINE'}`);
   lines.push(`- **Status:** ${gate.shouldFail ? '⚠️ Com issues' : '✅ Sem issues'}`);

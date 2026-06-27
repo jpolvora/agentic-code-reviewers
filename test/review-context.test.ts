@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { getCodeReviewPostingPlan, getNewReviewsFromPlan, parseCodeReviewResponse, shouldPostReviewSummary } from '../src/ado/post-comments.js';
-import { CLEAN_PR_SUMMARY_MESSAGE } from '../src/git/markers.js';
 import { getPullRequestReviewContext } from '../src/ado/review-context.js';
 import type { CodeReviewItem } from '../src/ado/types.js';
+import { buildBotTag } from '../src/bot-tag.js';
+import { CLEAN_PR_SUMMARY_MESSAGE } from '../src/git/markers.js';
+
+const BOT = buildBotTag('cursor-sdk');
 
 function validReview(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
   return {
@@ -36,7 +39,7 @@ describe('getPullRequestReviewContext', () => {
               {
                 id: 1,
                 parentCommentId: 0,
-                content: '[Cursor Reviewer]\nold issue',
+                content: `${BOT}\nold issue`,
                 commentType: 1,
               },
             ],
@@ -48,7 +51,7 @@ describe('getPullRequestReviewContext', () => {
     const context = await getPullRequestReviewContext(
       fakeClient as never,
       123,
-      '[Cursor Reviewer]',
+      BOT,
       () => {},
     );
 
@@ -75,7 +78,7 @@ describe('getPullRequestReviewContext', () => {
               {
                 id: 1,
                 parentCommentId: 0,
-                content: '[Cursor Reviewer]\nactive issue',
+                content: `${BOT}\nactive issue`,
                 commentType: 1,
               },
             ],
@@ -87,7 +90,7 @@ describe('getPullRequestReviewContext', () => {
     const context = await getPullRequestReviewContext(
       fakeClient as never,
       123,
-      '[Cursor Reviewer]',
+      BOT,
       () => {},
     );
 
@@ -173,7 +176,7 @@ describe('getPullRequestReviewContext', () => {
                 id: 1,
                 parentCommentId: 0,
                 content:
-                  '[Cursor Reviewer]\n⚠️ **WARNING:** análise menciona <!-- resolution-reply --> como exemplo.',
+                  `${BOT}\n⚠️ **WARNING:** análise menciona <!-- resolution-reply --> como exemplo.`,
                 commentType: 1,
               },
             ],
@@ -185,12 +188,48 @@ describe('getPullRequestReviewContext', () => {
     const context = await getPullRequestReviewContext(
       fakeClient as never,
       123,
-      '[Cursor Reviewer]',
+      BOT,
       () => {},
     );
 
     assert.equal(context.activeThreads.length, 1);
     assert.equal(context.activeThreads[0].hasResolutionReply, false);
+  });
+
+  it('inclui thread humana em openReviewThreads mas não em activeThreads', async () => {
+    const fakeClient = {
+      get: async () => ({
+        value: [
+          {
+            id: 22,
+            status: 'active',
+            threadContext: {
+              filePath: '/src/Human.cs',
+              rightFileStart: { line: 8 },
+            },
+            comments: [
+              {
+                id: 1,
+                parentCommentId: 0,
+                content: 'Por favor adicione validação neste endpoint.',
+                commentType: 1,
+              },
+            ],
+          },
+        ],
+      }),
+    };
+
+    const context = await getPullRequestReviewContext(
+      fakeClient as never,
+      123,
+      BOT,
+      () => {},
+    );
+
+    assert.equal(context.activeThreads.length, 0);
+    assert.equal(context.openReviewThreads.length, 1);
+    assert.equal(context.openReviewThreads[0].filePath, '/src/human.cs');
   });
 
   it('marca hasResolutionReply quando reply real (parentCommentId!=0) contém o marcador', async () => {
@@ -208,13 +247,13 @@ describe('getPullRequestReviewContext', () => {
               {
                 id: 1,
                 parentCommentId: 0,
-                content: '[Cursor Reviewer]\n⚠️ **WARNING:** bug real aqui.',
+                content: `${BOT}\n⚠️ **WARNING:** bug real aqui.`,
                 commentType: 1,
               },
               {
                 id: 2,
                 parentCommentId: 1,
-                content: '[Cursor Reviewer]\n<!-- resolution-reply -->\ncorrigido',
+                content: `${BOT}\n<!-- resolution-reply -->\ncorrigido`,
                 commentType: 1,
               },
             ],
@@ -226,7 +265,7 @@ describe('getPullRequestReviewContext', () => {
     const context = await getPullRequestReviewContext(
       fakeClient as never,
       123,
-      '[Cursor Reviewer]',
+      BOT,
       () => {},
     );
 
@@ -249,7 +288,7 @@ describe('getPullRequestReviewContext', () => {
               {
                 id: 1,
                 parentCommentId: 0,
-                content: '[Cursor Reviewer]\nErro com abreviação ex.: HTTP/REST e arquivo config.json.',
+                content: `${BOT}\nErro com abreviação ex.: HTTP/REST e arquivo config.json.`,
                 commentType: 1,
               },
             ],
@@ -261,7 +300,7 @@ describe('getPullRequestReviewContext', () => {
     const context = await getPullRequestReviewContext(
       fakeClient as never,
       123,
-      '[Cursor Reviewer]',
+      BOT,
       () => {},
     );
 

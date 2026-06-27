@@ -35,7 +35,6 @@ export const ENV = {
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
   GITHUB_TOKEN: primaryKey('GITHUB_TOKEN'),
   TARGET_BRANCH: primaryKey('TARGET_BRANCH'),
-  BOT_TAG: primaryKey('BOT_TAG'),
   SCORE_MIN: primaryKey('SCORE_MIN'),
   TIMEOUT_MS: primaryKey('TIMEOUT_MS'),
   SANDBOX: primaryKey('SANDBOX'),
@@ -89,7 +88,6 @@ export const env = {
     readCredential('GITHUB_TOKEN') ??
     readCredential('GH_TOKEN'),
   targetBranch: () => readEnv('TARGET_BRANCH'),
-  botTag: () => readEnv('BOT_TAG'),
   scoreMin: () => readEnv('SCORE_MIN'),
   timeoutMs: () => readEnv('TIMEOUT_MS'),
   sandbox: () => readEnv('SANDBOX'),

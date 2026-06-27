@@ -69,7 +69,7 @@ Antes de iniciar, confirme/obtenha via tools ou `.env`:
 |----------|---------|--------|
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min` | `6` | Só achados com `score ≥ scoreMin` entram em `reviews` |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Escalonamento após N rodadas (`0` = desliga) |
-| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Filtro de threads do bot |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine; tag nos comentários = `Agentic Code Reviewer {engine}` |
 | `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-agente |
 | `AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE` | `true` | `lineNumber` deve estar em linha alterada no diff |
 | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` | `8000` | Limite por campo |

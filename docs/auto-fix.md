@@ -18,9 +18,9 @@ O ciclo de Auto-Fix envolve a coordenação de duas pipelines separadas: a **rev
 
 ## Threads, score_min e resumo final
 
-- **Auto-fix só enxerga threads** na PR — achados precisam ser publicados como thread para entrar no loop.
-- **`AGENTIC_CODE_REVIEWERS_SCORE_MIN`** define o que vira thread: somente reviews com `score ≥ scoreMin` são publicados.
-- O **comentário de resumo** (“PR pronta para merge”) só é postado **no fim** de uma rodada de review, quando **não restam** threads ativas/pendentes do bot — sinalizando que o ciclo convergiu.
+- **Auto-fix processa todas as review threads abertas** na PR (com arquivo e linha), sem filtro de tag. Threads que não forem issue de código corrigível são ignoradas pelo subagente (`replacements: []`).
+- **`AGENTIC_CODE_REVIEWERS_SCORE_MIN`** define o que o **reviewer** publica como nova thread.
+- O **comentário de resumo** (“PR pronta para merge”) só é postado **no fim** de uma rodada de review, quando **não restam** threads ativas/pendentes do bot.
 
 ## Proteções do Sistema
 

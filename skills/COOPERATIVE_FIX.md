@@ -24,7 +24,7 @@ Os runtimes são **independentes** (sem import ou acoplamento de código). Este 
 
 | Runtime | Escopo |
 |---------|--------|
-| **Auto-Fix CI** | Somente threads do bot (`AGENTIC_CODE_REVIEWERS_BOT_TAG`) |
+| **Auto-Fix CI** | **Todas** as review threads abertas com arquivo+linha (qualquer autor/tag). Pula via `replacements: []` o que não for issue de código corrigível. |
 | **solve-pr IDE** | **Todas** as review threads abertas na PR (bot, humano, outros reviewers) |
 
 Em ambos: **não resolver** thread sem alteração comprovada na linha ancorada (`lineNumber`).
@@ -36,7 +36,7 @@ Em ambos: **não resolver** thread sem alteração comprovada na linha ancorada 
 Ordem **obrigatória** em ambos os runtimes:
 
 ```
-1. Ler threads ativas (Auto-Fix: bot; solve-pr: todas abertas)
+1. Ler threads abertas (Auto-Fix: todas com arquivo/linha; solve-pr: todas abertas)
 2. Investigar contexto (arquivo, testes, callers)
 3. Aplicar correções cirúrgicas
 4. Validar (testes locais quando aplicável)

@@ -19,7 +19,7 @@ const samplePending: PendingPrThread = {
   threadId: 1,
   status: 'active',
   author: 'bot',
-  botTag: '[Cursor Reviewer]',
+  botTag: 'Agentic Code Reviewer cursor-sdk',
   summary: 'Pending issue',
   filePath: '/src/Bar.cs',
   lineNumber: 5,

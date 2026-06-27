@@ -111,7 +111,7 @@ Variáveis associadas: `AGENTIC_CODE_REVIEWERS_STACK`, `AGENTIC_CODE_REVIEWERS_R
 | **Prompt LLM (Memória Intra-PR)** | Os sumários de TODAS as threads (ativas e resolvidas) são consolidados na seção `Padrões de Risco Detectados Nesta PR` para orientar ativamente as buscas das Fases 1 e 2. |
 | **Prompt LLM (ativas)** | Tabela "Active threads (open)" detalhada (~160 chars) |
 | **Prompt LLM (memória fechadas)** | Tabela "Already resolved threads" com instrução de **não re-levantar sem nova evidência** (anti-loop de re-litígio) |
-| **Gate** | Threads **active/pending** do bot `[Cursor Reviewer]` apenas |
+| **Gate** | Threads **active/pending** do runner (`Agentic Code Reviewer`) |
 
 Threads de humanos **não** entram no prompt; **não** entram no resumo de pendentes do bot. Threads resolvidas **não** entram no `existingKeys` (dedup determinístico) — viram apenas memória para o LLM.
 
@@ -296,7 +296,7 @@ Complementa o *recall* da rodada 1 (mandato de completude no `SYSTEM_PROMPT.md` 
 `ado/gate.ts` — reporta **COM ISSUES** quando:
 
 1. Qualquer review **novo** seria/foi publicado (após filtros), **ou**
-2. Qualquer thread **active/pending** do bot `[Cursor Reviewer]` permanece na PR
+2. Qualquer thread **active/pending** do runner (`Agentic Code Reviewer`) permanece na PR
 
 **Não bloqueia:** threads de humanos, outros bots, nem a pipeline (sempre exit **0** em execução bem-sucedida).
 
@@ -343,7 +343,7 @@ CLI `--org`, `--project`, etc. permanecem disponíveis para uso local.
 ## Formato das threads publicadas
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 
 🛑 **CRITICAL:** Descrição objetiva...
 
@@ -368,7 +368,7 @@ CLI `--org`, `--project`, etc. permanecem disponíveis para uso local.
 Resumo positivo (PR limpa):
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
 
 Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀

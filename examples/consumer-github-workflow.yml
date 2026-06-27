@@ -59,7 +59,6 @@ jobs:
 #     with:
 #       engine: opencode
 #       model: opencode-go/deepseek-v4-flash
-#       bot_tag: '[Cursor Reviewer · OpenCode]'
 #     secrets:
 #       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
 #       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}

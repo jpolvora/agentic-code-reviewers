@@ -19,6 +19,7 @@ import {
   type RoundStateLocation,
 } from '../ado/round-state.js';
 import { commentHasBotTag, normalizeFilePath, reviewDedupKey } from '../ado/utils.js';
+import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment } from '../bot-tag.js';
 import {
   commentBodyHasResolutionReply,
   RESOLUTION_MARKER,
@@ -100,6 +101,7 @@ export class GithubProvider implements PlatformProvider {
       const activeContextRows: Array<{ filePath: string; lineNumber: number; status: string; summary: string }> = [];
       const resolvedContextRows: Array<{ filePath: string; lineNumber: number; status: string; summary: string }> = [];
       const activeThreads: ActiveThreadInfo[] = [];
+      const openReviewThreads: ActiveThreadInfo[] = [];
       const pendingThreads: PendingPrThread[] = [];
 
       for (const thread of pr.reviewThreads) {
@@ -108,20 +110,37 @@ export class GithubProvider implements PlatformProvider {
 
         const firstComment = comments[0];
         const rawContent = firstComment.body;
-        const isBot = commentHasBotTag(rawContent, botTag, 'contains');
+        const isBot = isAgenticReviewerComment(rawContent);
+        const isThisEngine = commentHasBotTag(rawContent, botTag, 'contains');
         const normalizedPath = normalizeFilePath(thread.path);
         const lineNumber = thread.line ?? 1;
 
         const isResolved = thread.isResolved;
         const status = isResolved ? 'fixed' : 'active';
 
-        if (isBot && !isResolved) {
+        if (!isResolved && thread.path && lineNumber > 0) {
+          openReviewThreads.push({
+            threadId: thread.id,
+            filePath: normalizedPath,
+            lineNumber,
+            status,
+            summary: getReviewSummaryFromComment(rawContent, botTag),
+            botCommentId: firstComment.databaseId,
+            hasResolutionReply: comments.some(
+              (c) =>
+                c.databaseId !== firstComment.databaseId &&
+                (commentBodyHasResolutionReply(c.body, botTag) || c.body.includes(RESOLUTION_MARKER)),
+            ),
+          });
+        }
+
+        if (isThisEngine && !isResolved) {
           existingKeys.set(reviewDedupKey(normalizedPath, lineNumber), true);
         }
 
         const summary = getReviewSummaryFromComment(rawContent, botTag);
 
-        if (isBot) {
+        if (isThisEngine) {
           if (!isResolved) {
             activeContextRows.push({
               filePath: normalizedPath,
@@ -161,7 +180,7 @@ export class GithubProvider implements PlatformProvider {
             lineNumber,
             author: firstComment.author?.login ?? 'unknown',
             isBot,
-            botTag: isBot ? botTag : null,
+            botTag: isBot ? extractAgenticBotTagLine(rawContent) : null,
             summary: rawContent.slice(0, 160),
           });
         }
@@ -183,6 +202,7 @@ export class GithubProvider implements PlatformProvider {
 
       log(`Found ${pendingThreads.length} pending thread(s) on PR (all authors).`);
       log(`Found ${activeThreads.length} active bot thread(s) eligible for resolution.`);
+      log(`Found ${openReviewThreads.length} open review thread(s) eligible for auto-fix.`);
 
       let contextForLlm = '';
       if (activeContextRows.length > 0 || resolvedContextRows.length > 0) {
@@ -248,6 +268,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
         existingKeys,
         contextForLlm,
         activeThreads,
+        openReviewThreads,
         allThreads: allThreadsMock as any,
         pendingThreads,
       };
@@ -485,7 +506,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
       const comment = t.comments?.[0];
       if (!comment || comment.isDeleted) continue;
 
-      if (comment.content.includes(botTag) && comment.content.includes(ROUND_STATE_MARKER)) {
+      if (isAgenticReviewerComment(comment.content) && comment.content.includes(ROUND_STATE_MARKER)) {
         const match = comment.content.match(/Rodada:\s*(\d+)/i);
         const round = match ? Number.parseInt(match[1], 10) : 0;
         return {
@@ -531,7 +552,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
       const file = r.fileName.replace(/^\/+/, '');
       const firstLine = r.comment.split('\n').find((l) => l.trim().length > 0) ?? '';
       const cleanMessage = firstLine.replace(/\s+/g, ' ').trim();
-      log(`::${severity} file=${file},line=${r.lineNumber},col=1::[Cursor Reviewer] ${cleanMessage}`);
+      log(`::${severity} file=${file},line=${r.lineNumber},col=1::${BOT_TAG_PREFIX} ${cleanMessage}`);
     }
 
     const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -552,7 +573,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
     metrics?: Record<string, number>,
   ): string {
     const lines: string[] = [];
-    lines.push('### Cursor Reviewer Summary');
+    lines.push(`### ${BOT_TAG_PREFIX} Summary`);
     lines.push('');
     lines.push(`- **Mode:** ${dryRun ? 'DRY-RUN' : 'PIPELINE'}`);
     lines.push(`- **Status:** ${gate.shouldFail ? '⚠️ Issues found' : '✅ No issues'}`);

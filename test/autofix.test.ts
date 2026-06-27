@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync } from 'node:child_process';
-import { applyReplacements, computeUpdatedLineNumber, isThreadLineModified, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
+import { applyReplacements, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
 
 describe('applyReplacements', () => {
   it('aplica substituição simples em arquivo', () => {
@@ -112,6 +112,22 @@ describe('computeUpdatedLineNumber', () => {
   it('mapeia linha original para posição equivalente após replacement amplo', () => {
     const replacements = [{ startLine: 1, endLine: 10, replacementContent: 'a\nb\nc' }];
     assert.equal(computeUpdatedLineNumber(5, replacements), 3);
+  });
+});
+
+describe('getAutoFixThreads', () => {
+  it('prefere openReviewThreads quando o campo está presente', () => {
+    const open = [{ threadId: '1', filePath: '/a.ts', lineNumber: 1 } as any];
+    const botOnly = [{ threadId: '2', filePath: '/b.ts', lineNumber: 2 } as any];
+    assert.deepEqual(
+      getAutoFixThreads({ openReviewThreads: open, activeThreads: botOnly } as any),
+      open,
+    );
+  });
+
+  it('usa activeThreads quando openReviewThreads ausente (legado)', () => {
+    const botOnly = [{ threadId: '2', filePath: '/b.ts', lineNumber: 2 } as any];
+    assert.deepEqual(getAutoFixThreads({ activeThreads: botOnly } as any), botOnly);
   });
 });
 

@@ -5,9 +5,11 @@ import {
   stripHtml,
 } from './utils.js';
 import {
-  REVIEW_SUMMARY_MARKER,
   commentBodyHasResolutionReply,
+  RESOLUTION_MARKER,
+  REVIEW_SUMMARY_MARKER,
 } from '../git/markers.js';
+import { isAgenticReviewerComment, extractAgenticBotTagLine } from '../bot-tag.js';
 import type {
   ActiveThreadInfo,
   AdoThread,
@@ -61,8 +63,8 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
     }
 
     const rawContent = firstComment.content;
-    const isBot = commentHasBotTag(rawContent, botTag, 'contains');
-    const detectedBotTag = isBot ? botTag : null;
+    const isBot = isAgenticReviewerComment(rawContent);
+    const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
     const summary = getReviewSummaryFromComment(rawContent, botTag);
 
     pending.push({
@@ -80,8 +82,8 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
   return pending;
 }
 
-export function filterGatePendingThreads(threads: PendingPrThread[], botTag: string): PendingPrThread[] {
-  return threads.filter((t) => t.isBot && t.botTag === botTag);
+export function filterGatePendingThreads(threads: PendingPrThread[]): PendingPrThread[] {
+  return threads.filter((t) => t.isBot);
 }
 
 export async function getPullRequestReviewContext(
@@ -109,7 +111,42 @@ export async function getPullRequestReviewContext(
       summary: string;
     }> = [];
     const activeThreads: ActiveThreadInfo[] = [];
+    const openReviewThreads: ActiveThreadInfo[] = [];
     const pendingThreads = extractPendingThreads(existingThreads, botTag);
+
+    for (const thread of existingThreads.value) {
+      if (thread.isDeleted || !thread.threadContext?.filePath) {
+        continue;
+      }
+      const openStatus = String(thread.status ?? '').toLowerCase();
+      if (openStatus !== 'active' && openStatus !== 'pending') {
+        continue;
+      }
+      const rootComment = getFirstVisibleComment(thread);
+      if (!rootComment) {
+        continue;
+      }
+      const openPath = normalizeFilePath(thread.threadContext.filePath);
+      const openLine = thread.threadContext.rightFileStart?.line ?? 0;
+      if (openLine <= 0) {
+        continue;
+      }
+      openReviewThreads.push({
+        threadId: String(thread.id),
+        filePath: openPath,
+        lineNumber: openLine,
+        status: thread.status,
+        summary: getReviewSummaryFromComment(rootComment.content, botTag),
+        botCommentId: rootComment.id,
+        hasResolutionReply: thread.comments.some(
+          (comment) =>
+            !comment.isDeleted &&
+            comment.id !== rootComment.id &&
+            (commentBodyHasResolutionReply(comment.content, botTag) ||
+              comment.content.includes(RESOLUTION_MARKER)),
+        ),
+      });
+    }
 
     for (const thread of existingThreads.value) {
       if (thread.isDeleted || !thread.threadContext?.filePath) {
@@ -122,7 +159,7 @@ export async function getPullRequestReviewContext(
       }
 
       const botComment = thread.comments.find(
-        (comment) => !comment.isDeleted && commentHasBotTag(comment.content, botTag),
+        (comment) => !comment.isDeleted && commentHasBotTag(comment.content, botTag, 'contains'),
       );
       if (!botComment) {
         continue;
@@ -168,12 +205,14 @@ export async function getPullRequestReviewContext(
 
     log(`Found ${pendingThreads.length} pending thread(s) on PR (all authors).`);
     log(`Found ${activeThreads.length} active bot thread(s) eligible for resolution.`);
+    log(`Found ${openReviewThreads.length} open review thread(s) eligible for auto-fix.`);
 
     if (activeContextRows.length === 0 && resolvedContextRows.length === 0) {
       return {
         existingKeys,
         contextForLlm: '',
         activeThreads,
+        openReviewThreads,
         allThreads: existingThreads,
         pendingThreads,
       };
@@ -242,6 +281,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
       existingKeys,
       contextForLlm,
       activeThreads,
+      openReviewThreads,
       allThreads: existingThreads,
       pendingThreads,
     };
@@ -266,7 +306,7 @@ export function testReviewSummaryAlreadyPosted(
     }
 
     for (const comment of thread.comments) {
-      if (comment.isDeleted || !commentHasBotTag(comment.content, botTag)) {
+      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) {
         continue;
       }
       if (!comment.content.includes(REVIEW_SUMMARY_MARKER)) {

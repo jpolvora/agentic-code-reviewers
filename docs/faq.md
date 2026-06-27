@@ -459,7 +459,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Qual o formato da thread publicada?
 
-**Resposta:** `[Cursor Reviewer]` + emoji/severity + comentário + correção sugerida (opcional) + `<details>` com score, análise e caminhos. **Não** usa ` ```suggestion ` — ADO não aplica sugestões inline como GitHub.
+**Resposta:** `Agentic Code Reviewer {engine}` + emoji/severity + comentário + correção sugerida (opcional) + `<details>` com score, análise e caminhos. A tag é derivada de `AGENTIC_CODE_REVIEWERS_ENGINE` (ex.: `Agentic Code Reviewer cursor-sdk`). **Não** usa ` ```suggestion ` — ADO não aplica sugestões inline como GitHub.
 
 *Evidência:* `formatCommentForPosting` em `src/ado/format-thread.ts`.
 

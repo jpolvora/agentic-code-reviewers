@@ -61,7 +61,10 @@ export interface PendingPrThread {
 export interface ReviewContextResult {
   existingKeys: Map<string, boolean>;
   contextForLlm: string;
+  /** Threads do bot (tag) — resolução pelo agente de review. */
   activeThreads: ActiveThreadInfo[];
+  /** Todas as review threads abertas com arquivo+linha — auto-fix (sem filtro de tag). */
+  openReviewThreads: ActiveThreadInfo[];
   allThreads: AdoThreadsResponse | null;
   pendingThreads: PendingPrThread[];
 }
