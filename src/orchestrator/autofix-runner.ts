@@ -86,6 +86,7 @@ export async function runAutoFixFlow(
   const autoFixSystemPrompt = fs.readFileSync(autoFixPromptPath, 'utf8');
 
   const resolvedItems: ResolvedThreadItem[] = [];
+  const modifiedFiles: string[] = [];
   const filePaths = Array.from(threadsByFile.keys());
 
   await Promise.all(
@@ -148,7 +149,24 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           return;
         }
 
-        const updatedContent = applyReplacements(fileContent, parsed.replacements);
+        if (parsed.replacements.length === 0) {
+          logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}. Threads não serão resolvidas.`);
+          return;
+        }
+
+        let updatedContent: string;
+        try {
+          updatedContent = applyReplacements(fileContent, parsed.replacements);
+        } catch (err: any) {
+          logger.error(`Erro ao aplicar substituições em ${filePath}: ${err.message}`);
+          return;
+        }
+
+        if (updatedContent === fileContent) {
+          logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}. Threads não serão resolvidas.`);
+          return;
+        }
+
         const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
         
         if (config.dryRun) {
@@ -157,6 +175,8 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           logger.info(`Aplicando correções no arquivo local: ${filePath}`);
           fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
+
+        modifiedFiles.push(filePath);
 
         // Cria os itens resolvidos para marcar na PR
         for (const thread of threads) {
@@ -180,7 +200,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
 
   // Consolidar commit e push
   logger.section('Consolidando alterações com Git');
-  const commitSuccess = await runAutoFixCommit(config, logger, filePaths);
+  const commitSuccess = await runAutoFixCommit(config, logger, modifiedFiles);
 
   // Responder e resolver threads na PR
   logger.section('Respondendo e resolvendo threads na PR');

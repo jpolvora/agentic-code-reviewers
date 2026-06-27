@@ -88,12 +88,15 @@ describe('runAutoFixFlow', () => {
 
   function setupTempWorkspace() {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-test-'));
+    const remoteDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-remote-'));
     fs.mkdirSync(path.join(tmpDir, 'skills'));
     fs.writeFileSync(path.join(tmpDir, 'skills', 'AUTO_FIX.md'), 'dummy prompt');
     fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2\nlinha 3');
     
     // Configura repositório git para evitar falhas nos comandos git
-    execSync('git init', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init -b master', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git init --bare', { cwd: remoteDir, stdio: 'ignore' });
+    execSync(`git remote add origin "${remoteDir}"`, { cwd: tmpDir, stdio: 'ignore' });
     execSync('git config user.name "test"', { cwd: tmpDir, stdio: 'ignore' });
     execSync('git config user.email "test@example.com"', { cwd: tmpDir, stdio: 'ignore' });
     execSync('git add .', { cwd: tmpDir, stdio: 'ignore' });
@@ -138,5 +141,62 @@ describe('runAutoFixFlow', () => {
     const content = fs.readFileSync(path.join(tmpDir, 'file.txt'), 'utf8');
     assert.equal(content, 'linha 1\nlinha 2\nlinha 3', 'não deve gravar em disco no dry-run');
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0, 'não deve resolver threads via API no dry-run');
+  });
+
+  it('não resolve threads quando replacements é idempotente (sem alteração de conteúdo)', async () => {
+    const tmpDir = setupTempWorkspace();
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+    } as any;
+    const engine = {
+      run: async () => ({ fullText: '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":1,"replacementContent":"linha 1"}]}\n```' }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
+  });
+
+  it('com múltiplos arquivos, resolve apenas as threads dos arquivos alterados', async () => {
+    const tmpDir = setupTempWorkspace();
+    // Cria um segundo arquivo e comita para o git ficar limpo
+    fs.writeFileSync(path.join(tmpDir, 'file2.txt'), 'linha 1\nlinha 2\nlinha 3');
+    execSync('git add file2.txt && git commit -m "add file2"', { cwd: tmpDir, stdio: 'ignore' });
+
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [
+        { filePath: 'file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
+        { filePath: 'file2.txt', lineNumber: 1, summary: 'test issue 2', threadId: '2' },
+      ],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+    } as any;
+    const engine = {
+      run: async (cfg: any, task: any) => {
+        if (task.name.includes('file.txt')) {
+          // Arquivo 1: alteração real
+          return { fullText: '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":1,"replacementContent":"linha 1 alterada"}]}\n```' };
+        } else {
+          // Arquivo 2: sem alterações
+          return { fullText: '```json\n{"explanation":"ok","replacements":[]}\n```' };
+        }
+      },
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    // Apenas a thread 1 de file.txt deve ser resolvida. A thread de file2.txt não deve ser incluída.
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+    const calls = provider.resolvePullRequestReviewThreads.mock.calls;
+    const resolvedItemsArg = calls[0].arguments[2];
+    assert.equal(resolvedItemsArg.length, 1);
+    assert.equal(resolvedItemsArg[0].threadId, 1);
+    assert.equal(resolvedItemsArg[0].fileName, 'file.txt');
   });
 });
