@@ -227,7 +227,7 @@ function buildVerdictAndAdoPolicy(scoreMin: number): string[] {
     '2. **Completude:** confirme que percorreu **todos** os arquivos elegíveis e que cada achado real e comprovado foi incluído — não reserve achados para rodadas futuras (convergência em uma rodada).',
     '3. **Não duplique** threads ADO existentes (contexto abaixo), incluindo a tabela de threads **já resolvidas** — não re-levante um problema resolvido sem **nova evidência** de que voltou.',
     '4. `resolvedThreads`: somente se **verificou** via tools que o problema foi corrigido.',
-    '5. PR sem issues novas: `"reviews": []` + `reviewSummary` positivo.',
+    '5. PR limpa: `"reviews": []`; `reviewSummary` pode ser `""` (o runner publica mensagem de sucesso padronizada — não liste issues em `reviewSummary`).',
     '6. Emita **somente** o bloco JSON — sem narrativa fora do JSON.',
   ];
 }

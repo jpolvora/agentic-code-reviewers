@@ -68,6 +68,12 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 }
 ```
 
+### Campo `reviewSummary`
+
+- Use como **sinal de PR limpa** no JSON (`""` ou texto breve) — o runner **ignora** o texto.
+- **Threads** são o canal para auto-fix: achados com `score ≥ scoreMin` viram threads; abaixo do limiar não.
+- O comentário de resumo na PR é postado **no fim** do review, quando **não restam** threads ativas/pendentes do bot, com mensagem fixa: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`.
+
 ### Campos obrigatórios por review
 
 `fileName`, `lineNumber`, `severity`, `comment`, `score`, `developerAction`, `analysis`, `impactPaths`.
@@ -87,7 +93,7 @@ Retorne **exclusivamente** um único bloco JSON válido (fence com tag `json`). 
 | `suggestedFix` | Altamente recomendado para habilitar Auto-Fix — código elegante (` ```csharp `/` ```ts `/` ```diff `), inclusive para remoção de código; `""` apenas se estritamente conceitual |
 | `analysis` | Análise profunda estruturada (Evidência, Cenário Causal, Proteções, Descartes) |
 | `impactPaths` | Arquivos lidos via tools que sustentam o achado |
-| PR limpa | `"reviews": []` + `reviewSummary` indicando que tudo está certo (nenhum comentário/resumo de issues é postado na PR se houver problemas) |
+| PR limpa | `"reviews": []` quando sem achados ≥ scoreMin; resumo na PR só quando **zero threads** do bot ao fim do review (runner ignora `reviewSummary` do JSON) |
 
 ### Classificação `severity` × `score`
 

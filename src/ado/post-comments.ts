@@ -11,7 +11,7 @@ import {
   type SafeOutputOptions,
 } from './safe-outputs.js';
 import { normalizeFilePath, reviewDedupKey as pathLineDedupKey } from './utils.js';
-import { RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER } from '../git/markers.js';
+import { CLEAN_PR_SUMMARY_MESSAGE, RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER } from '../git/markers.js';
 import { testReviewSummaryAlreadyPosted } from './review-context.js';
 import type {
   ActiveThreadInfo,
@@ -100,26 +100,22 @@ export function parseCodeReviewResponse(
 
 export { isPublishableReview };
 
-export function getCodeReviewPostingPlan(
-  parsed: ParsedCodeReviewResponse,
-  hasExternalPendingThreads: boolean,
-): PostingPlan {
-  // `parsed.reviews` já passou pelo gate autoritativo em parseCodeReviewResponse
-  // (filterPublishableReviews). O filtro defensivo final fica em setPullRequestComments,
-  // no boundary de POST do ADO.
-  const reviews = parsed.reviews;
-  
-  // A PR está limpa se não houver novos reviews (novos problemas) e nenhuma thread externa pendente (problemas antigos ativos)
-  const isClean = reviews.length === 0 && !hasExternalPendingThreads;
-  
-  const summary = isClean
-    ? 'Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀'
-    : '';
-
+/** Plano de publicação de reviews (score ≥ scoreMin já aplicado em `parsed.reviews`). */
+export function getCodeReviewPostingPlan(parsed: ParsedCodeReviewResponse): Pick<PostingPlan, 'reviewsJson'> {
   return {
-    reviewsJson: JSON.stringify({ reviews }),
-    reviewSummary: summary,
-    postSummary: isClean,
+    reviewsJson: JSON.stringify({ reviews: parsed.reviews }),
+  };
+}
+
+/**
+ * Comentário de resumo na PR — somente no fim do review, quando não restam threads
+ * ativas/pendentes do bot (auto-fix e convergência dependem de threads, não do JSON).
+ */
+export function shouldPostReviewSummary(hasBotPendingThreads: boolean): Pick<PostingPlan, 'reviewSummary' | 'postSummary'> {
+  const postSummary = !hasBotPendingThreads;
+  return {
+    reviewSummary: postSummary ? CLEAN_PR_SUMMARY_MESSAGE : '',
+    postSummary,
   };
 }
 

@@ -230,7 +230,7 @@ Para **cada achado comprovado**, use `grep`/`glob` por **ocorrências irmãs do 
 2. **Completude:** percorreu todos os elegíveis; cada achado real incluído.
 3. **Não duplique** threads existentes (incluindo resolvidas).
 4. `resolvedThreads`: somente se **verificou** via tools que corrigido.
-5. PR limpa: `"reviews": []` + `reviewSummary` positivo.
+5. PR limpa: `"reviews": []`; `reviewSummary` pode ser `""` (runner publica mensagem padronizada — não liste issues em `reviewSummary`).
 6. Emita **somente** o bloco JSON — sem narrativa fora do JSON.
 
 ---
@@ -332,11 +332,11 @@ Leia rodada via `fetch_threads.cjs --json` (GitHub) ou API ADO. Se `currentRound
 
 ---
 
-## 11. Plano de postagem (`getCodeReviewPostingPlan`)
+## 11. Plano de postagem e resumo
 
-- O sumário de review só é publicado quando a PR está totalmente limpa (sem novos reviews e sem threads pendentes do bot).
-- Quando publicado, o sumário usa a mensagem padrão de sucesso em português: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`.
-- Se houver novos reviews ou pendências, nenhum sumário geral é publicado na PR.
+- **Threads:** `score ≥ scoreMin` → publicadas; auto-fix lê apenas threads ativas.
+- **Resumo:** `shouldPostReviewSummary` — só no **fim** do review, após refresh, se zero threads ativas/pendentes do bot. Mensagem: `CLEAN_PR_SUMMARY_MESSAGE`.
+- `getCodeReviewPostingPlan` monta só o `reviewsJson`.
 - Dedup contra `existingKeys` antes de publicar.
 
 ---

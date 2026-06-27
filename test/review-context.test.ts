@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { getCodeReviewPostingPlan, getNewReviewsFromPlan, parseCodeReviewResponse } from '../src/ado/post-comments.js';
+import { getCodeReviewPostingPlan, getNewReviewsFromPlan, parseCodeReviewResponse, shouldPostReviewSummary } from '../src/ado/post-comments.js';
+import { CLEAN_PR_SUMMARY_MESSAGE } from '../src/git/markers.js';
 import { getPullRequestReviewContext } from '../src/ado/review-context.js';
 import type { CodeReviewItem } from '../src/ado/types.js';
 
@@ -124,7 +125,7 @@ describe('getPullRequestReviewContext', () => {
       reviewSummary: '',
     });
 
-    const plan = getCodeReviewPostingPlan(parsed, false);
+    const plan = getCodeReviewPostingPlan(parsed);
     const reviews = getNewReviewsFromPlan(plan.reviewsJson, new Map());
 
     assert.equal(reviews.length, 1);
@@ -267,46 +268,15 @@ describe('getPullRequestReviewContext', () => {
     assert.ok(context.contextForLlm.includes('- Erro com abreviação ex.: HTTP/REST e arquivo config.json.'));
   });
 
-  describe('getCodeReviewPostingPlan summary policy', () => {
-    it('retorna postSummary=true e mensagem padrão de sucesso quando a PR está limpa e sem pendências', () => {
-      const parsed = parseCodeReviewResponse({
-        reviews: [],
-        resolvedThreads: [],
-        reviewSummary: 'Algum sumário retornado pelo LLM que deve ser ignorado',
-      });
-      const plan = getCodeReviewPostingPlan(parsed, false);
+  describe('shouldPostReviewSummary', () => {
+    it('retorna postSummary=true e mensagem padrão quando não há threads pendentes do bot', () => {
+      const plan = shouldPostReviewSummary(false);
       assert.equal(plan.postSummary, true);
-      assert.equal(
-        plan.reviewSummary,
-        'Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀',
-      );
+      assert.equal(plan.reviewSummary, CLEAN_PR_SUMMARY_MESSAGE);
     });
 
-    it('retorna postSummary=false e reviewSummary vazio quando há novos reviews', () => {
-      const parsed = parseCodeReviewResponse({
-        reviews: [
-          validReview({
-            fileName: '/src/Foo.cs',
-            lineNumber: 10,
-            severity: 'warning',
-            score: 7,
-          }),
-        ],
-        resolvedThreads: [],
-        reviewSummary: 'Algum sumário',
-      });
-      const plan = getCodeReviewPostingPlan(parsed, false);
-      assert.equal(plan.postSummary, false);
-      assert.equal(plan.reviewSummary, '');
-    });
-
-    it('retorna postSummary=false e reviewSummary vazio quando há threads externas pendentes', () => {
-      const parsed = parseCodeReviewResponse({
-        reviews: [],
-        resolvedThreads: [],
-        reviewSummary: 'Algum sumário',
-      });
-      const plan = getCodeReviewPostingPlan(parsed, true);
+    it('retorna postSummary=false e reviewSummary vazio quando há threads ativas/pendentes do bot', () => {
+      const plan = shouldPostReviewSummary(true);
       assert.equal(plan.postSummary, false);
       assert.equal(plan.reviewSummary, '');
     });

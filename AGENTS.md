@@ -90,6 +90,10 @@ Findings that violate any rule below are automatically discarded:
 | `analysis` | Required with all 4 steps of the structured proof. |
 | `impactPaths` | Array with at least one read file that supports the investigation. |
 
+### PR Summary Comment (`shouldPostReviewSummary` in `src/ado/post-comments.ts`)
+
+The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending bot threads** remain on the PR. `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`.
+
 ### Safe Outputs (`src/ado/safe-outputs.ts`)
 
 After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS`) applies additional deterministic validation:

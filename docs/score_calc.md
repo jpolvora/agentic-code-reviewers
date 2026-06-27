@@ -252,7 +252,7 @@ Em `src/parser/review-response.ts`:
 |-----|---------------|
 | **Corpo da thread** | `format-thread.ts` — prefixo por severity + bloco `<details>` com `Score: N/10` |
 | **Pipeline Azure DevOps** | `pipeline-logging.ts` — `critical` → `##vso[task.logissue type=error]`; demais → `type=warning` |
-| **Resumo positivo** | Se houver review `critical`, `reviewSummary` é **ignorado** |
+| **Resumo positivo** | No fim do review, só se zero threads ativas/pendentes do bot; mensagem fixa do runner |
 | **Escalonamento** | `currentRound > AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5) + issues abertas → publica **só** `critical`; suprime `warning`/`suggestion` novos |
 | **Dedup** | Chave `arquivoNormalizado\|line:N` — mesma linha não gera thread duplicada |
 
@@ -280,7 +280,7 @@ Regras explícitas do `SYSTEM_PROMPT.md`:
 |----------|---------------|
 | Dúvida se o achado **é real** | **Silêncio** — não publicar |
 | Achado **comprovado** que passa no gate | **Publicar** — não omitir para “não poluir” |
-| PR sem issues novas | `"reviews": []` + `reviewSummary` positivo |
+| PR sem issues novas | `"reviews": []` para achados ≥ scoreMin; resumo na PR só quando zero threads do bot ao fim do review |
 
 Objetivo anti-loop: **completude na mesma rodada** — listar todos os achados materiais de uma vez (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6), não reservar para rodadas futuras.
 
