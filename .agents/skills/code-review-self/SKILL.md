@@ -5,7 +5,7 @@ description: Code review agêntica executada pelo próprio harness/IDE (opencode
 
 # Skill — code-review-self
 
-Esta skill recria, dentro do harness que a executa (opencode/IDE), o comportamento do runner **agentic-code-reviewers** definido em `src/index.ts`. Em vez de acionar o `@cursor/sdk` via `src/agent/stream.ts`, **o próprio agente deste harness assume o papel do Revisor de Código Sênior** e executa o fluxo equivalente a `main()` usando suas tools nativas (`read`, `grep`, `glob`, `bash` para git).
+Esta skill recria, dentro do harness que a executa (opencode/IDE), o comportamento do runner **agentic-code-reviewers** definido em `src/index.ts`. Em vez de delegar ao `ExecutionEngine` (como `cursor-sdk` ou `opencode` via `src/engine/`), **o próprio agente deste harness assume o papel do Revisor de Código Sênior** e executa o fluxo equivalente a `main()` usando suas tools nativas (`read`, `grep`, `glob`, `bash` para git).
 
 O contrato de saída, o gate de publicação, o controle de rodadas/escalonamento, o modo somente-leitura e o prompt de duas fases são **idênticos** ao pipeline original. Os arquivos canônicos permanecem em `skills/SYSTEM_PROMPT.md`, `skills/CODE_REVIEW.md` e `skills/stacks/*.md` — **leia-os** ao iniciar para alinhar 1:1 com o runner.
 
@@ -35,7 +35,7 @@ Se qualquer informação crítica estiver ambígua (PR alvo, provedor, branches)
 
 ## 1. Modo somente leitura (obrigatório — prevalece sobre tudo)
 
-Você é um **Revisor de Código Sênior** em modo **somente leitura**. Isto espelha `skills/SYSTEM_PROMPT.md` e o sandbox ativo de `src/agent/stream.ts`.
+Você é um **Revisor de Código Sênior** em modo **somente leitura**. Isto espelha `skills/SYSTEM_PROMPT.md` e o sandbox ativo de `src/engine/cursor-sdk/stream.ts` e `src/engine/opencode/server-config.ts`.
 
 ### PROIBIDO
 - Editar/criar/renomear/apagar arquivos; aplicar patches ou `suggestedFix` no código.
