@@ -1,5 +1,13 @@
 # Revisão agêntica — um check por engine (matrix). Dispara apenas em PRs para main.
-# Modo padrão: paralelo. Sequential via workflow_dispatch ou vars.REVIEWER_EXECUTION_MODE.
+# Modo padrão: paralelo. Sequential via workflow_dispatch ou vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE.
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY  — obrigatório (legado: CURSOR_API_KEY)
+#   AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY — job opencode (legado: OPENCODE_GO_API_KEY)
+# GITHUB_TOKEN é automático (github.token); não precisa cadastrar.
+#
+# Variables opcionais (Settings → Secrets and variables → Actions → Variables):
+#   AGENTIC_CODE_REVIEWERS_EXECUTION_MODE — parallel | sequential (legado: REVIEWER_EXECUTION_MODE)
 name: Agentic Code Review
 
 on:
@@ -37,8 +45,9 @@ permissions:
 env:
   EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || vars.REVIEWER_EXECUTION_MODE || 'parallel' }}
   PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  # Nomes curtos — o runner normaliza para refs/heads/* via loadConfig
   SOURCE_BRANCH: ${{ github.head_ref || github.event.inputs.source_branch }}
-  TARGET_BRANCH: refs/heads/${{ github.event.pull_request.base.ref || github.event.inputs.target_branch }}
+  TARGET_BRANCH: ${{ github.event.pull_request.base.ref || github.event.inputs.target_branch || 'main' }}
 
 jobs:
   review:
@@ -104,10 +113,25 @@ jobs:
           fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
           NODE
 
+      - name: Validate required secrets
+        env:
+          CURSOR_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
+          OPENCODE_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY || secrets.OPENCODE_GO_API_KEY }}
+        run: |
+          if [ -z "$CURSOR_KEY" ]; then
+            echo "::error::Configure o secret AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY (ou legado CURSOR_API_KEY) em Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ "${{ matrix.opencode_setup }}" = "true" ] && [ -z "$OPENCODE_KEY" ]; then
+            echo "::error::Configure o secret AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY (ou legado OPENCODE_GO_API_KEY) para a engine opencode."
+            exit 1
+          fi
+
       - name: Run Reviewer Agent (${{ matrix.engine }})
         env:
           AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
