@@ -514,6 +514,14 @@ Diff sem `.cs`, `.ts` ou `.html` revisáveis, ou todos excluídos.
 
 Rode com `--verbose` e inspecione a saída bruta do agente.
 
+### OpenCode: `HeadersTimeoutError` / `fetch failed`
+
+`session.prompt` só devolve HTTP quando o agente termina (tool calls + LLM). O client OpenCode usa `undici` com `headersTimeout` alinhado a `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` (default 10 min). Se o review demorar mais, aumente:
+
+```bash
+AGENTIC_CODE_REVIEWERS_TIMEOUT_MS=1200000 npm run review -- --dry-run --engine opencode ...
+```
+
 ### OpenCode para após `Sessão criada` sem progresso
 
 1. Confirme `opencode` no `PATH` e credenciais (`auth.json` ou `OPENCODE_API_KEY`)

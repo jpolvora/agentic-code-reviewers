@@ -17,6 +17,7 @@ import {
 } from './prompt-body.js';
 import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
+import { createOpencodeFetch } from './fetch.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -70,6 +71,16 @@ function resolveAgentName(): string {
   return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
 }
 
+function isHeadersTimeoutError(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : error;
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === 'UND_ERR_HEADERS_TIMEOUT'
+  );
+}
+
 function assertResponseData<T>(result: { data?: T; error?: unknown }, context: string): T {
   if (result.error) {
     throw new Error(`${context}: ${JSON.stringify(result.error)}`);
@@ -120,16 +131,18 @@ function assistantMessageToMetrics(info: AssistantMessage): Record<string, numbe
 async function createRuntime(
   config: ReviewerConfig,
   model: string,
+  timeoutMs: number,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<OpencodeRuntime> {
   const directory = config.repoRoot;
   const externalUrl = resolveServerUrl();
+  const fetch = createOpencodeFetch(timeoutMs);
 
   if (externalUrl) {
     logger.info(`OpenCode: conectando ao servidor existente em ${externalUrl}`);
     return {
-      client: createOpencodeClient({ baseUrl: externalUrl, directory }),
+      client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch }),
       close: () => {},
     };
   }
@@ -159,7 +172,7 @@ async function createRuntime(
   }
 
   return {
-    client: createOpencodeClient({ baseUrl: server.url, directory }),
+    client: createOpencodeClient({ baseUrl: server.url, directory, fetch }),
     close: () => server.close(),
   };
 }
@@ -258,7 +271,7 @@ export async function runOpencodeStream(
   let sessionId: string | undefined;
 
   try {
-    runtime = await createRuntime(config, modelSelection.composite, abortController.signal, logger);
+    runtime = await createRuntime(config, modelSelection.composite, timeoutMs, abortController.signal, logger);
     const { client } = runtime;
 
     sessionId = await resolveSessionId(client, options, directory, logger);
@@ -319,6 +332,14 @@ export async function runOpencodeStream(
       throw new Error(
         `Timeout: agente OpenCode excedeu ${(timeoutMs / 1000).toFixed(0)}s. ` +
           `Aumente ${ENV.TIMEOUT_MS} se necessário.`,
+      );
+    }
+
+    if (isHeadersTimeoutError(error)) {
+      throw new Error(
+        `OpenCode session.prompt excedeu o limite HTTP antes de devolver resposta. ` +
+          `Aumente ${ENV.TIMEOUT_MS} (atual: ${timeoutMs}ms).`,
+        { cause: error instanceof Error ? error : undefined },
       );
     }
 
