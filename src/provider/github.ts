@@ -47,7 +47,7 @@ export class GithubProvider implements PlatformProvider {
 
   async initialize(config: ReviewerConfig, _logger: Logger): Promise<void> {
     this.config = config;
-    const token = config.adoAccessToken || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+    const token = config.adoAccessToken;
     this.client = new GithubClient(
       config.organization, // Reuses organization as owner
       config.repositoryName,

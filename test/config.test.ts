@@ -48,7 +48,7 @@ describe('loadConfig', () => {
   it('falha em dry-run com contexto ADO sem token para não ignorar threads pendentes', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         SYSTEM_ACCESSTOKEN: undefined,
         AZURE_DEVOPS_EXT_PAT: undefined,
         GITHUB_ACTIONS: undefined,
@@ -81,7 +81,7 @@ describe('loadConfig', () => {
   it('usa default composer-2.5 quando CURSOR_REVIEWER_MODEL está vazio (pipeline ADO sem variável)', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MODEL: '',
       },
       () => {
@@ -94,7 +94,7 @@ describe('loadConfig', () => {
   it('usa default composer-2.5 quando CURSOR_REVIEWER_MODEL é macro ADO não expandida', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MODEL: '$(CURSOR_REVIEWER_MODEL)',
       },
       () => {
@@ -107,7 +107,7 @@ describe('loadConfig', () => {
   it('usa cursor-sdk como engine default', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_ENGINE: undefined,
       },
       () => {
@@ -120,7 +120,7 @@ describe('loadConfig', () => {
   it('aceita AGENTIC_CODE_REVIEWERS_ENGINE=opencode', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
       },
       () => {
@@ -131,23 +131,10 @@ describe('loadConfig', () => {
     );
   });
 
-  it('aceita CURSOR_API_KEY legado como fallback', () => {
-    withEnv(
-      {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: undefined,
-        CURSOR_API_KEY: 'cursor_legacy',
-      },
-      () => {
-        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.cursorApiKey, 'cursor_legacy');
-      },
-    );
-  });
-
   it('--engine tem precedência sobre AGENTIC_CODE_REVIEWERS_ENGINE', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'cursor-sdk',
       },
       () => {
@@ -166,7 +153,7 @@ describe('loadConfig', () => {
   it('aceita alias --engine=cursor', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
       },
       () => {
         const config = loadConfig([
@@ -183,7 +170,7 @@ describe('loadConfig', () => {
   it('aceita modelo provider/model com engine opencode', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
         AGENTIC_CODE_REVIEWERS_MODEL: 'openai/gpt-4.1',
       },
@@ -197,7 +184,7 @@ describe('loadConfig', () => {
   it('rejeita engine inválido', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'invalid-engine',
       },
       () => {
@@ -218,7 +205,7 @@ describe('loadConfig', () => {
   it('prioriza --pr-id sobre SYSTEM_PULLREQUEST_PULLREQUESTID', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         SYSTEM_PULLREQUEST_PULLREQUESTID: '999',
         SYSTEM_ACCESSTOKEN: 'pat_test',
         GITHUB_ACTIONS: undefined,
@@ -249,7 +236,7 @@ describe('loadConfig', () => {
   it('usa SYSTEM_PULLREQUEST_PULLREQUESTID na pipeline', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         SYSTEM_PULLREQUEST_PULLREQUESTID: '456',
         GITHUB_ACTIONS: undefined,
         GITHUB_TOKEN: undefined,
@@ -267,7 +254,7 @@ describe('loadConfig', () => {
   it('prioriza --model sobre CURSOR_REVIEWER_MODEL', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MODEL: 'composer-2.5',
       },
       () => {
@@ -286,7 +273,7 @@ describe('loadConfig', () => {
   it('usa maxRounds default 5 e respeita override por env', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MAX_ROUNDS: undefined,
       },
       () => {
@@ -297,7 +284,7 @@ describe('loadConfig', () => {
 
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MAX_ROUNDS: '7',
       },
       () => {
@@ -308,7 +295,7 @@ describe('loadConfig', () => {
 
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MAX_ROUNDS: '0',
       },
       () => {
@@ -319,7 +306,7 @@ describe('loadConfig', () => {
 
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MAX_ROUNDS: '$(CURSOR_REVIEWER_MAX_ROUNDS)',
       },
       () => {
@@ -332,7 +319,7 @@ describe('loadConfig', () => {
   it('falha na inicialização com modelo inválido', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MODEL: 'gpt-5.4-medium',
       },
       () => {
@@ -347,7 +334,7 @@ describe('loadConfig', () => {
   it('detecta provider com flags --gh e --ado', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
       },
       () => {
         const configGh = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--gh']);
@@ -362,7 +349,7 @@ describe('loadConfig', () => {
   it('auto-detecta provider github baseado em envs', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         GITHUB_ACTIONS: 'true',
       },
       () => {
@@ -375,7 +362,7 @@ describe('loadConfig', () => {
   it('auto-detecta provider azuredevops baseado em envs', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         TF_BUILD: 'true',
         GITHUB_ACTIONS: undefined,
         GITHUB_TOKEN: undefined,
@@ -392,7 +379,7 @@ describe('loadConfig', () => {
   it('sucedes para github com contexto incompleto e sem dry-run', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
       },
       () => {
         const config = loadConfig(['--source-branch', 'refs/heads/feature', '--gh']);
@@ -408,7 +395,7 @@ describe('loadConfig', () => {
       try {
         withEnv(
           {
-            AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+            CURSOR_API_KEY: 'cursor_test',
           },
           () => {
             const config = loadConfig([
@@ -430,7 +417,7 @@ describe('loadConfig', () => {
     it('permite selecionar stack via variável de ambiente', () => {
       withEnv(
         {
-          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+          CURSOR_API_KEY: 'cursor_test',
           AGENTIC_CODE_REVIEWERS_STACK: 'PHP/Laravel',
         },
         () => {
@@ -444,7 +431,7 @@ describe('loadConfig', () => {
     it('permite selecionar stack via argumento CLI --stack <nome>', () => {
       withEnv(
         {
-          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+          CURSOR_API_KEY: 'cursor_test',
         },
         () => {
           const config = loadConfig([
@@ -463,7 +450,7 @@ describe('loadConfig', () => {
     it('permite selecionar stack via argumento CLI --stack=<nome>', () => {
       withEnv(
         {
-          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+          CURSOR_API_KEY: 'cursor_test',
         },
         () => {
           const config = loadConfig([
@@ -481,7 +468,7 @@ describe('loadConfig', () => {
     it('cai para o fallback se uma stack inválida for passada', () => {
       withEnv(
         {
-          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+          CURSOR_API_KEY: 'cursor_test',
         },
         () => {
           const config = loadConfig([
@@ -502,7 +489,7 @@ describe('loadConfig', () => {
       try {
         withEnv(
           {
-            AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+            CURSOR_API_KEY: 'cursor_test',
             AGENTIC_CODE_REVIEWERS_STACK: '$(CURSOR_REVIEWER_STACK)',
           },
           () => {
@@ -528,7 +515,7 @@ describe('loadConfig', () => {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${dir}/artisan`, '');
         try {
-          withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+          withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
             const config = loadConfig([
               '--dry-run',
               '--repo-root',
@@ -549,7 +536,7 @@ describe('loadConfig', () => {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${dir}/next.config.js`, '');
         try {
-          withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+          withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
             const config = loadConfig([
               '--dry-run',
               '--repo-root',
@@ -570,7 +557,7 @@ describe('loadConfig', () => {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${dir}/tsconfig.json`, '{}');
         try {
-          withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+          withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
             const config = loadConfig([
               '--dry-run',
               '--repo-root',
@@ -591,7 +578,7 @@ describe('loadConfig', () => {
         mkdirSync(dir, { recursive: true });
         writeFileSync(`${dir}/Foo.sln`, '');
         try {
-          withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+          withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
             const config = loadConfig([
               '--dry-run',
               '--repo-root',
@@ -611,7 +598,7 @@ describe('loadConfig', () => {
         const dir = 'test-temp-autodetect-empty';
         mkdirSync(dir, { recursive: true });
         try {
-          withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+          withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
             const config = loadConfig([
               '--dry-run',
               '--repo-root',
@@ -630,14 +617,14 @@ describe('loadConfig', () => {
   });
 
   it('usa SCORE_MIN=6 por padrão', () => {
-    withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: undefined }, () => {
+    withEnv({ CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: undefined }, () => {
       const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
       assert.equal(config.scoreMin, 6);
     });
   });
 
   it('aceita --score-min e SCORE_MIN', () => {
-    withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test' }, () => {
+    withEnv({ CURSOR_API_KEY: 'cursor_test' }, () => {
       const fromCli = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--score-min', '4']);
       assert.equal(fromCli.scoreMin, 4);
 
@@ -649,7 +636,7 @@ describe('loadConfig', () => {
   });
 
   it('CLI --score-min tem precedência sobre SCORE_MIN', () => {
-    withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: '8' }, () => {
+    withEnv({ CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: '8' }, () => {
       const config = loadConfig([
         '--dry-run',
         '--source-branch',
@@ -661,66 +648,37 @@ describe('loadConfig', () => {
     });
   });
 
-  it('ignora SCORE_MIN inválido e usa default 6', () => {
-    withEnv({ AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: 'invalid' }, () => {
+  it('ignora AGENTIC_CODE_REVIEWERS_SCORE_MIN inválido e usa default 6', () => {
+    withEnv({ CURSOR_API_KEY: 'cursor_test', AGENTIC_CODE_REVIEWERS_SCORE_MIN: 'invalid' }, () => {
       const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
       assert.equal(config.scoreMin, 6);
     });
   });
 
-  it('aceita SCORE_MIN legado como fallback', () => {
+  it('mensagem de erro de API key cita nome canônico (cursor-sdk)', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
-        AGENTIC_CODE_REVIEWERS_SCORE_MIN: undefined,
-        SCORE_MIN: '5',
-      },
-      () => {
-        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.scoreMin, 5);
-      },
-    );
-  });
-
-  it('aceita CURSOR_REVIEWER_ENGINE legado como fallback', () => {
-    withEnv(
-      {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
-        AGENTIC_CODE_REVIEWERS_ENGINE: undefined,
-        CURSOR_REVIEWER_ENGINE: 'opencode',
-      },
-      () => {
-        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.engine, 'opencode');
-      },
-    );
-  });
-
-  it('aceita CURSOR_REVIEWER_MAX_ROUNDS legado como fallback', () => {
-    withEnv(
-      {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
-        AGENTIC_CODE_REVIEWERS_MAX_ROUNDS: undefined,
-        CURSOR_REVIEWER_MAX_ROUNDS: '9',
-      },
-      () => {
-        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.maxRounds, 9);
-      },
-    );
-  });
-
-  it('mensagem de erro de API key cita nome canônico', () => {
-    withEnv(
-      {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: undefined,
         CURSOR_API_KEY: undefined,
       },
       () => {
         assert.throws(
-          () => loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']),
-          /AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY é obrigatório/,
+          () => loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--engine', 'cursor-sdk']),
+          /CURSOR_API_KEY é obrigatório/,
         );
+      },
+    );
+  });
+
+  it('opencode não exige CURSOR_API_KEY', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: undefined,
+        AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--engine', 'opencode']);
+        assert.equal(config.engine, 'opencode');
+        assert.equal(config.cursorApiKey, '');
       },
     );
   });
@@ -728,7 +686,7 @@ describe('loadConfig', () => {
   it('REVIEW_SELF=true mescla yml/yaml/sh nos includePatterns da stack', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true',
         AGENTIC_CODE_REVIEWERS_STACK: 'TypeScript',
       },
@@ -745,7 +703,7 @@ describe('loadConfig', () => {
   it('REVIEW_SELF=true não altera INCLUDE_PATTERNS explícito', () => {
     withEnv(
       {
-        AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: 'cursor_test',
+        CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true',
         AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS: '**/*.py',
       },

@@ -5,31 +5,32 @@ function primaryKey(suffix: string): string {
   return `${ENV_PREFIX}${suffix}`;
 }
 
-/**
- * Lê variável canônica `AGENTIC_CODE_REVIEWERS_*` com fallback opcional a nomes legados (deprecated).
- */
-export function readEnv(suffix: string, ...legacyKeys: string[]): string | undefined {
-  const primary = process.env[primaryKey(suffix)]?.trim();
-  if (primary) return primary;
+function readCredential(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
 
-  for (const legacy of legacyKeys) {
-    const value = process.env[legacy]?.trim();
-    if (value) return value;
-  }
-
-  return undefined;
+/** Lê variável canônica `AGENTIC_CODE_REVIEWERS_*`. */
+export function readEnv(suffix: string): string | undefined {
+  const value = process.env[primaryKey(suffix)]?.trim();
+  return value || undefined;
 }
 
 /** Nomes canônicos (para mensagens de erro, logs e metadados). */
 export const ENV = {
-  CURSOR_API_KEY: primaryKey('CURSOR_API_KEY'),
+  CURSOR_API_KEY: 'CURSOR_API_KEY',
   ENGINE: primaryKey('ENGINE'),
   MODEL: primaryKey('MODEL'),
   OPENCODE_URL: primaryKey('OPENCODE_URL'),
   OPENCODE_HOSTNAME: primaryKey('OPENCODE_HOSTNAME'),
   OPENCODE_PORT: primaryKey('OPENCODE_PORT'),
   OPENCODE_AGENT: primaryKey('OPENCODE_AGENT'),
-  OPENCODE_GO_API_KEY: primaryKey('OPENCODE_GO_API_KEY'),
+  OPENCODE_SERVER_LOG: primaryKey('OPENCODE_SERVER_LOG'),
+  OPENCODE_LOG_LEVEL: primaryKey('OPENCODE_LOG_LEVEL'),
+  OPENCODE_KILL_PORT: primaryKey('OPENCODE_KILL_PORT'),
+  OPENCODE_STREAM_REASONING: primaryKey('OPENCODE_STREAM_REASONING'),
+  OPENCODE_STREAM_ASSISTANT: primaryKey('OPENCODE_STREAM_ASSISTANT'),
+  OPENCODE_API_KEY: 'OPENCODE_API_KEY',
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
   GITHUB_TOKEN: primaryKey('GITHUB_TOKEN'),
   TARGET_BRANCH: primaryKey('TARGET_BRANCH'),
@@ -59,37 +60,42 @@ export const ENV = {
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
 export const env = {
-  cursorApiKey: () => readEnv('CURSOR_API_KEY', 'CURSOR_API_KEY'),
-  engine: () => readEnv('ENGINE', 'CURSOR_REVIEWER_ENGINE'),
-  model: () => readEnv('MODEL', 'CURSOR_REVIEWER_MODEL'),
-  opencodeUrl: () => readEnv('OPENCODE_URL', 'CURSOR_REVIEWER_OPENCODE_URL', 'OPENCODE_SERVER_URL'),
-  opencodeHostname: () => readEnv('OPENCODE_HOSTNAME', 'CURSOR_REVIEWER_OPENCODE_HOSTNAME'),
-  opencodePort: () => readEnv('OPENCODE_PORT', 'CURSOR_REVIEWER_OPENCODE_PORT'),
-  opencodeAgent: () => readEnv('OPENCODE_AGENT', 'CURSOR_REVIEWER_OPENCODE_AGENT'),
-  opencodeGoApiKey: () => readEnv('OPENCODE_GO_API_KEY', 'OPENCODE_GO_API_KEY'),
-  azureDevOpsPat: () => readEnv('AZURE_DEVOPS_PAT', 'AZURE_DEVOPS_EXT_PAT'),
-  githubToken: () => readEnv('GITHUB_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN'),
-  targetBranch: () => readEnv('TARGET_BRANCH', 'CURSOR_REVIEWER_TARGET_BRANCH'),
-  botTag: () => readEnv('BOT_TAG', 'CURSOR_REVIEWER_BOT_TAG'),
-  scoreMin: () => readEnv('SCORE_MIN', 'SCORE_MIN'),
-  timeoutMs: () => readEnv('TIMEOUT_MS', 'CURSOR_REVIEWER_TIMEOUT_MS'),
-  sandbox: () => readEnv('SANDBOX', 'CURSOR_REVIEWER_SANDBOX'),
-  repoRoot: () => readEnv('REPO_ROOT', 'CURSOR_REVIEWER_REPO_ROOT'),
-  reviewSelf: () => readEnv('REVIEW_SELF', 'CURSOR_REVIEWER_REVIEW_SELF'),
-  stack: () => readEnv('STACK', 'CURSOR_REVIEWER_STACK'),
-  customPrompt: () => readEnv('CUSTOM_PROMPT', 'CURSOR_REVIEWER_CUSTOM_PROMPT'),
-  includePatterns: () => readEnv('INCLUDE_PATTERNS', 'CURSOR_REVIEWER_INCLUDE_PATTERNS'),
-  verbose: () => readEnv('VERBOSE', 'CURSOR_REVIEWER_VERBOSE'),
-  dryRun: () => readEnv('DRY_RUN', 'CURSOR_REVIEWER_DRY_RUN'),
-  seedTest: () => readEnv('SEED_TEST', 'CURSOR_REVIEWER_SEED_TEST'),
-  includeUncommitted: () => readEnv('INCLUDE_UNCOMMITTED', 'CURSOR_REVIEWER_INCLUDE_UNCOMMITTED'),
-  maxRounds: () => readEnv('MAX_ROUNDS', 'CURSOR_REVIEWER_MAX_ROUNDS'),
-  extraExcludePatterns: () => readEnv('EXTRA_EXCLUDE_PATTERNS', 'CURSOR_REVIEWER_EXTRA_EXCLUDE_PATTERNS'),
-  prId: () => readEnv('PR_ID', 'CURSOR_REVIEWER_PR_ID'),
-  adoOrg: () => readEnv('ADO_ORG', 'CURSOR_REVIEWER_ADO_ORG'),
-  adoProject: () => readEnv('ADO_PROJECT', 'CURSOR_REVIEWER_ADO_PROJECT'),
-  adoRepo: () => readEnv('ADO_REPO', 'CURSOR_REVIEWER_ADO_REPO'),
-  repoUrl: () => readEnv('REPO_URL', 'CURSOR_REVIEWER_REPO_URL'),
-  promptColor: () => readEnv('PROMPT_COLOR', 'CURSOR_REVIEWER_PROMPT_COLOR'),
-  executionMode: () => readEnv('EXECUTION_MODE', 'REVIEWER_EXECUTION_MODE'),
+  cursorApiKey: () => readCredential(ENV.CURSOR_API_KEY),
+  engine: () => readEnv('ENGINE'),
+  model: () => readEnv('MODEL'),
+  opencodeUrl: () => readEnv('OPENCODE_URL'),
+  opencodeHostname: () => readEnv('OPENCODE_HOSTNAME'),
+  opencodePort: () => readEnv('OPENCODE_PORT'),
+  opencodeAgent: () => readEnv('OPENCODE_AGENT'),
+  opencodeServerLog: () => readEnv('OPENCODE_SERVER_LOG'),
+  opencodeLogLevel: () => readEnv('OPENCODE_LOG_LEVEL'),
+  opencodeKillPort: () => readEnv('OPENCODE_KILL_PORT'),
+  opencodeStreamReasoning: () => readEnv('OPENCODE_STREAM_REASONING'),
+  opencodeStreamAssistant: () => readEnv('OPENCODE_STREAM_ASSISTANT'),
+  opencodeApiKey: () => readCredential(ENV.OPENCODE_API_KEY),
+  azureDevOpsPat: () => readEnv('AZURE_DEVOPS_PAT'),
+  githubToken: () => readEnv('GITHUB_TOKEN'),
+  targetBranch: () => readEnv('TARGET_BRANCH'),
+  botTag: () => readEnv('BOT_TAG'),
+  scoreMin: () => readEnv('SCORE_MIN'),
+  timeoutMs: () => readEnv('TIMEOUT_MS'),
+  sandbox: () => readEnv('SANDBOX'),
+  repoRoot: () => readEnv('REPO_ROOT'),
+  reviewSelf: () => readEnv('REVIEW_SELF'),
+  stack: () => readEnv('STACK'),
+  customPrompt: () => readEnv('CUSTOM_PROMPT'),
+  includePatterns: () => readEnv('INCLUDE_PATTERNS'),
+  verbose: () => readEnv('VERBOSE'),
+  dryRun: () => readEnv('DRY_RUN'),
+  seedTest: () => readEnv('SEED_TEST'),
+  includeUncommitted: () => readEnv('INCLUDE_UNCOMMITTED'),
+  maxRounds: () => readEnv('MAX_ROUNDS'),
+  extraExcludePatterns: () => readEnv('EXTRA_EXCLUDE_PATTERNS'),
+  prId: () => readEnv('PR_ID'),
+  adoOrg: () => readEnv('ADO_ORG'),
+  adoProject: () => readEnv('ADO_PROJECT'),
+  adoRepo: () => readEnv('ADO_REPO'),
+  repoUrl: () => readEnv('REPO_URL'),
+  promptColor: () => readEnv('PROMPT_COLOR'),
+  executionMode: () => readEnv('EXECUTION_MODE'),
 } as const;

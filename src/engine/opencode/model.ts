@@ -1,4 +1,4 @@
-/** Default quando `CURSOR_REVIEWER_ENGINE=opencode` e modelo omitido. */
+/** Default quando `AGENTIC_CODE_REVIEWERS_ENGINE=opencode` e modelo omitido. */
 export const DEFAULT_OPENCODE_MODEL = 'anthropic/claude-sonnet-4-6';
 
 export interface OpencodeModelSelection {

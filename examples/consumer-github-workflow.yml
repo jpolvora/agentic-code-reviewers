@@ -1,0 +1,61 @@
+# Exemplo — code review em repositório consumidor (GitHub Actions)
+#
+# Copie para .github/workflows/code-review.yml no seu projeto.
+# Configure o secret CURSOR_API_KEY em Settings → Secrets.
+#
+# ── Opção A (recomendada): reusable workflow ─────────────────────────────
+
+name: Agentic Code Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+    secrets:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+
+# ── Opção B: curl direto (sem reusable workflow) ─────────────────────────
+#
+# jobs:
+#   review:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v5
+#         with:
+#           fetch-depth: 0
+#
+#       - uses: actions/setup-node@v6
+#         with:
+#           node-version: 22
+#
+#       - name: Run remote reviewer
+#         env:
+#           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+#           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+#         run: |
+#           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
+#             --gh \
+#             --pr-id "${{ github.event.pull_request.number }}" \
+#             --source-branch "${{ github.head_ref }}" \
+#             --target-branch "${{ github.event.pull_request.base.ref }}"
+#         continue-on-error: true
+#
+# ── OpenCode (Opção A com engine opencode) ────────────────────────────────
+#
+# jobs:
+#   review-opencode:
+#     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+#     with:
+#       engine: opencode
+#       model: opencode-go/deepseek-v4-flash
+#       bot_tag: '[Cursor Reviewer · OpenCode]'
+#     secrets:
+#       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+#       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}

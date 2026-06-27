@@ -21,14 +21,13 @@ assert_required_skill "skills/SYSTEM_PROMPT.md"
 cd "$SCRIPT_DIR"
 
 has_cursor_api_key() {
-  [[ -n "${AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY:-${CURSOR_API_KEY:-}}" ]] \
-    || grep -Eq '^[[:space:]]*(AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY|CURSOR_API_KEY)[[:space:]]*=[[:space:]]*[^[:space:]#]+' "$SCRIPT_DIR/.env" 2>/dev/null
+  [[ -n "${CURSOR_API_KEY:-}" ]] \
+    || grep -Eq '^[[:space:]]*CURSOR_API_KEY[[:space:]]*=[[:space:]]*[^[:space:]#]+' "$SCRIPT_DIR/.env" 2>/dev/null
 }
 
 if ! has_cursor_api_key; then
-  echo "Defina AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY antes de executar."
-  echo "  export AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY=cursor_..."
-  echo "  (legado: CURSOR_API_KEY)"
+  echo "Defina CURSOR_API_KEY antes de executar."
+  echo "  export CURSOR_API_KEY=cursor_..."
   echo "  ou configure .env na raiz do projeto"
   exit 1
 fi
@@ -41,7 +40,7 @@ normalize_ref() {
   printf '%s' "$ref"
 }
 
-TARGET_BRANCH="${2:-${AGENTIC_CODE_REVIEWERS_TARGET_BRANCH:-${CURSOR_REVIEWER_TARGET_BRANCH:-refs/heads/master}}}"
+TARGET_BRANCH="${2:-${AGENTIC_CODE_REVIEWERS_TARGET_BRANCH:-refs/heads/master}}"
 TARGET_BRANCH="$(normalize_ref "$TARGET_BRANCH")"
 
 is_ci_environment() {

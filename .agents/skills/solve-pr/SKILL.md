@@ -18,7 +18,7 @@ Execute o script utilitário de busca de threads passando o ID da Pull Request c
 node .agents/skills/solve-pr/scripts/fetch_threads.cjs <PR_ID>
 ```
 > [!IMPORTANT]
-> Certifique-se de que `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (ou legado `GITHUB_TOKEN` / `GH_TOKEN`) está definida com permissões de leitura/escrita no repositório.
+> Certifique-se de que `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` está definida com permissões de leitura/escrita no repositório.
 
 ### Passo 2: Investigação e Análise das Issues
 Para cada thread ativa listada na saída do script:

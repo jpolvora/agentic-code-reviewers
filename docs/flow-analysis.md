@@ -330,7 +330,7 @@ Variáveis lidas automaticamente na pipeline:
 | `SYSTEM_TEAMPROJECT` | Projeto |
 | `BUILD_REPOSITORY_NAME` | Repositório |
 | `SYSTEM_ACCESSTOKEN` | Publicação ADO |
-| `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | Agente Cursor |
+| `CURSOR_API_KEY` | Agente Cursor |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Target override (variable group) |
 
 CLI `--org`, `--project`, etc. permanecem disponíveis para uso local.

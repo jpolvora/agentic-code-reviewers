@@ -1,6 +1,5 @@
 import {
   createOpencodeClient,
-  createOpencodeServer,
   type AssistantMessage,
   type OpencodeClient,
   type Part,
@@ -10,11 +9,14 @@ import type { ReviewerConfig } from '../../config.js';
 import { env, ENV } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
+import { startOpencodeEventStream } from './event-stream.js';
 import { type OpencodeModelSelection, resolveOpencodeModelSelection } from './model.js';
 import {
   buildSessionPromptBody,
   shouldFallbackSessionPromptWithoutModel,
 } from './prompt-body.js';
+import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
+import { createEmbeddedOpencodeServer } from './server.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -58,26 +60,14 @@ function resolveHostname(): string {
 
 function resolvePort(): number {
   const raw = env.opencodePort()?.trim();
-  if (!raw) return DEFAULT_PORT;
+  if (!raw || raw.toLowerCase() === 'auto') return DEFAULT_PORT;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_PORT;
+  return parsed;
 }
 
 function resolveAgentName(): string {
   return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
-}
-
-/** Config inline do servidor embutido (modelo + sandbox read-only). */
-function buildOpencodeServerConfig(model: string) {
-  return {
-    model,
-    permission: {
-      edit: 'deny' as const,
-      bash: 'deny' as const,
-      webfetch: 'deny' as const,
-      external_directory: 'ask' as const,
-    },
-  };
 }
 
 function assertResponseData<T>(result: { data?: T; error?: unknown }, context: string): T {
@@ -146,17 +136,27 @@ async function createRuntime(
 
   const hostname = resolveHostname();
   const port = resolvePort();
-  logger.info(`OpenCode: iniciando servidor embutido em ${hostname}:${port}`);
+  logger.info(
+    port === 0
+      ? `OpenCode: servidor embutido em ${hostname} (porta livre do SO)`
+      : `OpenCode: servidor embutido ${hostname}:${port} (reutiliza, sequência ou porta livre)`,
+  );
 
-  const server = await createOpencodeServer({
+  const logServerOutput = resolveServerLogEnabled();
+  const server = await createEmbeddedOpencodeServer({
     hostname,
     port,
     signal,
     timeout: 30_000,
     config: buildOpencodeServerConfig(model),
+    logServerOutput,
+    logger,
   });
 
-  logger.info(`OpenCode server: ${server.url}`);
+  logger.info(`OpenCode server: ${server.url} (porta ${server.port})`);
+  if (logServerOutput) {
+    logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
+  }
 
   return {
     client: createOpencodeClient({ baseUrl: server.url, directory }),
@@ -263,15 +263,30 @@ export async function runOpencodeStream(
 
     sessionId = await resolveSessionId(client, options, directory, logger);
 
-    const response = await sendSessionPrompt(
+    const eventStream = startOpencodeEventStream({
       client,
       sessionId,
       directory,
-      agentName,
-      options.prompt,
-      modelSelection,
       logger,
-    );
+      signal: abortController.signal,
+    });
+
+    logger.info('Enviando prompt ao agente OpenCode (aguarde — progresso via event stream)...');
+
+    let response: SessionPromptResponse;
+    try {
+      response = await sendSessionPrompt(
+        client,
+        sessionId,
+        directory,
+        agentName,
+        options.prompt,
+        modelSelection,
+        logger,
+      );
+    } finally {
+      eventStream.stop();
+    }
     const info = response.info;
     const fullText = extractTextFromParts(response.parts);
 
