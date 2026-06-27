@@ -41,7 +41,10 @@ export function resolveRunnerRoot(fromModuleUrl: string): string {
     if ((existsSync(markerSource) || existsSync(markerDist)) && existsSync(pkgPath)) {
       try {
         const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { name?: string };
-        if (pkg.name?.includes('cursor-reviewer')) {
+        if (
+          pkg.name?.includes('cursor-reviewer') ||
+          pkg.name?.includes('agentic-code-reviewers')
+        ) {
           return resolve(current);
         }
       } catch {

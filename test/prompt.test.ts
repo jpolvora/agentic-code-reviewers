@@ -4,6 +4,9 @@ import { describe, it } from 'node:test';
 import { buildAgentPrompt } from '../src/agent/prompt.js';
 import type { ReviewerConfig } from '../src/config.js';
 import type { PromptContext } from '../src/agent/prompt.js';
+import { resolveRunnerRoot } from '../src/project.js';
+
+const runnerRoot = resolveRunnerRoot(import.meta.url);
 
 function minimalConfig(skillPath: string, systemPromptPath: string): ReviewerConfig {
   return {
@@ -60,9 +63,6 @@ const promptContext: PromptContext = {
 
 describe('buildAgentPrompt', () => {
   it('monta prompt em camadas com diff, rules e sem duplicar schema JSON', () => {
-    const runnerRoot = process.cwd().includes('cursor-reviewer')
-      ? process.cwd()
-      : `${process.cwd()}/scripts/cursor-reviewer`;
     const skillPath = `${runnerRoot}/skills/CODE_REVIEW.md`;
     const systemPromptPath = `${runnerRoot}/skills/SYSTEM_PROMPT.md`;
     const skillOnDisk = readFileSync(skillPath, 'utf8');
@@ -86,10 +86,6 @@ describe('buildAgentPrompt', () => {
   });
 
   it('inclui Pull Request ID no contexto da execução', () => {
-    const runnerRoot = process.cwd().includes('cursor-reviewer')
-      ? process.cwd()
-      : `${process.cwd()}/scripts/cursor-reviewer`;
-
     const config = {
       ...minimalConfig(`${runnerRoot}/skills/CODE_REVIEW.md`, `${runnerRoot}/skills/SYSTEM_PROMPT.md`),
       pullRequestId: 789,
@@ -104,10 +100,6 @@ describe('buildAgentPrompt', () => {
   });
 
   it('inclui diff embutido e descrição da PR quando fornecidos', () => {
-    const runnerRoot = process.cwd().includes('cursor-reviewer')
-      ? process.cwd()
-      : `${process.cwd()}/scripts/cursor-reviewer`;
-
     const ctx: PromptContext = {
       ...promptContext,
       prDescriptionContext: '## Pull Request (Azure DevOps)\n\n> **Pull Request ID:** #789\n\n**Título:** Equipamentos Florestais',
@@ -132,10 +124,6 @@ describe('buildAgentPrompt', () => {
   });
 
   it('inclui metadados da stack e arquivo de recomendação no prompt', () => {
-    const runnerRoot = process.cwd().includes('cursor-reviewer')
-      ? process.cwd()
-      : `${process.cwd()}/scripts/cursor-reviewer`;
-
     const config = {
       ...minimalConfig(`${runnerRoot}/skills/CODE_REVIEW.md`, `${runnerRoot}/skills/SYSTEM_PROMPT.md`),
       stack: 'PHP/Laravel',
