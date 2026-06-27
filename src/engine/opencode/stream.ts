@@ -15,6 +15,7 @@ import {
   buildSessionPromptBody,
   shouldFallbackSessionPromptWithoutModel,
 } from './prompt-body.js';
+import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
 
 export interface OpencodeRunResult {
@@ -66,36 +67,6 @@ function resolvePort(): number {
 
 function resolveAgentName(): string {
   return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
-}
-
-function resolveServerLogEnabled(): boolean {
-  const raw = env.opencodeServerLog()?.trim().toLowerCase();
-  if (raw === 'false' || raw === '0' || raw === 'off') return false;
-  return true;
-}
-
-function resolveServerLogLevel(): 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | undefined {
-  const raw = env.opencodeLogLevel()?.trim().toUpperCase();
-  if (raw === 'DEBUG' || raw === 'INFO' || raw === 'WARN' || raw === 'ERROR') {
-    return raw;
-  }
-  return resolveServerLogEnabled() ? 'INFO' : undefined;
-}
-
-/** Config inline do servidor embutido (modelo + sandbox read-only). */
-function buildOpencodeServerConfig(model: string) {
-  const logLevel = resolveServerLogLevel();
-  return {
-    model,
-    ...(logLevel ? { logLevel } : {}),
-    permission: {
-      edit: 'deny' as const,
-      bash: 'deny' as const,
-      webfetch: 'deny' as const,
-      external_directory: 'deny' as const,
-      doom_loop: 'deny' as const,
-    },
-  };
 }
 
 function assertResponseData<T>(result: { data?: T; error?: unknown }, context: string): T {

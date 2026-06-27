@@ -1,0 +1,118 @@
+# Workflow reutilizável — revisão agêntica em repositórios consumidores.
+# Baixa run.sh (branch release por padrão), clona artefatos compilados e revisa o checkout atual.
+#
+# Uso no repositório consumidor (.github/workflows/code-review.yml):
+#
+#   name: Code Review
+#   on:
+#     pull_request:
+#       branches: [main]
+#   permissions:
+#     pull-requests: write
+#     contents: read
+#   jobs:
+#     review:
+#       uses: OWNER/agentic-code-reviewers/.github/workflows/review-remote.yml@release
+#       secrets:
+#         AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY }}
+#         AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY }}
+#
+# Alternativa sem reusable workflow: examples/consumer-github-workflow.yml
+name: Review (remote runner)
+
+on:
+  workflow_call:
+    inputs:
+      engine:
+        description: Engine LLM (cursor-sdk ou opencode)
+        type: string
+        default: cursor-sdk
+      model:
+        description: Modelo LLM (vazio = default da engine)
+        type: string
+        default: ''
+      bot_tag:
+        description: Tag do bot nos comentários da PR
+        type: string
+        default: '[Cursor Reviewer]'
+      runner_repository:
+        description: Repositório do runner (owner/repo)
+        type: string
+        default: jpolvora/agentic-code-reviewers
+      runner_ref:
+        description: Branch ou tag do run.sh e artefatos release
+        type: string
+        default: release
+      source_branch:
+        description: Branch de origem (vazio = head da PR)
+        type: string
+        default: ''
+      target_branch:
+        description: Branch de destino (vazio = base da PR ou main)
+        type: string
+        default: ''
+      pr_number:
+        description: Número da PR (vazio = evento pull_request)
+        type: string
+        default: ''
+    secrets:
+      AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY:
+        required: true
+      AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY:
+        required: false
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  review:
+    name: Review (${{ inputs.engine }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate secrets
+        env:
+          OPENCODE_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY }}
+        run: |
+          if [ "${{ inputs.engine }}" = "opencode" ] && [ -z "$OPENCODE_KEY" ]; then
+            echo "::error::Secret AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY é obrigatório para engine opencode."
+            exit 1
+          fi
+
+      - name: Run remote reviewer
+        env:
+          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: ${{ inputs.engine }}
+          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ inputs.bot_tag }}
+          AGENTIC_CODE_REVIEWERS_REPO_URL: https://github.com/${{ inputs.runner_repository }}.git
+          AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH: ${{ inputs.runner_ref }}
+          AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
+          SOURCE_BRANCH: ${{ inputs.source_branch || github.head_ref }}
+          TARGET_BRANCH: ${{ inputs.target_branch || github.event.pull_request.base.ref || 'main' }}
+          RUNNER_SCRIPT_URL: https://raw.githubusercontent.com/${{ inputs.runner_repository }}/${{ inputs.runner_ref }}/run.sh
+          RUNNER_MODEL: ${{ inputs.model }}
+        run: |
+          MODEL_ARGS=()
+          if [ -n "$RUNNER_MODEL" ]; then
+            MODEL_ARGS=(--model "$RUNNER_MODEL")
+          fi
+
+          curl -fsSL "$RUNNER_SCRIPT_URL" | bash -s -- \
+            --engine "$AGENTIC_CODE_REVIEWERS_ENGINE" \
+            "${MODEL_ARGS[@]}" \
+            --gh \
+            --pr-id "$PR_NUMBER" \
+            --source-branch "$SOURCE_BRANCH" \
+            --target-branch "$TARGET_BRANCH"
+        continue-on-error: true

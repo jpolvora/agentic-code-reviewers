@@ -45,12 +45,16 @@ export function formatToolPart(part: Extract<Part, { type: 'tool' }>): string {
   return `${part.tool} — ${part.state.status}${suffix}`;
 }
 
-function belongsToSession(event: Event, sessionId: string): boolean {
+export function eventBelongsToSession(event: Event, sessionId: string): boolean {
   const properties = event.properties as { sessionID?: string };
   if (!properties.sessionID) {
     return event.type === 'session.error';
   }
   return properties.sessionID === sessionId;
+}
+
+function belongsToSession(event: Event, sessionId: string): boolean {
+  return eventBelongsToSession(event, sessionId);
 }
 
 async function autoReplyPermission(

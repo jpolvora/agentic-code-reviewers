@@ -77,7 +77,7 @@ function pipeServerLines(
   });
 }
 
-function parseServerUrl(line: string): string | undefined {
+export function parseOpencodeServerListenUrl(line: string): string | undefined {
   if (!line.startsWith('opencode server listening')) return undefined;
   const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
   return match?.[1];
@@ -124,7 +124,7 @@ export async function createEmbeddedOpencodeServer(
       output += chunk.toString();
       const lines = output.split(/\r?\n/);
       for (const line of lines) {
-        const serverUrl = parseServerUrl(line);
+        const serverUrl = parseOpencodeServerListenUrl(line);
         if (!serverUrl) continue;
 
         clearTimeout(timer);

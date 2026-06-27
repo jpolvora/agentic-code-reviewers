@@ -103,6 +103,11 @@ describe('env', () => {
     assert.equal(env.opencodeLogLevel(), 'DEBUG');
   });
 
+  it('env expõe chaves OpenCode de logging', () => {
+    assert.equal(ENV.OPENCODE_SERVER_LOG, 'AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG');
+    assert.equal(ENV.OPENCODE_LOG_LEVEL, 'AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL');
+  });
+
   it('env.githubToken prioriza AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN', () => {
     setEnv('AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN', 'gh_canonical');
     setEnv('GITHUB_TOKEN', 'gh_legacy');
