@@ -310,23 +310,22 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
   if (config.dryRun) {
     logger.info(`[dry-run] Simulando resolução de ${resolvedItems.length} thread(s).`);
     simulateThreadResolution(activeThreads, reviewContext.pendingThreads ?? [], resolvedItems);
-    return;
-  }
-
-  const resolvedCount = await provider.resolvePullRequestReviewThreads(
-    config.botTag,
-    activeThreads,
-    resolvedItems,
-    (msg) => logger.info(msg),
-  );
-  logger.info(`Total de threads resolvidas: ${resolvedCount}/${resolvedItems.length}`);
-
-  if (resolvedCount < resolvedItems.length) {
-    logger.warn(
-      'Gate cooperativo: resolução incompleta — push abortado. Commit local preservado; ' +
-        'corrija token/permissões ou resolva manualmente (skill solve-pr).',
+  } else {
+    const resolvedCount = await provider.resolvePullRequestReviewThreads(
+      config.botTag,
+      activeThreads,
+      resolvedItems,
+      (msg) => logger.info(msg),
     );
-    return;
+    logger.info(`Total de threads resolvidas: ${resolvedCount}/${resolvedItems.length}`);
+
+    if (resolvedCount < resolvedItems.length) {
+      logger.warn(
+        'Gate cooperativo: resolução incompleta — push abortado. Commit local preservado; ' +
+          'corrija token/permissões ou resolva manualmente (skill solve-pr).',
+      );
+      return;
+    }
   }
 
   logger.section('Push das alterações (após resolução)');
