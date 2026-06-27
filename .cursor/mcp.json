@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${env:GITHUB_TOKEN}"
+      }
+    },
+    "azure-devops": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp", "${env:AZURE_DEVOPS_ORG}"],
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}

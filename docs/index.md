@@ -147,6 +147,24 @@ npm run review -- --dry-run --score-min 4
 
 ---
 
+### Safe Outputs e paralelismo
+
+Gate determinístico pós-LLM (`src/ado/safe-outputs.ts`). Default: `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS=true`.
+
+| Variável | Default | Uso |
+|----------|---------|-----|
+| `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Master toggle |
+| `AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE` | `true` | Ancora `lineNumber` no diff |
+| `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` | `8000` | Limite de tamanho |
+| `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS` | built-in | Globs extras (CI, locks) |
+| `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process |
+| `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Filtro LLM pós-merge |
+| `AGENTIC_CODE_REVIEWERS_MCP_ENABLED` | `false` | Ferramentas read-only no prompt |
+
+CLI de artefatos (stdout, sem post na PR): `--generate-commit-message`, `--generate-pr-description`, `--artifacts-only`.
+
+---
+
 ## Alterar o modelo LLM
 
 Prioridade: CLI `--model` > env `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`.

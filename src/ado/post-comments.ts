@@ -5,6 +5,11 @@ import {
   filterPublishableReviews,
   isPublishableReview,
 } from './review-validation.js';
+import {
+  filterSafeOutputs,
+  isSafeReview,
+  type SafeOutputOptions,
+} from './safe-outputs.js';
 import { normalizeFilePath, reviewDedupKey as pathLineDedupKey } from './utils.js';
 import { RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER } from '../git/markers.js';
 import { testReviewSummaryAlreadyPosted } from './review-context.js';
@@ -27,6 +32,7 @@ function reviewDedupKey(review: Pick<CodeReviewItem, 'fileName' | 'lineNumber'>)
 export function parseCodeReviewResponse(
   raw: CodeReviewResponse,
   scoreMin: number = DEFAULT_SCORE_MIN,
+  safeOptions?: SafeOutputOptions,
 ): ParsedCodeReviewResponse {
   const incoming = raw.reviews ?? [];
   
@@ -70,13 +76,15 @@ export function parseCodeReviewResponse(
     }
   }
 
-  const reviews = filterPublishableReviews(flattenedIncoming, scoreMin);
-  if (reviews.length < flattenedIncoming.length) {
+  const publishable = filterPublishableReviews(flattenedIncoming, scoreMin);
+  if (publishable.length < flattenedIncoming.length) {
     const belowMinLabel = scoreMin > 0 ? `score < ${scoreMin}` : 'score inválido';
     console.warn(
-      `Policy: ${flattenedIncoming.length - reviews.length} review(s) descartado(s) — ${belowMinLabel}, campos obrigatórios ausentes ou contrato inválido.`,
+      `Policy: ${flattenedIncoming.length - publishable.length} review(s) descartado(s) — ${belowMinLabel}, campos obrigatórios ausentes ou contrato inválido.`,
     );
   }
+
+  const reviews = safeOptions ? filterSafeOutputs(publishable, safeOptions) : publishable;
   const resolvedThreads = raw.resolvedThreads ?? [];
   const reviewSummary = raw.reviewSummary ?? '';
   const hasCriticalReviews = reviews.some((review) => review.severity === 'critical');
@@ -326,7 +334,7 @@ export async function setPullRequestComments(
   log(`Authenticated as: ${connection.authenticatedUser.providerDisplayName}`);
 
   const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
-  const reviews = (reviewsObject.reviews ?? []).filter((review) => isPublishableReview(review, scoreMin));
+  let reviews = (reviewsObject.reviews ?? []).filter((review) => isPublishableReview(review, scoreMin));
 
   if (reviews.length === 0) {
     log('No reviews to post.');
@@ -403,7 +411,9 @@ export function getNewReviewsFromPlan(
   scoreMin: number = DEFAULT_SCORE_MIN,
 ): CodeReviewItem[] {
   const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
-  return (reviewsObject.reviews ?? [])
-    .filter((review) => isPublishableReview(review, scoreMin))
-    .filter((review) => !isDuplicateReview(review, existingKeys));
+  const reviews = (reviewsObject.reviews ?? [])
+    .filter((review) => isPublishableReview(review, scoreMin));
+  return reviews.filter((review) => !isDuplicateReview(review, existingKeys));
 }
+
+export { isSafeReview, filterSafeOutputs, type SafeOutputOptions } from './safe-outputs.js';

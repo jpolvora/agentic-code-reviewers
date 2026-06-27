@@ -8,6 +8,10 @@ import { assertOpencodeModel, DEFAULT_OPENCODE_MODEL } from './engine/opencode/m
 import type { ReviewerEngineName } from './engine/types.js';
 import { detectSourceBranchRef } from './git/diff.js';
 import { ENV, ENV_PREFIX, env } from './env.js';
+import {
+  buildDefaultProtectedPatterns,
+  DEFAULT_MAX_COMMENT_CHARS,
+} from './ado/safe-outputs.js';
 import { ProjectValidationError, resolveProject } from './project.js';
 
 export interface StackConfig {
@@ -161,6 +165,7 @@ export function detectStack(repoRoot: string): string | undefined {
 
 export interface ReviewerConfig {
   repoRoot: string;
+  runnerRoot: string;
   cursorApiKey: string;
   /** Engine de execução LLM (default: cursor-sdk). */
   engine: ReviewerEngineName;
@@ -201,6 +206,30 @@ export interface ReviewerConfig {
   stackPromptPath: string | null;
   stackSource: 'cli' | 'env' | 'detected' | 'fallback';
   customPromptContent?: string;
+
+  /** Safe Outputs gate — deterministic post-LLM validation. */
+  safeOutputs: boolean;
+  requireDiffLine: boolean;
+  maxCommentChars: number;
+  protectedPatterns: string[];
+
+  /** Task-specific prompt modules (auto or forced via env). */
+  promptModules: string[];
+
+  /** MCP review tools (read-only context gathering). */
+  mcpEnabled: boolean;
+  mcpTools: string[];
+  mcpLintCmd: string;
+  mcpTestCmd: string;
+
+  /** In-process parallel chunk count (1 = single agent). */
+  parallelChunks: number;
+  metaReviewer: boolean;
+
+  /** Artifact generation modes (stdout only). */
+  generateCommitMessage: boolean;
+  generatePrDescription: boolean;
+  artifactsOnly: boolean;
 }
 
 export interface CliArgs {
@@ -225,6 +254,9 @@ export interface CliArgs {
   includePatterns?: string;
   scoreMin?: number;
   engine?: string;
+  generateCommitMessage?: boolean;
+  generatePrDescription?: boolean;
+  artifactsOnly?: boolean;
 }
 
 const DEFAULT_INCLUDE = ['**/*.cs', '**/*.ts', '**/*.html', '*.cs', '*.ts', '*.html'];
@@ -368,6 +400,18 @@ function parseArgs(argv: string[]): CliArgs {
     }
     if (arg.startsWith('--engine=')) {
       args.engine = arg.slice(9);
+      continue;
+    }
+    if (arg === '--generate-commit-message') {
+      args.generateCommitMessage = true;
+      continue;
+    }
+    if (arg === '--generate-pr-description') {
+      args.generatePrDescription = true;
+      continue;
+    }
+    if (arg === '--artifacts-only') {
+      args.artifactsOnly = true;
       continue;
     }
 
@@ -774,6 +818,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
 
   return {
     repoRoot,
+    runnerRoot: resolvedProject.runnerRoot,
     cursorApiKey,
     engine,
     model: resolveReviewerModel(engine, cli.model),
@@ -807,6 +852,20 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     stackPromptPath,
     stackSource,
     customPromptContent,
+    safeOutputs: parseBool(env.safeOutputs(), true),
+    requireDiffLine: parseBool(env.requireDiffLine(), true),
+    maxCommentChars: parseNonNegativeInt(env.maxCommentChars(), DEFAULT_MAX_COMMENT_CHARS) || DEFAULT_MAX_COMMENT_CHARS,
+    protectedPatterns: buildDefaultProtectedPatterns(env.protectedPatterns()),
+    promptModules: parseCsvPatterns(env.promptModules()),
+    mcpEnabled: parseBool(env.mcpEnabled(), false),
+    mcpTools: parseCsvPatterns(env.mcpTools()),
+    mcpLintCmd: resolveOptionalEnv(env.mcpLintCmd(), ''),
+    mcpTestCmd: resolveOptionalEnv(env.mcpTestCmd(), ''),
+    parallelChunks: Math.max(1, parseNonNegativeInt(env.parallelChunks(), 1) || 1),
+    metaReviewer: parseBool(env.metaReviewer(), false),
+    generateCommitMessage: cli.generateCommitMessage ?? false,
+    generatePrDescription: cli.generatePrDescription ?? false,
+    artifactsOnly: cli.artifactsOnly ?? false,
   };
 }
 
@@ -836,6 +895,9 @@ Opções:
   --custom-prompt VAL    Caminho do arquivo ou string de prompt quando a stack é Custom (requerido para --stack=Custom)
   --include-patterns VAL Lista separada por vírgulas de padrões glob de inclusão (sobrescreve o default da stack)
   --score-min N          Score mínimo (inclusive) para publicar issue como thread (default: 6)
+  --generate-commit-message  Gera mensagem de commit convencional (stdout)
+  --generate-pr-description  Gera descrição de PR (stdout)
+  --artifacts-only       Gera artefatos sem executar review
 
 Pré-requisitos do projeto alvo (obrigatórios — o script encerra se ausentes):
   skills/CODE_REVIEW.md

@@ -20,3 +20,5 @@ O runner **pré-mapeia** `.cursor/rules/*.mdc` por glob dos arquivos alterados �
 Se uma skill estiver ausente, documente a lacuna em `analysis` e aplique senso crítico mínimo (segurança, autorização, integridade de dados).
 
 **Formato de saída:** prevalece o System Prompt (JSON desta pipeline), não o markdown de relatório das skills do projeto.
+
+Quando `AGENTIC_CODE_REVIEWERS_MCP_ENABLED=true`, o runner pode pré-coletar saída de lint/testes configurados — **observação somente leitura**; não execute comandos destrutivos nem modifique arquivos.

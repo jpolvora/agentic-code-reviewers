@@ -4,7 +4,9 @@ import {
   getNewReviewsFromPlan,
   parseCodeReviewResponse,
   simulateThreadResolution,
+  type SafeOutputOptions,
 } from './ado/post-comments.js';
+import { buildSafeOutputOptions } from './ado/safe-outputs.js';
 import { filterGatePendingThreads } from './ado/review-context.js';
 import {
   decideRoundEscalation,
@@ -12,6 +14,7 @@ import {
 } from './ado/round-state.js';
 import type { CodeReviewItem, PendingPrThread, ReviewContextResult } from './ado/types.js';
 import { runCodeReviewAgent } from './agent/runner.js';
+import { runReviewArtifacts } from './agent/artifact-runner.js';
 import { EMPTY_METRICS } from './engine/types.js';
 import { getEngine } from './engine/index.js';
 import { loadConfig, ProjectValidationError } from './config.js';
@@ -20,6 +23,7 @@ import {
   formatDiffSizeKb,
   getDiffBreakdown,
   getDiffFileSummaries,
+  getDiffPatch,
   prepareLocalReviewWorkspace,
   type DiffFileSummary,
 } from './git/diff.js';
@@ -28,6 +32,7 @@ import { parseAgentReviewOutput } from './parser/review-response.js';
 import { buildRulesMap } from './project/rules-map.js';
 import { formatCommentForPosting } from './ado/format-thread.js';
 import { getProvider } from './provider/index.js';
+import { runParallelReview } from './orchestrator/parallel-runner.js';
 
 function logDiffFileSummaries(
   logger: Logger,
@@ -136,6 +141,9 @@ async function main(): Promise<void> {
     diffStats.filteredFiles,
     diffOptions,
   );
+
+  const scopedDiffText = getDiffPatch(config.repoRoot, gitContext.diffRange, filteredDiffOptions);
+  const safeOutputOptions: SafeOutputOptions = buildSafeOutputOptions(config, scopedDiffText);
   if (diffSection.mode !== 'empty') {
     logger.info(
       `Diff no prompt: modo=${diffSection.mode}, ${formatDiffSizeKb(diffSection.totalBytes)}, ` +
@@ -196,26 +204,67 @@ async function main(): Promise<void> {
 
   const engine = getEngine(config);
 
+  if (config.generateCommitMessage || config.generatePrDescription) {
+    await runReviewArtifacts(config, {
+      workItemContext,
+      prDescriptionContext,
+      existingReviewContext: reviewContext.contextForLlm,
+      rulesContext: rulesMap.contextForPrompt,
+      diffSection,
+      diffStats,
+      gitContext,
+    }, engine, logger, {
+      commitMessage: config.generateCommitMessage,
+      prDescription: config.generatePrDescription,
+    });
+    if (config.artifactsOnly) {
+      logger.section('Concluído (artifacts-only)');
+      return;
+    }
+  }
+
   const agentStartTime = performance.now();
   if (diffStats.fileCount > 0 && config.pullRequestId > 0 && !hasContext) {
     logger.info(`Iniciando revisão somente leitura da PR #${config.pullRequestId}.`);
   }
   const agentResult =
     diffStats.fileCount > 0
-      ? await runCodeReviewAgent(
-          config,
-          {
-            workItemContext,
-            prDescriptionContext,
-            existingReviewContext: reviewContext.contextForLlm,
-            rulesContext: rulesMap.contextForPrompt,
-            diffSection,
-            diffStats,
-            gitContext,
-          },
-          engine,
-          logger,
-        )
+      ? config.parallelChunks > 1
+        ? await runParallelReview(
+            config,
+            {
+              workItemContext,
+              prDescriptionContext,
+              existingReviewContext: reviewContext.contextForLlm,
+              rulesContext: rulesMap.contextForPrompt,
+              diffSection,
+              diffStats,
+              gitContext,
+            },
+            engine,
+            logger,
+            {
+              parallelChunks: config.parallelChunks,
+              metaReviewer: config.metaReviewer,
+              filteredFiles: diffStats.filteredFiles,
+              diffRange: gitContext.diffRange,
+              diffOptions,
+            },
+          )
+        : await runCodeReviewAgent(
+            config,
+            {
+              workItemContext,
+              prDescriptionContext,
+              existingReviewContext: reviewContext.contextForLlm,
+              rulesContext: rulesMap.contextForPrompt,
+              diffSection,
+              diffStats,
+              gitContext,
+            },
+            engine,
+            logger,
+          )
       : {
           fullText: '{"reviews":[],"resolvedThreads":[],"reviewSummary":""}',
           sessionId: 'skipped',
@@ -233,7 +282,7 @@ async function main(): Promise<void> {
     logger.info(`Tempo do agente: ${formatElapsedMs(agentElapsed)}`);
   }
   const rawResponse = parseAgentReviewOutput(agentResult.fullText);
-  const parsed = parseCodeReviewResponse(rawResponse, config.scoreMin);
+  const parsed = parseCodeReviewResponse(rawResponse, config.scoreMin, safeOutputOptions);
 
   logger.info(`Reviews: ${parsed.reviews.length}`);
   logger.info(`Resolved threads (agent): ${parsed.resolvedThreads.length}`);

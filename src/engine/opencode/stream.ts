@@ -158,7 +158,7 @@ async function createRuntime(
   );
 
   const logServerOutput = resolveServerLogEnabled();
-  const serverConfig = buildOpencodeServerConfig(model);
+  const serverConfig = buildOpencodeServerConfig(model, config);
   const server = await createEmbeddedOpencodeServer({
     hostname,
     port,

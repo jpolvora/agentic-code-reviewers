@@ -1,5 +1,6 @@
 import { AdoClient } from './client.js';
 import { stripHtml } from './utils.js';
+import { sanitizeUserProvidedContent } from '../agent/input-sanitization.js';
 
 interface PullRequestApiResponse {
   pullRequestId?: number;
@@ -33,10 +34,10 @@ export function buildPullRequestContextForLlm(
   ];
 
   if (title) {
-    lines.push(`**Título:** ${title}`);
+    lines.push(sanitizeUserProvidedContent('Título da PR', title, 500));
   }
   if (description) {
-    lines.push('', '**Descrição:**', description);
+    lines.push('', sanitizeUserProvidedContent('Descrição da PR', description));
   }
 
   return lines.join('\n');

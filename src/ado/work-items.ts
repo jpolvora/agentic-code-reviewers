@@ -1,6 +1,7 @@
 
 import { AdoClient } from './client.js';
 import { stripHtml } from './utils.js';
+import { sanitizeUserProvidedContent } from '../agent/input-sanitization.js';
 import type { AdoWorkItemsResponse } from './types.js';
 
 export interface WorkItemSummary {
@@ -118,20 +119,24 @@ async function fetchWorkItems(client: AdoClient, ids: number[]): Promise<AdoWork
   return client.get<AdoWorkItemsResponse>(url);
 }
 
-function formatWorkItemSection(workItem: { id: number; fields: Record<string, unknown> }): string {
+export function formatWorkItemSection(workItem: { id: number; fields: Record<string, unknown> }): string {
   const fields = workItem.fields;
-  let section = `### Work Item #${workItem.id} — ${fields['System.WorkItemType']}
-- **Title:** ${fields['System.Title']}
-- **State:** ${fields['System.State']}`;
+  const type = getWorkItemType(fields);
+  const title = getWorkItemTitle(fields);
+  let section = `### Work Item #${workItem.id} — ${type}`;
+  if (title) {
+    section += `\n\n${sanitizeUserProvidedContent(`Work Item #${workItem.id} — Title`, title, 500)}`;
+  }
+  section += `\n- **State:** ${fields['System.State']}`;
 
   const description = getFieldText(fields, 'System.Description');
   if (description) {
-    section += `\n\n**Description:**\n${description}`;
+    section += `\n\n${sanitizeUserProvidedContent(`Work Item #${workItem.id} — Description`, description)}`;
   }
 
   const acceptanceCriteria = getFieldText(fields, 'Microsoft.VSTS.Common.AcceptanceCriteria');
   if (acceptanceCriteria) {
-    section += `\n\n**Acceptance Criteria:**\n${acceptanceCriteria}`;
+    section += `\n\n${sanitizeUserProvidedContent(`Work Item #${workItem.id} — Acceptance Criteria`, acceptanceCriteria)}`;
   }
 
   return section;

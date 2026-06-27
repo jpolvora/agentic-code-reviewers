@@ -11,6 +11,7 @@ import {
 } from '../ado/post-comments.js';
 import { parseRoundStateFromThreads, persistRoundState } from '../ado/round-state.js';
 import { emitPipelineReviewOutput } from '../ado/pipeline-logging.js';
+import type { SafeOutputOptions } from '../ado/safe-outputs.js';
 import type { PlatformProvider } from './types.js';
 import type {
   ActiveThreadInfo,
