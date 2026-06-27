@@ -241,8 +241,6 @@ export async function resolvePullRequestReviewThreads(
       botTag,
       RESOLUTION_MARKER,
       '',
-      'Issue addressed in the current iteration. Marking as resolved.',
-      '',
       reason.trim(),
     ].join('\n');
 

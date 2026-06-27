@@ -192,11 +192,11 @@ describe('getPullRequestReviewContext', () => {
       () => {},
     );
 
-    assert.equal(context.activeThreads.length, 1);
-    assert.equal(context.activeThreads[0].hasResolutionReply, false);
+    assert.equal(context.fileReviewThreads.length, 1);
+    assert.equal(context.fileReviewThreads[0].hasResolutionReply, false);
   });
 
-  it('inclui thread humana em openReviewThreads mas não em activeThreads', async () => {
+  it('inclui thread humana em fileReviewThreads', async () => {
     const fakeClient = {
       get: async () => ({
         value: [
@@ -227,9 +227,8 @@ describe('getPullRequestReviewContext', () => {
       () => {},
     );
 
-    assert.equal(context.activeThreads.length, 0);
-    assert.equal(context.openReviewThreads.length, 1);
-    assert.equal(context.openReviewThreads[0].filePath, '/src/human.cs');
+    assert.equal(context.fileReviewThreads.length, 1);
+    assert.equal(context.fileReviewThreads[0].filePath, '/src/human.cs');
   });
 
   it('marca hasResolutionReply quando reply real (parentCommentId!=0) contém o marcador', async () => {
@@ -269,8 +268,8 @@ describe('getPullRequestReviewContext', () => {
       () => {},
     );
 
-    assert.equal(context.activeThreads.length, 1);
-    assert.equal(context.activeThreads[0].hasResolutionReply, true);
+    assert.equal(context.fileReviewThreads.length, 1);
+    assert.equal(context.fileReviewThreads[0].hasResolutionReply, true);
   });
 
   it('preserva sumários completos com pontos no padrão de risco', async () => {

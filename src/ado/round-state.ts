@@ -1,6 +1,5 @@
 import { AdoClient } from './client.js';
 import { commentHasBotTag } from './utils.js';
-
 import type { AdoThreadsResponse, CodeReviewItem } from './types.js';
 
 /** Marcador HTML da thread (geral) que persiste o contador de rodadas de review. */

@@ -183,8 +183,7 @@ async function main(): Promise<void> {
   let reviewContext: ReviewContextResult = {
     existingKeys: new Map<string, boolean>(),
     contextForLlm: '',
-    activeThreads: [],
-    openReviewThreads: [],
+    fileReviewThreads: [],
     allThreads: null,
     pendingThreads: [],
   };
@@ -372,7 +371,7 @@ async function main(): Promise<void> {
 
     if (hasContext) {
       const simulated = simulateThreadResolution(
-        reviewContext.activeThreads,
+        reviewContext.fileReviewThreads,
         pendingThreads,
         parsed.resolvedThreads,
       );
@@ -394,7 +393,7 @@ async function main(): Promise<void> {
     logger.section('Resolvendo threads confirmadas pelo agente');
     resolvedCount = await provider.resolvePullRequestReviewThreads(
       config.botTag,
-      reviewContext.activeThreads,
+      reviewContext.fileReviewThreads,
       parsed.resolvedThreads,
       (msg) => logger.info(msg),
     );

@@ -26,4 +26,3 @@ export function extractAgenticBotTagLine(content: string): string | null {
   if (firstLine.startsWith(LEGACY_BOT_TAG_PREFIX)) return LEGACY_BOT_TAG_PREFIX;
   return content.includes(BOT_TAG_PREFIX) ? BOT_TAG_PREFIX : LEGACY_BOT_TAG_PREFIX;
 }
-}

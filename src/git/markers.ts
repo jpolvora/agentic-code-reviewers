@@ -3,7 +3,7 @@ export const RESOLUTION_MARKER = '<!-- resolution-reply -->';
 export const LEGACY_RESOLUTION_MARKER = '<!-- reviewer-resolved -->';
 export const REVIEW_SUMMARY_MARKER = '<!-- review-summary -->';
 
-/** Mensagem fixa publicada na PR quando não há issues novas nem threads pendentes do bot. */
+/** Mensagem fixa publicada na PR quando não há issues novas nem threads pendentes com arquivo. */
 export const CLEAN_PR_SUMMARY_MESSAGE =
   'Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀';
 

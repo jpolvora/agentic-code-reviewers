@@ -124,7 +124,7 @@ export function formatGateSummary(
           ? `${thread.filePath}:${thread.lineNumber ?? '?'}`
           : '(thread geral)';
       lines.push(
-        `  - #${thread.threadId} [${thread.status}] ${location} | autor: ${thread.author}${thread.botTag ? ` (${thread.botTag})` : ''}`,
+        `  - #${thread.threadId} [${thread.status}] ${location} | autor: ${thread.author}`,
       );
       lines.push(`    ${thread.summary}`);
     }

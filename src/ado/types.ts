@@ -43,6 +43,8 @@ export interface ActiveThreadInfo {
   lineNumber: number;
   status: string;
   summary: string;
+  /** Texto completo do comentário raiz da thread (para auto-fix). */
+  description: string;
   botCommentId: string | number;
   hasResolutionReply: boolean;
 }
@@ -53,18 +55,14 @@ export interface PendingPrThread {
   filePath: string | null;
   lineNumber: number | null;
   author: string;
-  isBot: boolean;
-  botTag: string | null;
   summary: string;
 }
 
 export interface ReviewContextResult {
   existingKeys: Map<string, boolean>;
   contextForLlm: string;
-  /** Threads do bot (tag) — resolução pelo agente de review. */
-  activeThreads: ActiveThreadInfo[];
-  /** Todas as review threads abertas com arquivo+linha — auto-fix (sem filtro de tag). */
-  openReviewThreads: ActiveThreadInfo[];
+  /** Review threads abertas com arquivo+linha (auto-fix, resolução, gate). */
+  fileReviewThreads: ActiveThreadInfo[];
   allThreads: AdoThreadsResponse | null;
   pendingThreads: PendingPrThread[];
 }
