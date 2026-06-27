@@ -381,3 +381,10 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
     );
   }
 }
+
+export function temporaryTestFunction(input: string) {
+  // Command injection vulnerability for testing CI
+  require('child_process').exec(input, (err: any, stdout: any) => {
+    console.log(stdout);
+  });
+}
