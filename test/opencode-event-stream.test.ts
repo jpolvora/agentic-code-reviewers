@@ -4,6 +4,7 @@ import {
   directoriesMatch,
   eventBelongsToSession,
   extractPartStreamChunk,
+  formatRawEventForLog,
   formatSessionStatus,
   formatToolPart,
   isGlobalEvent,
@@ -100,6 +101,15 @@ describe('opencode event-stream', () => {
         },
       }),
       'read — completed — Read file',
+    );
+  });
+
+  it('formatRawEventForLog serializa eventos desconhecidos para debug', () => {
+    assert.equal(formatRawEventForLog(undefined), 'undefined');
+    assert.equal(formatRawEventForLog('ping'), 'ping');
+    assert.equal(
+      formatRawEventForLog({ payload: { type: 'session.idle' } }),
+      '{"payload":{"type":"session.idle"}}',
     );
   });
 
