@@ -1,6 +1,6 @@
-# Documentação — Cursor Reviewer
+# Documentação — Agentic Code Reviewers
 
-> Documentação completa de configuração, uso e integração do `cursor-reviewer`.
+> Documentação completa de configuração, uso e integração do **agentic-code-reviewers** — Multi Agent Code Reviewer plugável para Azure DevOps, GitHub e extensível a novas plataformas/engines.
 
 ---
 
@@ -57,7 +57,7 @@ Se a ref target não existir localmente, fetch mínimo de `origin/{target}` (`--
 |------|---------|
 | **Include** | `**/*.cs`, `**/*.ts`, `**/*.html`, `*.cs`, `*.ts`, `*.html` |
 | **Exclude (base)** | `*/proxy/*`, `*/bin/*`, `*/obj/*`, `*.md`, `*.csproj`, `secret.txt` |
-| **Exclude (self-review)** | Diretório do runner (dinâmico); fallback: `scripts/cursor-reviewer/**` |
+| **Exclude (self-review)** | Diretório do runner (dinâmico); fallback: `scripts/agentic-code-reviewers/**` ou legado `scripts/cursor-reviewer/**` |
 
 | Variável | Default | Descrição |
 |----------|---------|-----------|
@@ -149,15 +149,15 @@ Template: [`azure-pipelines-cursor-code-review.yml`](azure-pipelines-cursor-code
 
 ```bash
 # como submódulo
-cp cursor-reviewer/azure-pipelines-cursor-code-review.yml ./
+cp agentic-code-reviewers/azure-pipelines-cursor-code-review.yml ./
 ```
 
 ### Variáveis do template
 
 | Variável | Descrição |
 |----------|-----------|
-| `group: vg-cursor-reviewer` | Variable group com `CURSOR_API_KEY` |
-| `REVIEWER_DIR` | Path do projeto (default: `scripts/cursor-reviewer`) |
+| `group: vg-agentic-code-reviewers` | Variable group com `CURSOR_API_KEY` |
+| `REVIEWER_DIR` | Path do projeto (default: `scripts/agentic-code-reviewers` ou legado `scripts/cursor-reviewer`) |
 | `CURSOR_REVIEWER_TARGET_BRANCH` | Branch target |
 | `CURSOR_REVIEWER_MODEL` | Modelo LLM |
 | `SCORE_MIN` | *(opcional)* Limiar de publicação; omitir = `6` |
@@ -320,7 +320,7 @@ Sequência: `seed:install` → `--dry-run --seed-test` → avalia → `seed:unin
 ## Exemplo de execução
 
 ```
-Cursor Reviewer
+Agentic Code Reviewers
 Modo: DRY-RUN
 Source: refs/heads/feat/minha-feature → Target: refs/heads/master
 
@@ -337,7 +337,7 @@ Reviews: 2 | Resolved threads: 0 | Has critical: true
 
 ━ Concluído ━
 Agent: agent_abc | Run: run_xyz
-=== Resumo do Cursor Reviewer ===
+=== Resumo do Agentic Code Reviewers ===
 Reviews novos: 2 | Threads resolvidas: 0
 Severidades: critical=1, warning=1, suggestion=0
 Review: COM ISSUES PENDENTES
@@ -357,6 +357,7 @@ Pipeline: SUCESSO (exit 0)
 | `--org`, `--project`, `--repo`, `--pr-id` | Contexto ADO |
 | `--bot-tag TAG` | Tag do bot |
 | `--model ID` | Modelo Cursor |
+| `--engine NAME` | Engine: `cursor-sdk`, `cursor` ou `opencode` |
 | `--repo-root PATH` | Raiz do repositório alvo |
 | `--score-min N` | Score mínimo para thread (default: `6`; opt-in) |
 | `--help` / `-h` | Ajuda |
@@ -412,7 +413,23 @@ Rode com `--verbose` e inspecione a saída bruta do agente.
 
 ## Arquitetura Desacoplada e Suporte a Novas Plataformas
 
-O `cursor-reviewer` é estruturado de forma a ser totalmente independente de plataformas e repositórios específicos. O core do agente se comunica com os ambientes externos exclusivamente através de uma abstração de provedor de plataforma.
+O **agentic-code-reviewers** é estruturado de forma a ser totalmente independente de plataformas e repositórios específicos. O core do agente se comunica com os ambientes externos exclusivamente através de abstrações plugáveis: `ExecutionEngine` (LLM/harness) e `PlatformProvider` (Git/CI).
+
+### Engines agênticas (`ExecutionEngine`)
+
+A camada LLM/harness é plugável via `CURSOR_REVIEWER_ENGINE`. Contrato em `src/engine/types.ts`:
+
+| Engine | Status | Pacote |
+|--------|--------|--------|
+| `cursor-sdk` | Estável (default) | `@cursor/sdk` |
+| `opencode` | Estável | `@opencode-ai/sdk` |
+| Custom | Via PR | Seu adapter |
+
+Para adicionar uma engine:
+1. Implemente `ExecutionEngine` em `src/engine/<nome>/engine.ts`.
+2. Estenda `ReviewerEngineName` e registre em `getEngine()` (`src/engine/index.ts`).
+3. Retorne JSON no contrato de `skills/SYSTEM_PROMPT.md` via `EngineRunResult.fullText`.
+4. Abra PR com testes.
 
 ### Provedores de Plataforma (`PlatformProvider`)
 

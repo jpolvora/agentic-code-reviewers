@@ -1,23 +1,108 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# Cursor Reviewer Remote Runner
+# Agentic Code Reviewers — Remote Runner
 # ──────────────────────────────────────────────────────────────────────
-# Este script clona a branch 'release' do cursor-reviewer, instala as
-# dependências de runtime e executa o reviewer no contexto do projeto atual.
+# Clona a branch 'release', instala dependências de runtime e executa o
+# reviewer no diretório atual (repo alvo). Suporta seleção de engine.
 # ──────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
-# Configurações padrão
-CURSOR_REVIEWER_REPO_URL="${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/cursor-reviewer.git}"
-TEMP_DIR=".tmp-cursor-reviewer"
+CURSOR_REVIEWER_REPO_URL="${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}"
+TEMP_DIR=".tmp-agentic-code-reviewers"
 CALLER_DIR="$(pwd)"
+ENGINE_RAW="${CURSOR_REVIEWER_ENGINE:-cursor-sdk}"
+FORWARD_ARGS=()
 
-echo "=== [Runner] Iniciando execução remota do Cursor Reviewer ==="
+usage() {
+  cat <<'EOF'
+Uso: run.sh [opções do runner] [-- opções repassadas]
+
+Seleciona a engine LLM e executa o Agentic Code Reviewers no diretório atual
+(repositório ou pasta alvo) via clone remoto da branch release.
+
+Opções do runner:
+  --engine ENGINE   Engine: cursor, cursor-sdk (padrão) ou opencode
+  -e ENGINE         Atalho para --engine
+  --help, -h        Exibe esta ajuda
+
+Demais argumentos são repassados ao reviewer, por exemplo:
+  --dry-run
+  --stack typescript
+  --target-branch refs/heads/main
+  --gh --pr-id 42
+
+Variáveis de ambiente:
+  CURSOR_REVIEWER_ENGINE     Mesmo que --engine
+  CURSOR_REVIEWER_REPO_URL   URL do repositório (default: agentic-code-reviewers)
+
+Exemplos:
+  curl -fsSL .../run.sh | bash -s -- --dry-run
+  curl -fsSL .../run.sh | bash -s -- --engine opencode --dry-run
+  curl -fsSL .../run.sh | bash -s -- -e cursor --dry-run --stack typescript
+EOF
+}
+
+normalize_engine() {
+  case "${1,,}" in
+    cursor | cursor-sdk)
+      echo "cursor-sdk"
+      ;;
+    opencode)
+      echo "opencode"
+      ;;
+    *)
+      echo "Engine inválida: '$1'. Valores aceitos: cursor, cursor-sdk, opencode." >&2
+      exit 1
+      ;;
+  esac
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --engine)
+      if [[ $# -lt 2 ]]; then
+        echo "Erro: --engine requer um valor (cursor ou opencode)." >&2
+        exit 1
+      fi
+      ENGINE_RAW="$2"
+      shift 2
+      ;;
+    --engine=*)
+      ENGINE_RAW="${1#*=}"
+      shift
+      ;;
+    -e)
+      if [[ $# -lt 2 ]]; then
+        echo "Erro: -e requer um valor (cursor ou opencode)." >&2
+        exit 1
+      fi
+      ENGINE_RAW="$2"
+      shift 2
+      ;;
+    --help | -h)
+      usage
+      exit 0
+      ;;
+    *)
+      FORWARD_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+CURSOR_REVIEWER_ENGINE="$(normalize_engine "$ENGINE_RAW")"
+export CURSOR_REVIEWER_ENGINE
+
+echo "=== [Runner] Iniciando execução remota do Agentic Code Reviewers ==="
 echo "Repositório do Reviewer: $CURSOR_REVIEWER_REPO_URL"
 echo "Diretório Alvo da Análise: $CALLER_DIR"
+echo "Engine: $CURSOR_REVIEWER_ENGINE"
 
-# Função de limpeza para execução pós-término ou interrupção
+if [[ "$CURSOR_REVIEWER_ENGINE" == "opencode" ]] && ! command -v opencode >/dev/null 2>&1; then
+  echo "AVISO: engine opencode requer o CLI 'opencode' instalado (https://opencode.ai/install)" >&2
+fi
+
 cleanup() {
   if [ -d "$CALLER_DIR/$TEMP_DIR" ]; then
     echo "=== [Runner] Limpando diretório temporário ==="
@@ -26,20 +111,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Garante que qualquer diretório temporário anterior seja removido
 rm -rf "$CALLER_DIR/$TEMP_DIR"
 
 echo "=== [Runner] Baixando artefatos compilados (branch release) ==="
-# Clona de forma rasa (--depth 1) para ser o mais rápido possível
 git clone --depth 1 --branch release "$CURSOR_REVIEWER_REPO_URL" "$CALLER_DIR/$TEMP_DIR"
 
 echo "=== [Runner] Instalando dependências de runtime ==="
 cd "$CALLER_DIR/$TEMP_DIR"
-
-# Instala apenas as dependências necessárias de produção
 npm ci --omit=dev
 
 VERSION=$(node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); console.log(pkg.version);")
-echo "=== [Runner] Executando Cursor Reviewer Agent (v$VERSION) ==="
-# Executa o reviewer passando o diretório original do chamador como repo-root e encaminhando os argumentos
-node dist/index.js --repo-root "$CALLER_DIR" "$@"
+echo "=== [Runner] Executando Agentic Code Reviewers v$VERSION (engine: $CURSOR_REVIEWER_ENGINE) ==="
+node dist/index.js --repo-root "$CALLER_DIR" "${FORWARD_ARGS[@]}"

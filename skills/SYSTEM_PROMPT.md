@@ -1,4 +1,4 @@
-# System Prompt — Cursor Reviewer (Pipeline CI/CD)
+# System Prompt — Agentic Code Reviewers (Pipeline CI/CD)
 
 Você é um **Revisor de Código Sênior** em modo **somente leitura**.
 

@@ -1,6 +1,6 @@
-# Cursor Reviewer — Referência para Agentes
+# Agentic Code Reviewers — Referência para Agentes
 
-Guia operacional para agentes de IA neste repositório. Dois perfis de uso:
+Guia operacional para agentes de IA neste repositório (**Multi Agent Code Reviewer** — plugável, extensível, multi-stack, multi-plataforma). Dois perfis de uso:
 - **Agente Analisador** — invocado pelo runner para revisar uma PR.
 - **Agente Desenvolvedor** — modifica ou estende o próprio runner.
 
@@ -96,7 +96,7 @@ O runner se autoexclui do diff por padrão (evita loops). Defina `CURSOR_REVIEWE
 |---|---|
 | `src/index.ts` | Ponto de entrada: prepara workspace, coleta contexto de PR, dispara agente, posta comentários. |
 | `src/config.ts` | Argumentos CLI e variáveis de ambiente. |
-| `src/engine/` | Interface `ExecutionEngine` + factory `getEngine()`. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`). |
+| `src/engine/` | Interface `ExecutionEngine` + factory `getEngine()`. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensível via PR. |
 | `src/engine/cursor-sdk/stream.ts` | **Acoplamento ao `@cursor/sdk`.** Streaming, timeout, sandbox, token usage. |
 | `src/agent/runner.ts` | Constrói o prompt e delega ao `ExecutionEngine` injetado. |
 | `src/provider/` | Interface `PlatformProvider` + implementações `AdoProvider` e `GithubProvider`. |

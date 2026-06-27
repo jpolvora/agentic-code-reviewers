@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────
-# Script de Build e Release — Cursor Reviewer
+# Script de Build e Release — Agentic Code Reviewers
 # ──────────────────────────────────────────────────────────────────────
 # Compila o TypeScript e publica apenas os artefatos de execução na
 # branch 'release' do repositório remoto atual.
@@ -70,6 +70,8 @@ cp package-lock.json .release-tmp/package-lock.json
 cp README.md .release-tmp/README.md
 cp LICENSE .release-tmp/LICENSE 2>/dev/null || true
 cp AGENTS.md .release-tmp/AGENTS.md 2>/dev/null || true
+cp run.sh .release-tmp/run.sh
+chmod +x .release-tmp/run.sh
 
 # Criar um .gitignore específico para a branch de release (evitar commit de node_modules local por engano)
 echo "node_modules/" > .release-tmp/.gitignore

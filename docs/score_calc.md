@@ -1,4 +1,4 @@
-# Score e severidade — Cursor Reviewer
+# Score e severidade — Agentic Code Reviewers
 
 > **Artefato de referência** — descreve como o **score** (0–10) e a **severidade** (`critical` / `warning` / `suggestion`) são atribuídos, validados e usados na publicação de threads na PR.  
 > **Complementa:** [`flow-analysis.md`](flow-analysis.md) (fluxo geral) · [`../skills/SYSTEM_PROMPT.md`](../skills/SYSTEM_PROMPT.md) (contrato JSON) · [`.agents/skills/code-review/SKILL.md`](../../../.agents/skills/code-review/SKILL.md) (critérios do projeto).
@@ -7,7 +7,7 @@
 
 ## Visão geral
 
-O Cursor Reviewer **não calcula score por fórmula** (`score = f(linhas, arquivos, …)`). O fluxo é:
+O **Agentic Code Reviewers** **não calcula score por fórmula** (`score = f(linhas, arquivos, …)`). O fluxo é:
 
 1. **Agente LLM** — após provar o achado com tools, **atribui** `score`, `severity` e `developerAction` conforme rubricas dos prompts.
 2. **TypeScript** — **valida** se o review é publicável (`isPublishableReview`); descarta score abaixo de `SCORE_MIN` (default **6**) ou contrato inválido.
