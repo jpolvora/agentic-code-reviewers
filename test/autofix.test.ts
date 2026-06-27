@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { applyReplacements } from '../src/orchestrator/autofix-runner.js';
+import { describe, it, mock, afterEach } from 'node:test';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as os from 'node:os';
+import { execSync } from 'node:child_process';
+import { applyReplacements, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
 
 describe('applyReplacements', () => {
   it('aplica substituição simples em arquivo', () => {
@@ -59,5 +63,80 @@ describe('applyReplacements', () => {
     assert.throws(() => {
       applyReplacements(original, replacements);
     }, /Substituição fora dos limites/);
+  });
+
+  it('lança erro para substituições sobrepostas', () => {
+    const original = 'linha 1\nlinha 2\nlinha 3\nlinha 4';
+    const replacements = [
+      { startLine: 1, endLine: 3, replacementContent: 'l1-3' },
+      { startLine: 2, endLine: 4, replacementContent: 'l2-4' },
+    ];
+    assert.throws(() => {
+      applyReplacements(original, replacements);
+    }, /Replacements sobrepostos/);
+  });
+});
+
+describe('runAutoFixFlow', () => {
+  const dummyLogger = {
+    info: () => {},
+    error: () => {},
+    warn: () => {},
+    debug: () => {},
+    section: () => {},
+  } as any;
+
+  function setupTempWorkspace() {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-test-'));
+    fs.mkdirSync(path.join(tmpDir, 'skills'));
+    fs.writeFileSync(path.join(tmpDir, 'skills', 'AUTO_FIX.md'), 'dummy prompt');
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2\nlinha 3');
+    
+    // Configura repositório git para evitar falhas nos comandos git
+    execSync('git init', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git config user.name "test"', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git config user.email "test@example.com"', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git add .', { cwd: tmpDir, stdio: 'ignore' });
+    execSync('git commit -m "initial"', { cwd: tmpDir, stdio: 'ignore' });
+    
+    return tmpDir;
+  }
+
+  it('não resolve threads quando replacements está vazio', async () => {
+    const tmpDir = setupTempWorkspace();
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+    } as any;
+    const engine = {
+      run: async () => ({ fullText: '```json\n{"explanation":"ok","replacements":[]}\n```' }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
+  });
+
+  it('dry-run não grava arquivo nem resolve threads na API', async () => {
+    const tmpDir = setupTempWorkspace();
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: true, autoFix: true } as any;
+    const reviewContext = {
+      activeThreads: [{ filePath: 'file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+    } as any;
+    const engine = {
+      run: async () => ({ fullText: '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":1,"replacementContent":"fixed"}]}\n```' }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    const content = fs.readFileSync(path.join(tmpDir, 'file.txt'), 'utf8');
+    assert.equal(content, 'linha 1\nlinha 2\nlinha 3', 'não deve gravar em disco no dry-run');
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0, 'não deve resolver threads via API no dry-run');
   });
 });

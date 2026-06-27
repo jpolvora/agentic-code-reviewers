@@ -1,23 +1,28 @@
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import type { ReviewerConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 
-export async function runAutoFixCommit(config: ReviewerConfig, logger: Logger): Promise<void> {
+export async function runAutoFixCommit(config: ReviewerConfig, logger: Logger, changedPaths: string[]): Promise<boolean> {
   if (config.dryRun) {
     logger.info('[dry-run] Simulando commit e push das alterações.');
-    return;
+    return true;
   }
 
   try {
+    if (changedPaths.length === 0) {
+      logger.info('Nenhum arquivo modificado para comitar.');
+      return false;
+    }
+
+    logger.info('Adicionando arquivos modificados ao stage...');
+    execFileSync('git', ['add', '--', ...changedPaths], { cwd: config.repoRoot, stdio: 'inherit' });
+
     logger.info('Verificando alterações no repositório...');
     const status = execSync('git status --porcelain', { cwd: config.repoRoot }).toString().trim();
     if (!status) {
       logger.info('Nenhuma alteração detectada no repositório local.');
-      return;
+      return false;
     }
-
-    logger.info('Adicionando arquivos modificados ao stage...');
-    execSync('git add -u', { cwd: config.repoRoot, stdio: 'inherit' });
 
     // Configura usuário temporário se não houver configuração global/local
     try {
@@ -41,6 +46,7 @@ export async function runAutoFixCommit(config: ReviewerConfig, logger: Logger): 
     logger.info('Fazendo push das alterações para o remoto...');
     execSync('git push origin HEAD', { cwd: config.repoRoot, stdio: 'inherit' });
     logger.info('Push concluído com sucesso.');
+    return true;
   } catch (error: any) {
     logger.error(`Falha ao consolidar alterações no Git: ${error.message}`);
     throw error;

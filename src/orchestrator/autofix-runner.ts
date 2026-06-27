@@ -7,6 +7,7 @@ import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
 import { runAutoFixCommit } from '../git/autofix-commit.js';
+import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
   startLine: number;
@@ -14,7 +15,19 @@ export interface Replacement {
   replacementContent: string;
 }
 
+export function assertNonOverlapping(replacements: Replacement[]): void {
+  const sorted = [...replacements].sort((a, b) => a.startLine - b.startLine);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].startLine <= sorted[i - 1].endLine) {
+      throw new Error(
+        `Replacements sobrepostos: ${sorted[i - 1].startLine}-${sorted[i - 1].endLine} e ${sorted[i].startLine}-${sorted[i].endLine}`,
+      );
+    }
+  }
+}
+
 export function applyReplacements(content: string, replacements: Replacement[]): string {
+  assertNonOverlapping(replacements);
   const lines = content.split(/\r?\n/);
   const hasCarriageReturn = content.includes('\r\n');
   const separator = hasCarriageReturn ? '\r\n' : '\n';
@@ -135,18 +148,23 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           return;
         }
 
-        logger.info(`Aplicando correções no arquivo local: ${filePath}`);
         const updatedContent = applyReplacements(fileContent, parsed.replacements);
-        fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
+        const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
+        
+        if (config.dryRun) {
+          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
+        } else {
+          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
+          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
+        }
 
         // Cria os itens resolvidos para marcar na PR
-        const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
         for (const thread of threads) {
           resolvedItems.push({
             threadId: (Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId)) as any,
             fileName: thread.filePath,
             lineNumber: thread.lineNumber,
-            note: explanation,
+            note: config.dryRun ? `${explanation} (simulado)` : explanation,
           });
         }
       } catch (err: any) {
@@ -162,15 +180,22 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
 
   // Consolidar commit e push
   logger.section('Consolidando alterações com Git');
-  await runAutoFixCommit(config, logger);
+  const commitSuccess = await runAutoFixCommit(config, logger, filePaths);
 
   // Responder e resolver threads na PR
   logger.section('Respondendo e resolvendo threads na PR');
-  const resolvedCount = await provider.resolvePullRequestReviewThreads(
-    config.botTag,
-    activeThreads,
-    resolvedItems,
-    (msg) => logger.info(msg),
-  );
-  logger.info(`Total de threads resolvidas: ${resolvedCount}`);
+  if (config.dryRun) {
+    logger.info(`[dry-run] Simulando resolução de ${resolvedItems.length} thread(s).`);
+    simulateThreadResolution(activeThreads, reviewContext.pendingThreads ?? [], resolvedItems);
+  } else if (commitSuccess) {
+    const resolvedCount = await provider.resolvePullRequestReviewThreads(
+      config.botTag,
+      activeThreads,
+      resolvedItems,
+      (msg) => logger.info(msg),
+    );
+    logger.info(`Total de threads resolvidas: ${resolvedCount}`);
+  } else {
+    logger.info('Commit não realizado; abortando resolução de threads.');
+  }
 }
