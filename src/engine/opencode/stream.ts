@@ -40,6 +40,8 @@ const DEFAULT_AGENT = 'explore';
 
 type OpencodeRuntime = {
   client: OpencodeClient;
+  /** Cliente sem runSignal — operações de cleanup após timeout/abort. */
+  cleanupClient: OpencodeClient;
   close: () => void;
 };
 
@@ -127,7 +129,8 @@ async function createRuntime(
 ): Promise<OpencodeRuntime> {
   const directory = config.repoRoot;
   const externalUrl = resolveServerUrl();
-  const fetch = createOpencodeFetch(timeoutMs, signal);
+  const runFetch = createOpencodeFetch(timeoutMs, signal);
+  const cleanupFetch = createOpencodeFetch(timeoutMs);
 
   if (externalUrl) {
     logger.info(`OpenCode: conectando ao servidor existente em ${externalUrl}`);
@@ -135,7 +138,8 @@ async function createRuntime(
       'OpenCode harness: AGENTS.md/opencode.json nativos do repo + prompt do runner (sem inject via OPENCODE_CONFIG_CONTENT)',
     );
     return {
-      client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch }),
+      client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: runFetch }),
+      cleanupClient: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: cleanupFetch }),
       close: () => {},
     };
   }
@@ -169,7 +173,8 @@ async function createRuntime(
   }
 
   return {
-    client: createOpencodeClient({ baseUrl: server.url, directory, fetch }),
+    client: createOpencodeClient({ baseUrl: server.url, directory, fetch: runFetch }),
+    cleanupClient: createOpencodeClient({ baseUrl: server.url, directory, fetch: cleanupFetch }),
     close: () => server.close(),
   };
 }
@@ -344,8 +349,10 @@ export async function runOpencodeStream(
         process.exitCode = 1;
         throw reason;
       }
-      if (runtime?.client && sessionId) {
-        await runtime.client.session.abort({ path: { id: sessionId }, query: { directory } }).catch(() => {});
+      if (runtime?.cleanupClient && sessionId) {
+        await runtime.cleanupClient.session
+          .abort({ path: { id: sessionId }, query: { directory } })
+          .catch(() => {});
       }
       throw new Error(
         `Timeout: agente OpenCode excedeu ${(timeoutMs / 1000).toFixed(0)}s. ` +
@@ -375,8 +382,10 @@ export async function runOpencodeStream(
   } finally {
     clearTimeout(timeoutHandle);
 
-    if (runtime?.client && sessionId && !options.resumeSessionId) {
-      await runtime.client.session.delete({ path: { id: sessionId }, query: { directory } }).catch(() => {});
+    if (runtime?.cleanupClient && sessionId && !options.resumeSessionId) {
+      await runtime.cleanupClient.session
+        .delete({ path: { id: sessionId }, query: { directory } })
+        .catch(() => {});
     }
 
     runtime?.close();
