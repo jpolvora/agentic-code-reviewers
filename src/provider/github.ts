@@ -19,7 +19,7 @@ import {
   type RoundStateLocation,
 } from '../ado/round-state.js';
 import { normalizeFilePath, reviewDedupKey } from '../ado/utils.js';
-import { BOT_TAG_PREFIX } from '../bot-tag.js';
+import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment } from '../bot-tag.js';
 import {
   commentBodyHasResolutionReply,
   RESOLUTION_MARKER,
@@ -110,14 +110,17 @@ export class GithubProvider implements PlatformProvider {
         const firstComment = comments[0];
         const rawContent = firstComment.body;
         const normalizedPath = normalizeFilePath(thread.path);
-        const lineNumber = thread.line ?? 1;
+        const lineNumber = thread.line;
 
-        if (!thread.path || lineNumber <= 0) {
+        if (!thread.path || lineNumber == null || lineNumber <= 0) {
           continue;
         }
 
+
         const isResolved = thread.isResolved;
         const status = isResolved ? 'fixed' : 'active';
+        const isBot = isAgenticReviewerComment(rawContent);
+        const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
         const summary = getReviewSummaryFromComment(rawContent, botTag);
         const hasResolutionReply = comments.some(
           (c) =>
@@ -149,6 +152,8 @@ export class GithubProvider implements PlatformProvider {
             filePath: normalizedPath,
             lineNumber,
             author: firstComment.author?.login ?? 'unknown',
+            isBot,
+            botTag: detectedBotTag,
             summary: summary || rawContent.slice(0, 160),
           });
         } else {

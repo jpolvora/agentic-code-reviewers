@@ -8,8 +8,8 @@ import {
 import {
   extractAgenticBotTagLine,
   isAgenticReviewerComment,
-  LEGACY_BOT_TAG_PREFIX,
 } from '../bot-tag.js';
+
 import type {
   ActiveThreadInfo,
   AdoThread,
@@ -20,14 +20,10 @@ import type {
 
 function isRunnerComment(content: string): boolean {
   if (!content) return false;
-  return isAgenticReviewerComment(content) || content.includes(LEGACY_BOT_TAG_PREFIX);
+  return isAgenticReviewerComment(content);
 }
 
-function extractRunnerBotTagLine(content: string): string | null {
-  const agenticTag = extractAgenticBotTagLine(content);
-  if (agenticTag) return agenticTag;
-  return content.includes(LEGACY_BOT_TAG_PREFIX) ? LEGACY_BOT_TAG_PREFIX : null;
-}
+
 
 export function getReviewSummaryFromComment(content: string, botTag: string): string {
 
@@ -72,6 +68,8 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
     }
 
     const rawContent = firstComment.content;
+    const isBot = isRunnerComment(rawContent);
+    const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
     const summary = getReviewSummaryFromComment(rawContent, botTag);
 
     pending.push({
@@ -80,19 +78,21 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
       filePath: thread.threadContext?.filePath ?? null,
       lineNumber: thread.threadContext?.rightFileStart?.line ?? null,
       author: firstComment.author?.displayName ?? 'unknown',
+      isBot,
+      botTag: detectedBotTag,
       summary: summary || stripHtml(rawContent).replace(/\s+/g, ' ').slice(0, 160),
     });
+
   }
 
   return pending;
 }
 
-/** Threads pendentes ancoradas em arquivo+linha (sem filtro de autor/tag). */
-export function filterGatePendingThreads(threads: PendingPrThread[]): PendingPrThread[] {
-  return threads.filter(
-    (t) => t.filePath != null && t.lineNumber != null && t.lineNumber > 0,
-  );
+/** Threads pendentes do runner para gate e resumo final (exclui revisores humanos). */
+export function filterGatePendingThreads(threads: PendingPrThread[], _botTag: string): PendingPrThread[] {
+  return threads.filter((t) => t.isBot);
 }
+
 
 export async function getPullRequestReviewContext(
   client: AdoClient,

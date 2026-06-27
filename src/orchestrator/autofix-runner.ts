@@ -121,8 +121,6 @@ export function isThreadLineModified(
 interface AutoFixAgentResponse {
   replacements: Replacement[];
   resolvedThreads?: Array<{ threadId: string | number; explanation: string }>;
-  /** @deprecated use resolvedThreads[].explanation */
-  explanation?: string;
 }
 
 function buildResolvedItemsFromAgent(
@@ -132,35 +130,25 @@ function buildResolvedItemsFromAgent(
 ): ResolvedThreadItem[] {
   const items: ResolvedThreadItem[] = [];
 
-  if (parsed.resolvedThreads && parsed.resolvedThreads.length > 0) {
-    for (const entry of parsed.resolvedThreads) {
-      const thread = threads.find((t) => String(t.threadId) === String(entry.threadId));
-      if (!thread) continue;
-      const note = entry.explanation?.trim();
-      if (!note) continue;
-      items.push({
-        threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
-        fileName: thread.filePath,
-        lineNumber: thread.lineNumber,
-        note: dryRun ? `${note} (simulado)` : note,
-      });
-    }
+  if (!parsed.resolvedThreads || parsed.resolvedThreads.length === 0) {
     return items;
   }
 
-  const fallbackNote = parsed.explanation?.trim();
-  if (!fallbackNote) return items;
-
-  for (const thread of threads) {
+  for (const entry of parsed.resolvedThreads) {
+    const thread = threads.find((t) => String(t.threadId) === String(entry.threadId));
+    if (!thread) continue;
+    const note = entry.explanation?.trim();
+    if (!note) continue;
     items.push({
       threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
       fileName: thread.filePath,
       lineNumber: thread.lineNumber,
-      note: dryRun ? `${fallbackNote} (simulado)` : fallbackNote,
+      note: dryRun ? `${note} (simulado)` : note,
     });
   }
   return items;
 }
+
 
 interface FileFixResult {
   relativePath: string;
@@ -332,9 +320,27 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
 
         const localResolvedItems = buildResolvedItemsFromAgent(threads, parsed, config.dryRun);
 
-        if (localResolvedItems.length === 0) {
+        const verifiedResolvedItems = localResolvedItems.filter((item) => {
+          const thread = threads.find(
+            (t) =>
+              (Number.isNaN(Number(item.threadId)) ? item.threadId : Number(item.threadId)) ===
+              (Number.isNaN(Number(t.threadId)) ? t.threadId : Number(t.threadId)),
+          );
+          if (!thread) return false;
+          if (
+            !isThreadLineModified(fileContent, updatedContent, thread.lineNumber, parsed.replacements)
+          ) {
+            logger.warn(
+              `Thread ${thread.threadId} declarada resolvida mas linha ${thread.lineNumber} não foi alterada — ignorada.`,
+            );
+            return false;
+          }
+          return true;
+        });
+
+        if (verifiedResolvedItems.length === 0) {
           logger.warn(
-            `Arquivo ${filePath} alterado mas nenhuma thread listada em resolvedThreads — correção descartada.`,
+            `Arquivo ${filePath} alterado mas nenhuma thread confirmada após verificação determinística — correção descartada.`,
           );
           return undefined;
         }
@@ -346,7 +352,8 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
           fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
-        return { relativePath, resolvedItems: localResolvedItems };
+        return { relativePath, resolvedItems: verifiedResolvedItems };
+
       } catch (err: any) {
         logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
         return undefined;
