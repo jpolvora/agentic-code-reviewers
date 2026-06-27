@@ -1,257 +1,261 @@
-# Agentic Code Reviewers — Referência para Agentes
+# Agentic Code Reviewers — Agent Reference
 
-Guia operacional para agentes de IA neste repositório (**Multi Agent Code Reviewer** — plugável, extensível, multi-stack, multi-plataforma). Dois perfis de uso:
-- **Agente Analisador** — invocado pelo runner para revisar uma PR.
-- **Agente Desenvolvedor** — modifica ou estende o próprio runner.
-
----
-
-## Comportamento Invariável
-
-- **Não implemente o que não foi pedido expressamente.** Ante qualquer ambiguidade ou bifurcação de design, pare e pergunte.
-- **Seja crítico, não complacente.** Questione premissas; recuse sugestões sem sentido arquitetural com justificativa técnica.
-- **Simplicity first.** Mudanças mínimas, sem workarounds, sem over-engineering.
+Operational guide for AI agents in this repository (**Multi Agent Code Reviewer** — pluggable, extensible, multi-stack, multi-platform). Two agent profiles:
+- **Analyzer Agent** — invoked by the runner to review a PR.
+- **Developer Agent** — modifies or extends the runner itself.
 
 ---
 
-## 1. Agente Analisador
+## Invariant Behavior
 
-### Modo de operação
-- Estritamente **somente leitura**. Proibido: commits, push, alteração de arquivos no repositório alvo, formatters/linters.
-- Permitido: `read_file`, `grep_search`, `glob`, busca semântica, inspeção de diff.
-- O sandbox (`local.sandboxOptions.enabled` em `src/engine/cursor-sdk/stream.ts`) reforça esse contrato no nível do SDK.
+- **Only implement what is explicitly requested.** On any ambiguity or design fork, stop and ask.
+- **Be critical, not compliant.** Challenge assumptions; reject architecturally unsound suggestions with a technical rationale.
+- **Simplicity first.** Minimal changes, no workarounds, no over-engineering.
+- **Think more, write less.** Prefer elegant solutions over verbose ones. Less code is better: eliminate redundancy, abstract only when two or more real cases exist.
+- **No token maxxing.** Responses and diffs must be concise. Avoid comments that merely paraphrase code, unnecessary explanatory prose, and mechanically generated boilerplate.
+- **Tests are a contract, not optional.** Every feature or fix must ship with tests covering the happy path and relevant edge cases. Never delete existing tests unless they are dead code or unreachable.
+- **Decompose before executing.** Break large tasks into independent subtasks. When possible, parallelize with subagents sharing only the minimum necessary context — keep context windows small.
 
-### Análise em duas fases
+---
 
-**Fase 1 — Triagem:** examine o diff. Identifique candidatos com falhas reais (segurança, concorrência, vazamento de recursos, bugs lógicos). Descarte imediatamente: nits, estilo, preferências e alertas conceituais sem caminho executável de falha.
+## 1. Analyzer Agent
 
-**Fase 2 — Investigação:** para cada candidato, use `read_file` e `grep_search` para ler o arquivo completo, testes, chamadores e middlewares relacionados. Um achado só é válido se você conseguir preencher as quatro etapas abaixo no campo `analysis`:
-1. **Evidência** — arquivos e símbolos lidos.
-2. **Cenário** — como a falha ocorre na prática.
-3. **Proteção ausente** — por que validações/testes atuais não bloqueiam a falha.
-4. **Descartes** — hipóteses alternativas testadas e rejeitadas.
+### Operating Mode
+- Strictly **read-only**. Forbidden: commits, push, file modifications in the target repository, formatters/linters.
+- Allowed: `read_file`, `grep_search`, `glob`, semantic search, diff inspection.
+- The sandbox (`local.sandboxOptions.enabled` in `src/engine/cursor-sdk/stream.ts`) enforces this contract at the SDK level.
 
-Se não conseguir preencher as quatro etapas, descarte o achado.
+### Two-Phase Analysis
 
-### Consulta ao harness do projeto alvo
-Antes de revisar, consulte no `repoRoot` (nesta ordem, se existirem):
-1. `AGENTS.md` do projeto.
-2. `.cursor/rules/main.mdc` ou as regras pré-mapeadas no prompt.
+**Phase 1 — Triage:** examine the diff. Identify candidates with real failures (security, concurrency, resource leaks, logic bugs). Immediately discard: nits, style, preferences, and conceptual warnings with no executable failure path.
+
+**Phase 2 — Investigation:** for each candidate, use `read_file` and `grep_search` to read the full file, tests, callers, and related middlewares. A finding is only valid if you can fill in all four steps below in the `analysis` field:
+1. **Evidence** — files and symbols read.
+2. **Scenario** — how the failure occurs in practice.
+3. **Missing protection** — why existing validations/tests do not block the failure.
+4. **Discards** — alternative hypotheses tested and rejected.
+
+If you cannot fill in all four steps, discard the finding.
+
+### Target Project Harness Lookup
+Before reviewing, check in `repoRoot` (in this order, if they exist):
+1. Project `AGENTS.md`.
+2. `.cursor/rules/main.mdc` or pre-mapped rules in the prompt.
 3. `.agents/skills/code-review/SKILL.md`.
-4. `docs/` — regras de domínio e arquitetura.
+4. `docs/` — domain and architecture rules.
 
-### Contrato de saída JSON
-Responda **exclusivamente** com um bloco JSON contendo:
+### JSON Output Contract
+Respond **exclusively** with a JSON block containing:
 
 ```json
 {
   "reviews": [
     {
-      "fileName": "/src/MinhaClasse.cs",
+      "fileName": "/src/MyClass.cs",
       "lineNumber": 15,
       "severity": "critical",
-      "comment": "Descrição curta da falha (sem blocos de código).",
+      "comment": "Short description of the failure (no code blocks).",
       "score": 9,
       "developerAction": "fix-code",
-      "analysis": "1. Evidência: ... 2. Cenário: ... 3. Proteção: ... 4. Descarte: ...",
-      "impactPaths": ["/src/MinhaClasse.cs", "/src/Middlewares/Auth.cs"],
-      "suggestedFix": "```csharp\n// correção cirúrgica\n```"
+      "analysis": "1. Evidence: ... 2. Scenario: ... 3. Protection: ... 4. Discards: ...",
+      "impactPaths": ["/src/MyClass.cs", "/src/Middlewares/Auth.cs"],
+      "suggestedFix": "```csharp\n// surgical fix\n```"
     }
   ],
   "resolvedThreads": [
-    { "threadId": 12345, "note": "Corrigido na linha 15." }
+    { "threadId": 12345, "note": "Fixed at line 15." }
   ],
   "reviewSummary": ""
 }
 ```
 
-### Regras do gate (`src/ado/review-validation.ts`)
-Achados que violarem qualquer regra abaixo são descartados automaticamente:
+### Gate Rules (`src/ado/review-validation.ts`)
+Findings that violate any rule below are automatically discarded:
 
-| Campo | Regra |
+| Field | Rule |
 |---|---|
-| `score` | Inteiro entre **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** (default `6`). Score abaixo do mínimo é descartado. Omitir env / `--score-min` preserva o limiar 6. |
-| `fileName` + `lineNumber` | Devem apontar para linhas alteradas no diff (lineNumber > 0). |
+| `score` | Integer between **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** (default `6`). Score below the minimum is discarded. Omitting env / `--score-min` preserves the threshold of 6. |
+| `fileName` + `lineNumber` | Must point to lines changed in the diff (lineNumber > 0). |
 | `severity` | `critical` (score 9–10) · `warning` (6–8) · `suggestion` (6–7) |
-| `developerAction` | `fix-code` ou `escalate`. Nunca `resolve-comment` em reviews novos. |
-| `suggestedFix` | Opcional. Em Azure DevOps, não use a cerca ` ```suggestion `. Em GitHub, pode usar para habilitar o botão de aplicação automática. |
-| `analysis` | Obrigatório com as 4 etapas da prova estruturada. |
-| `impactPaths` | Array com ao menos um arquivo lido que sustente a investigação. |
+| `developerAction` | `fix-code` or `escalate`. Never `resolve-comment` in new reviews. |
+| `suggestedFix` | Optional. In Azure DevOps, do not use the ` ```suggestion ` fence. In GitHub, you may use it to enable the one-click apply button. |
+| `analysis` | Required with all 4 steps of the structured proof. |
+| `impactPaths` | Array with at least one read file that supports the investigation. |
 
 ### Safe Outputs (`src/ado/safe-outputs.ts`)
 
-Após `isPublishableReview`, o gate **Safe Outputs** (default ON via `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS`) aplica validação determinística adicional:
+After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS`) applies additional deterministic validation:
 
-| Regra | Descrição |
+| Rule | Description |
 |---|---|
-| Diff-line anchoring | `lineNumber` deve estar em linha alterada do diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
-| Protected paths | Bloqueia reviews referenciando CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
-| Severity ↔ score | Coerência obrigatória (`critical` 9–10, `warning` 6–8, `suggestion` 6–7) |
-| Analysis structure | Quatro seções numeradas (Evidência, Cenário, Proteção, Descarte) |
+| Diff-line anchoring | `lineNumber` must be on a changed line in the diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
+| Protected paths | Blocks reviews referencing CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
+| Severity ↔ score | Consistency required (`critical` 9–10, `warning` 6–8, `suggestion` 6–7) |
+| Analysis structure | Four numbered sections (Evidence, Scenario, Protection, Discards) |
 | Size limits | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` (default 8000) |
-| Secrets / markdown | Bloqueia padrões de credencial e HTML/script perigoso |
+| Secrets / markdown | Blocks credential patterns and dangerous HTML/script |
 
-### Rodadas e escalonamento
-O runner rastreia iterações pelo marcador `<!-- reviewer-round-state -->`. Ao exceder `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (padrão: 5):
-- Suprima achados `warning` e `suggestion`.
-- Publique apenas `critical` (segurança ou quebra de invariantes de negócio).
-- O runner adicionará aviso de handoff para revisão humana na PR.
+### Rounds and Escalation
+The runner tracks iterations via the `<!-- reviewer-round-state -->` marker. When `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default: 5) is exceeded:
+- Suppress `warning` and `suggestion` findings.
+- Publish only `critical` (security or business invariant breaks).
+- The runner will add a handoff warning for human review on the PR.
 
-O runner se autoexclui do diff por padrão (evita loops). Defina `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` para revisar o próprio codebase — inclui a pasta do runner no diff e mescla `**/*.yml`, `**/*.yaml`, `**/*.sh` aos includes da stack (salvo `INCLUDE_PATTERNS` explícito).
+The runner excludes itself from the diff by default (avoids loops). Set `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` to review the runner's own codebase — includes the runner folder in the diff and merges `**/*.yml`, `**/*.yaml`, `**/*.sh` into the stack includes (unless `INCLUDE_PATTERNS` is explicitly set).
 
-### Variáveis de ambiente
+### Environment Variables
 
-Todas as variáveis do runner usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`** (sem prefixo; `OPENCODE_API_KEY` é lida por `run.sh`/CI, **não** por `env.*`). Leitura TypeScript: `src/env.ts` (`readEnv`, `ENV`, `env.*`).
+All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except credentials **`CURSOR_API_KEY`** and **`OPENCODE_API_KEY`** (no prefix; `OPENCODE_API_KEY` is read by `run.sh`/CI, **not** by `env.*`). TypeScript reader: `src/env.ts` (`readEnv`, `ENV`, `env.*`).
 
-> **Migração:** `CURSOR_REVIEWER_*` foi substituído por `AGENTIC_CODE_REVIEWERS_*`. `AGENTIC_CODE_REVIEWERS_REPO_URL` e `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` existem só em `run.sh`/workflow — removidos de `env.ts`.
+> **Migration:** `CURSOR_REVIEWER_*` was replaced by `AGENTIC_CODE_REVIEWERS_*`. `AGENTIC_CODE_REVIEWERS_REPO_URL` and `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` exist only in `run.sh`/workflow — removed from `env.ts`.
 
-**Essenciais** (`.env.example`):
+**Essential** (`.env.example`):
 
-| Variável | Default | Uso |
+| Variable | Default | Usage |
 |---|---|---|
-| `CURSOR_API_KEY` | — | Obrigatória com engine `cursor-sdk` |
-| `OPENCODE_API_KEY` | — | OpenCode Go em CI (`run.sh` → `auth.json`; não via `env.*`) |
+| `CURSOR_API_KEY` | — | Required with `cursor-sdk` engine |
+| `OPENCODE_API_KEY` | — | OpenCode Go in CI (`run.sh` → `auth.json`; not via `env.*`) |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | `cursor-sdk` \| `opencode` |
-| `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | ID Cursor ou `provider/model` |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor externo; **vazio = embutido** |
-| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO local |
-| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub local; fallback `GITHUB_TOKEN` / `GH_TOKEN` |
-| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff |
-| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir runner no diff (CI deste repo) |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | per engine | Cursor ID or `provider/model` |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | External server; **empty = embedded** |
+| `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | ADO PAT (local) |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | GitHub token (local); fallback `GITHUB_TOKEN` / `GH_TOKEN` |
+| `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Diff comparison branch |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Include runner in diff (CI of this repo) |
 
-**Avançadas** (defaults OK — ver README § Configuração avançada): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
+**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
 
-**Só `run.sh`:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
+**`run.sh` only:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
-**Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); não passa por `env.ts`.
+**CI workflow only:** repository variable `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); not processed by `env.ts`.
 
-Lista completa: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/index.md`](docs/index.md).
+Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/index.md`](docs/index.md).
 
-**Precedência:** flags CLI (`--engine`, `--model`, `--score-min`) > env canônica > default.
+**Precedence:** CLI flags (`--engine`, `--model`, `--score-min`) > canonical env > default.
 
 ---
 
-## 2. Agente Desenvolvedor
+## 2. Developer Agent
 
-### Arquitetura
+### Architecture
 
-| Arquivo/Pasta | Responsabilidade |
+| File/Folder | Responsibility |
 |---|---|
-| `src/index.ts` | Ponto de entrada: prepara workspace, coleta contexto de PR, dispara agente, posta comentários. |
-| `src/config.ts` | Argumentos CLI e variáveis de ambiente. |
-| `src/env.ts` | Prefixo `AGENTIC_CODE_REVIEWERS_*`, credenciais sem prefixo, leitores `env.*`. |
-| `src/engine/` | Interface `ExecutionEngine` + factory `getEngine()`. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensível via PR. |
-| `src/engine/opencode/stream.ts` | Sessão OpenCode, prompt, event stream SSE, timeout/abort. |
-| `src/engine/opencode/fetch.ts` | Fetch `undici` com `headersTimeout` alinhado a `TIMEOUT_MS` + `AbortSignal`. |
-| `src/engine/opencode/server.ts` | `createEmbeddedOpencodeServer` — spawn `opencode serve`; não reutiliza servidor alheio sem harness. |
-| `src/engine/opencode/server-config.ts` | Config embutida (modelo, log level, permissões deny, `instructions` do harness). |
-| `src/engine/opencode/harness-instructions.ts` | Globs `instructions` injetados no servidor embutido (paridade `settingSources: ['project']`). |
-| `src/engine/opencode/event-stream.ts` | Consumo de `/global/event` e auto-reply de permissões. |
-| `src/engine/cursor-sdk/stream.ts` | **Acoplamento ao `@cursor/sdk`.** Streaming, timeout, sandbox, token usage. |
-| `run.sh` | Runner portátil: modo **remoto** (clone `release`) ou **local** (`--local`, CI deste repo). |
-| `.github/workflows/code-review.yml` | CI deste repo — `run.sh --local`, matrix engines. |
-| `.github/workflows/review-remote.yml` | Reusable workflow para repositórios consumidores. |
-| `examples/consumer-github-workflow.yml` | Template copy-paste para consumidores GitHub. |
-| `src/agent/runner.ts` | Constrói o prompt e delega ao `ExecutionEngine` injetado. |
-| `src/provider/` | Interface `PlatformProvider` + implementações `AdoProvider` e `GithubProvider`. |
-| `src/ado/` | Gate (`gate.ts`), validação (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatação (`format-thread.ts`), rodadas (`round-state.ts`). |
-| `src/orchestrator/` | Paralelismo in-process (`parallel-runner.ts`), merge (`merge-reviews.ts`), meta-reviewer opcional. |
-| `src/mcp/` | Ferramentas read-only de contexto (`review-tools.ts`) e injeção no prompt. |
-| `skills/stacks/` | Recomendações por stack em Markdown (carregadas pelo runner). |
-| `skills/SYSTEM_PROMPT.md` | Contrato JSON, score, severity, política de publicação. |
-| `skills/CODE_REVIEW.md` | Harness genérico de code review (injetado no prompt). |
-| `.agents/skills/` | Skills agênticas para o **Cursor/IDE** (fora do `@cursor/sdk`). |
+| `src/index.ts` | Entry point: prepares workspace, collects PR context, triggers agent, posts comments. |
+| `src/config.ts` | CLI arguments and environment variables. |
+| `src/env.ts` | `AGENTIC_CODE_REVIEWERS_*` prefix, unprefixed credentials, `env.*` readers. |
+| `src/engine/` | `ExecutionEngine` interface + `getEngine()` factory. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensible via PR. |
+| `src/engine/opencode/stream.ts` | OpenCode session, prompt, SSE event stream, timeout/abort. |
+| `src/engine/opencode/fetch.ts` | `undici` fetch with `headersTimeout` aligned to `TIMEOUT_MS` + `AbortSignal`. |
+| `src/engine/opencode/server.ts` | `createEmbeddedOpencodeServer` — spawns `opencode serve`; does not reuse an external server without a harness. |
+| `src/engine/opencode/server-config.ts` | Embedded config (model, log level, deny permissions, harness `instructions`). |
+| `src/engine/opencode/harness-instructions.ts` | `instructions` globs injected into the embedded server (parity with `settingSources: ['project']`). |
+| `src/engine/opencode/event-stream.ts` | Consumes `/global/event` and auto-replies to permission prompts. |
+| `src/engine/cursor-sdk/stream.ts` | **Coupled to `@cursor/sdk`.** Streaming, timeout, sandbox, token usage. |
+| `run.sh` | Portable runner: **remote** mode (clone `release`) or **local** (`--local`, CI of this repo). |
+| `.github/workflows/code-review.yml` | CI of this repo — `run.sh --local`, engine matrix. |
+| `.github/workflows/review-remote.yml` | Reusable workflow for consumer repositories. |
+| `examples/consumer-github-workflow.yml` | Copy-paste template for GitHub consumers. |
+| `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
+| `src/provider/` | `PlatformProvider` interface + `AdoProvider` and `GithubProvider` implementations. |
+| `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`). |
+| `src/orchestrator/` | In-process parallelism (`parallel-runner.ts`), merge (`merge-reviews.ts`), optional meta-reviewer. |
+| `src/mcp/` | Read-only context tools (`review-tools.ts`) and prompt injection. |
+| `skills/stacks/` | Per-stack Markdown recommendations (loaded by the runner). |
+| `skills/SYSTEM_PROMPT.md` | JSON contract, score, severity, publishing policy. |
+| `skills/CODE_REVIEW.md` | Generic code review harness (injected into the prompt). |
+| `.agents/skills/` | Agentic skills for **Cursor/IDE** (outside `@cursor/sdk`). |
 
-### Skills — roteamento e gestão
+### Skills — Routing and Management
 
-O repositório tem **duas camadas** de “skills”. Não confundir:
+The repository has **two layers** of "skills". Do not confuse them:
 
-| Camada | Local | Quem carrega | Quando |
+| Layer | Location | Loaded by | When |
 |---|---|---|---|
-| **Prompts de runtime** | `skills/` | `buildAgentPrompt()` em `src/agent/prompt.ts` | Toda execução via `npm run review`, CI ou `run.sh` |
-| **Skills IDE** | `.agents/skills/<nome>/SKILL.md` | Agente do Cursor quando o usuário invoca `/nome` | Desenvolvimento local, dry-run manual, ciclo fix/review |
+| **Runtime prompts** | `skills/` | `buildAgentPrompt()` in `src/agent/prompt.ts` | Every execution via `npm run review`, CI, or `run.sh` |
+| **IDE skills** | `.agents/skills/<name>/SKILL.md` | Cursor agent when the user invokes `/<name>` | Local development, manual dry-runs, fix/review cycle |
 
-#### Prompts de runtime (`skills/`)
+#### Runtime Prompts (`skills/`)
 
-Montagem do prompt (ordem em `buildAgentPrompt`):
+Prompt assembly order in `buildAgentPrompt`:
 
-1. `skills/SYSTEM_PROMPT.md` — contrato JSON, tabelas score × severity, política ADO/GitHub.
-2. `skills/CODE_REVIEW.md` — harness genérico do projeto.
-3. `skills/stacks/<stack>.md` — recomendações da stack (`AGENTIC_CODE_REVIEWERS_STACK` / `--stack`).
-4. Contexto dinâmico — diff, rules `.cursor/rules/*.mdc`, PR, work items, threads existentes.
-5. Workflow em duas fases — instruções Fase 1/2/3; injeta `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no filtro.
+1. `skills/SYSTEM_PROMPT.md` — JSON contract, score × severity tables, ADO/GitHub publishing policy.
+2. `skills/CODE_REVIEW.md` — generic project harness.
+3. `skills/stacks/<stack>.md` — stack recommendations (`AGENTIC_CODE_REVIEWERS_STACK` / `--stack`).
+4. Dynamic context — diff, `.cursor/rules/*.mdc` rules, PR, work items, existing threads.
+5. Two-phase workflow — Phase 1/2/3 instructions; injects `AGENTIC_CODE_REVIEWERS_SCORE_MIN` into the filter.
 
-O agente em CI **não** lê `.agents/skills/` automaticamente — só o que o runner embute no prompt. Referência cruzada no prompt: skill genérica de code-review do **projeto alvo** em `.agents/skills/code-review/SKILL.md` (se existir no `repoRoot`).
+The CI agent does **not** read `.agents/skills/` automatically — only what the runner embeds in the prompt. Cross-reference in the prompt: the target project's generic code-review skill at `.agents/skills/code-review/SKILL.md` (if it exists in `repoRoot`).
 
-#### Skills IDE (`.agents/skills/`)
+#### IDE Skills (`.agents/skills/`)
 
-| Skill | Invocação | Modo | Pipeline espelhado |
+| Skill | Invocation | Mode | Mirrored pipeline |
 |---|---|---|---|
-| [`code-review-self`](.agents/skills/code-review-self/SKILL.md) | `/code-review-self` | Somente leitura | `src/index.ts` — triagem, gate, rodadas, JSON idêntico |
-| [`megabrain`](.agents/skills/megabrain/SKILL.md) | `/megabrain` | Somente leitura | Revisão iterativa com `[Thread #N]`; avalia `RESOLVED`/`UNRESOLVED` |
-| [`solve-pr`](.agents/skills/solve-pr/SKILL.md) | `/solve-pr` | Leitura + escrita | Busca threads GitHub → fix → commit/push → nova rodada CI |
+| [`code-review-self`](.agents/skills/code-review-self/SKILL.md) | `/code-review-self` | Read-only | `src/index.ts` — triage, gate, rounds, identical JSON |
+| [`megabrain`](.agents/skills/megabrain/SKILL.md) | `/megabrain` | Read-only | Iterative review with `[Thread #N]`; evaluates `RESOLVED`/`UNRESOLVED` |
+| [`solve-pr`](.agents/skills/solve-pr/SKILL.md) | `/solve-pr` | Read + write | Fetches GitHub threads → fix → commit/push → new CI round |
 
-**Roteamento — qual usar?**
+**Routing — which to use?**
 
 ```
-PR em CI (ADO/GitHub)     → runner automático (npm run review / workflow)
-Dry-run local sem SDK     → code-review-self
-Follow-up após correções  → megabrain (threads humanas) ou runner (threads do bot)
-Corrigir threads do bot   → solve-pr (GitHub) ou dev manual
+PR in CI (ADO/GitHub)      → automatic runner (npm run review / workflow)
+Local dry-run without SDK  → code-review-self
+Follow-up after fixes      → megabrain (human threads) or runner (bot threads)
+Fix bot-published threads  → solve-pr (GitHub) or manual dev
 ```
 
-| Cenário | Skill / caminho |
+| Scenario | Skill / path |
 |---|---|
-| Validar gate e prompt antes de merge | `code-review-self` + `npm test` |
-| Revisão conversacional com IDs estáveis | `megabrain` |
-| Bot publicou threads; quero auto-fix | `solve-pr` (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` ou `GITHUB_TOKEN` / `GH_TOKEN`) |
-| Produção / pipeline | Nenhuma skill IDE — só runner + `skills/` |
+| Validate gate and prompt before merge | `code-review-self` + `npm test` |
+| Conversational review with stable IDs | `megabrain` |
+| Bot published threads; want auto-fix | `solve-pr` (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` or `GITHUB_TOKEN` / `GH_TOKEN`) |
+| Production / pipeline | No IDE skill — runner + `skills/` only |
 
-#### Adicionar ou alterar skill IDE
+#### Adding or Modifying an IDE Skill
 
-1. Crie `.agents/skills/<nome>/SKILL.md` com frontmatter `name` + `description` (trigger do Cursor).
-2. Documente modo (read-only vs write), pré-requisitos de env e fluxo passo a passo.
-3. Scripts auxiliares em `.agents/skills/<nome>/scripts/` (ex.: `solve-pr`).
-4. Atualize **este** `AGENTS.md`, [`README.md`](README.md) e tabela em [`docs/index.md`](docs/index.md).
-5. Skills genéricas reutilizáveis entre projetos → [workflow-skills](https://github.com/jpolvora/workflow-skills).
+1. Create `.agents/skills/<name>/SKILL.md` with `name` + `description` frontmatter (Cursor trigger).
+2. Document mode (read-only vs. write), env prerequisites, and step-by-step flow.
+3. Auxiliary scripts in `.agents/skills/<name>/scripts/` (e.g., `solve-pr`).
+4. Update **this** `AGENTS.md`, [`README.md`](README.md), and the table in [`docs/index.md`](docs/index.md).
+5. Generic skills reusable across projects → [workflow-skills](https://github.com/jpolvora/workflow-skills).
 
-#### Adicionar stack de runtime
+#### Adding a Runtime Stack
 
-1. Registre em `STACKS` + `getStackConfig` (`src/config.ts`).
-2. Crie `skills/stacks/<nome>.md`.
-3. Cubra autodetecção em `test/config.test.ts`.
-4. **Sincronize** `README.md`, `AGENTS.md`, `docs/` e `.env.example` quando alterar env, workflows, stacks ou engines.
+1. Register in `STACKS` + `getStackConfig` (`src/config.ts`).
+2. Create `skills/stacks/<name>.md`.
+3. Cover auto-detection in `test/config.test.ts`.
+4. **Sync** `README.md`, `AGENTS.md`, `docs/`, and `.env.example` when changing env vars, workflows, stacks, or engines.
 
-### Comandos de validação e execução local
+### Validation and Local Execution Commands
 
-Ao desenvolver ou depurar a infraestrutura do runner, utilize os seguintes comandos:
+When developing or debugging the runner infrastructure, use the following commands:
 
 ```bash
-# Execução manual e simulações (dry-run)
-npm run review:local      # Roda o runner local (via tsx) contra a branch atual (dry-run)
-bash run.sh --local ...   # Testa o script de wrapper de CI executando o código TypeScript nativamente
+# Manual execution and simulations (dry-run)
+npm run review:local      # Runs the local runner (via tsx) against the current branch (dry-run)
+bash run.sh --local ...   # Tests the CI wrapper script running TypeScript natively
 
-# Build e Testes (Obrigatórios antes de abrir PR)
-npm run build             # Compila o projeto (dist/index.js) — valida a tipagem e empacotamento
-npm test                  # Typecheck estrito + bateria de testes unitários (Vitest)
-npm run test:seed         # E2E: instala fixtures localmente, roda dry-run com o agente, valida cobertura contra SEED-ISSUES.md e desaloca as fixtures
-npm run seed:verify-clean # Utilitário para garantir que a suite E2E não deixou lixo de fixtures rastreadas no working tree
+# Build and Tests (required before opening a PR)
+npm run build             # Compiles the project (dist/index.js) — validates typing and bundling
+npm test                  # Strict typecheck + unit test suite (Vitest)
+npm run test:seed         # E2E: installs fixtures locally, runs agent dry-run, validates coverage against SEED-ISSUES.md, and deallocates fixtures
+npm run seed:verify-clean # Utility to ensure the E2E suite left no tracked fixture litter in the working tree
 ```
 
-### Boas práticas
+### Best Practices
 
-- **Provedores:** toda nova feature deve funcionar em Azure DevOps **e** GitHub. Markdown, GraphQL/REST e sugestões interativas diferem entre plataformas.
-- **Stacks:** ao adicionar/modificar stacks, mantenha compatibilidade com o fallback `ABP/Angular` e cubra a autodetecção em `test/config.test.ts`.
-- **Sincronização de docs:** ao alterar `review-validation.ts`, `round-state.ts`, lógica de diff, stacks, prompts, env vars (`src/env.ts`) ou skills, atualize este `AGENTS.md`, o `README.md` e `docs/` em conjunto.
+- **Providers:** every new feature must work on both Azure DevOps **and** GitHub. Markdown, GraphQL/REST, and interactive suggestions differ between platforms.
+- **Stacks:** when adding/modifying stacks, maintain compatibility with the `ABP/Angular` fallback and cover auto-detection in `test/config.test.ts`.
+- **Doc sync:** when changing `review-validation.ts`, `round-state.ts`, diff logic, stacks, prompts, env vars (`src/env.ts`), or skills, update this `AGENTS.md`, `README.md`, and `docs/` together.
 
-### Skills locais — referência rápida
+### Local Skills — Quick Reference
 
-Ver seção [Skills — roteamento e gestão](#skills--roteamento-e-gestão) acima. Resumo:
+See [Skills — Routing and Management](#skills--routing-and-management) above. Summary:
 
-| Skill | Uso |
+| Skill | Usage |
 |---|---|
-| `code-review-self` | Review agêntico somente-leitura via IDE, sem `@cursor/sdk`. |
-| `megabrain` | Threads numeradas (`[Thread #N]`); follow-up entre commits. |
-| `solve-pr` | Threads ativas no GitHub → fix → commit/push → aguarda runner. |
+| `code-review-self` | Read-only agentic review via IDE, without `@cursor/sdk`. |
+| `megabrain` | Numbered threads (`[Thread #N]`); follow-up across commits. |
+| `solve-pr` | Active GitHub threads → fix → commit/push → awaits runner. |
 
-Ao adicionar ou alterar skills, atualize este arquivo, o `README.md` e `docs/index.md`.
+When adding or modifying skills, update this file, `README.md`, and `docs/index.md`.
