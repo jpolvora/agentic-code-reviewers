@@ -312,7 +312,7 @@ async function main(): Promise<void> {
   let postedReviews: CodeReviewItem[] = [];
   let pendingThreads = [...reviewContext.pendingThreads];
 
-  const gatePendingBeforePost = filterGatePendingThreads(reviewContext.pendingThreads, config.botTag);
+  const gatePendingBeforePost = filterGatePendingThreads(reviewContext.pendingThreads);
 
   const wouldPostReviewsPre = getNewReviewsFromPlan(
     getCodeReviewPostingPlan(parsed).reviewsJson,
@@ -425,7 +425,7 @@ async function main(): Promise<void> {
     );
     pendingThreads = refreshedContext.pendingThreads;
 
-    const gatePendingAfterPost = filterGatePendingThreads(pendingThreads, config.botTag);
+    const gatePendingAfterPost = filterGatePendingThreads(pendingThreads);
 
     const summaryPlan = shouldPostReviewSummary(gatePendingAfterPost.length > 0);
 
@@ -456,7 +456,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const gatePending = filterGatePendingThreads(pendingThreads, config.botTag);
+  const gatePending = filterGatePendingThreads(pendingThreads);
 
   const gate = evaluateGate({
     newReviews: postedReviews,

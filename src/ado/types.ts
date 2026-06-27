@@ -55,6 +55,8 @@ export interface PendingPrThread {
   filePath: string | null;
   lineNumber: number | null;
   author: string;
+  isBot: boolean;
+  botTag: string | null;
   summary: string;
 }
 

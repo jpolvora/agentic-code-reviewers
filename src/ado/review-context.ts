@@ -18,13 +18,6 @@ import type {
   ReviewContextResult,
 } from './types.js';
 
-function isRunnerComment(content: string): boolean {
-  if (!content) return false;
-  return isAgenticReviewerComment(content);
-}
-
-
-
 export function getReviewSummaryFromComment(content: string, botTag: string): string {
 
   let summary = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
@@ -68,7 +61,7 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
     }
 
     const rawContent = firstComment.content;
-    const isBot = isRunnerComment(rawContent);
+    const isBot = isAgenticReviewerComment(rawContent);
     const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
     const summary = getReviewSummaryFromComment(rawContent, botTag);
 
@@ -89,8 +82,8 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
 }
 
 /** Threads pendentes do runner para gate e resumo final (exclui revisores humanos). */
-export function filterGatePendingThreads(threads: PendingPrThread[], _botTag: string): PendingPrThread[] {
-  return threads.filter((t) => t.isBot);
+export function filterGatePendingThreads(threads: PendingPrThread[]): PendingPrThread[] {
+  return threads.filter((t) => t.isBot && t.botTag != null);
 }
 
 
@@ -280,7 +273,7 @@ export function testReviewSummaryAlreadyPosted(
     }
 
     for (const comment of thread.comments) {
-      if (comment.isDeleted || !isRunnerComment(comment.content)) {
+      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) {
         continue;
       }
       if (!comment.content.includes(REVIEW_SUMMARY_MARKER)) {

@@ -16,9 +16,10 @@ const sampleReview: CodeReviewItem = {
 };
 
 const samplePending: PendingPrThread = {
-  threadId: 1,
+  threadId: '1',
   status: 'active',
   author: 'bot',
+  isBot: true,
   botTag: 'Agentic Code Reviewer cursor-sdk',
   summary: 'Pending issue',
   filePath: '/src/Bar.cs',
