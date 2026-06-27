@@ -43,7 +43,15 @@ export function selectPromptModuleIds(changedFiles: string[] | undefined, forced
   const forced = forcedModules ?? [];
   const files = changedFiles ?? [];
   if (forced.length > 0) {
-    return [...new Set(forced.map((m) => m.trim().toLowerCase()).filter(Boolean))];
+    const selected = [...new Set(forced.map((m) => m.trim().toLowerCase()).filter(Boolean))];
+    const validIds = new Set(TASK_MODULES.map((m) => m.id));
+    const invalid = selected.filter((id) => !validIds.has(id));
+    if (invalid.length > 0) {
+      console.warn(
+        `[prompt-modules] Invalid module IDs ignored: ${invalid.join(', ')}. Valid: ${[...validIds].join(', ')}`,
+      );
+    }
+    return selected.filter((id) => validIds.has(id));
   }
 
   const selected = new Set<string>();

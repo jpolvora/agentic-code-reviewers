@@ -36,4 +36,22 @@ rename to new.ts
   it('returns empty map for empty input', () => {
     assert.equal(parseChangedLinesFromDiff('').size, 0);
   });
+
+  it('anchors deletion-only hunks so reviews are not silently discarded', () => {
+    const deletionOnlyDiff = `diff --git a/src/Bar.cs b/src/Bar.cs
+index abc..def 100644
+--- a/src/Bar.cs
++++ b/src/Bar.cs
+@@ -10,3 +10,0 @@ namespace App
+-  removed line 1
+-  removed line 2
+-  removed line 3
+`;
+    const map = parseChangedLinesFromDiff(deletionOnlyDiff);
+    const barLines = map.get('src/Bar.cs');
+    assert.ok(barLines, 'file should be in the map');
+    assert.ok(barLines.size > 0, 'deletion-only hunks should produce at least one anchor line');
+    // The anchor line should be the right-side position (line 10)
+    assert.ok(barLines.has(10));
+  });
 });

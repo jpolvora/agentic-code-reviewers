@@ -84,4 +84,55 @@ describe('mergeReviews', () => {
       ['/src/A.cs', '/src/B.cs'],
     );
   });
+
+  it('preserves original critical findings when meta-reviewer returns empty', () => {
+    const critical: CodeReviewItem = {
+      fileName: '/src/A.cs',
+      lineNumber: 10,
+      severity: 'critical',
+      comment: 'critical issue',
+      score: 9,
+      developerAction: 'fix-code',
+      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      impactPaths: ['/src/A.cs'],
+    };
+    // Simulates the new parallel-runner logic: originalCritical + metaCritical + metaNonCritical
+    const originalCritical = [critical];
+    const metaCritical: CodeReviewItem[] = [];
+    const metaNonCritical: CodeReviewItem[] = [];
+    const merged = mergeReviews([originalCritical, metaCritical, metaNonCritical]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]!.severity, 'critical');
+    assert.equal(merged[0]!.fileName, '/src/A.cs');
+  });
+
+  it('filters out non-critical FPs when meta-reviewer excludes them', () => {
+    const warning1: CodeReviewItem = {
+      fileName: '/src/B.cs',
+      lineNumber: 20,
+      severity: 'warning',
+      comment: 'legit warning',
+      score: 7,
+      developerAction: 'fix-code',
+      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      impactPaths: ['/src/B.cs'],
+    };
+    const warning2: CodeReviewItem = {
+      fileName: '/src/C.cs',
+      lineNumber: 30,
+      severity: 'warning',
+      comment: 'false positive',
+      score: 6,
+      developerAction: 'fix-code',
+      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      impactPaths: ['/src/C.cs'],
+    };
+    // Meta-reviewer only keeps warning1 and drops warning2 (FP)
+    const originalCritical: CodeReviewItem[] = [];
+    const metaCritical: CodeReviewItem[] = [];
+    const metaNonCritical = [warning1];
+    const merged = mergeReviews([originalCritical, metaCritical, metaNonCritical]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]!.fileName, '/src/B.cs');
+  });
 });

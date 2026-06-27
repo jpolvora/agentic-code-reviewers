@@ -64,8 +64,10 @@ export async function runParallelReview(
       files: options.filteredFiles,
     });
     const filtered = await runMetaReviewer(config, engine, logger, merged.reviews, diffExcerpt);
-    const nonCritical = merged.reviews.filter((r) => r.severity !== 'critical');
-    merged = { ...merged, reviews: mergeReviews([nonCritical, filtered]) };
+    const originalCritical = merged.reviews.filter((r) => r.severity === 'critical');
+    const metaCritical = filtered.filter((r) => r.severity === 'critical');
+    const metaNonCritical = filtered.filter((r) => r.severity !== 'critical');
+    merged = { ...merged, reviews: mergeReviews([originalCritical, metaCritical, metaNonCritical]) };
   }
 
   const fullText = JSON.stringify({

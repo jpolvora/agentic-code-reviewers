@@ -68,6 +68,12 @@ export function parseChangedLinesFromDiff(diffText: string): ChangedLinesMap {
     }
 
     if (line.startsWith('-') && !line.startsWith('---')) {
+      // Anchor the current right-side position when the file has only deletions,
+      // so reviews near deleted code are not silently discarded by safe-outputs.
+      const lineSet = result.get(currentFile)!;
+      if (lineSet.size === 0 && rightLine > 0) {
+        lineSet.add(rightLine);
+      }
       continue;
     }
 

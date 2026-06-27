@@ -3,6 +3,7 @@ import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { parseAgentReviewOutput } from '../parser/review-response.js';
 import type { CodeReviewItem } from '../ado/types.js';
+import { reviewDedupKey } from '../ado/utils.js';
 
 export async function runMetaReviewer(
   config: ReviewerConfig,
@@ -45,5 +46,6 @@ export async function runMetaReviewer(
   );
 
   const parsed = parseAgentReviewOutput(result.fullText);
-  return parsed.reviews ?? [];
+  const allowed = new Set(candidates.map((r) => reviewDedupKey(r.fileName, r.lineNumber)));
+  return (parsed.reviews ?? []).filter((r) => allowed.has(reviewDedupKey(r.fileName, r.lineNumber)));
 }
