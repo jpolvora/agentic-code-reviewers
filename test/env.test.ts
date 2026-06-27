@@ -103,6 +103,16 @@ describe('env', () => {
     assert.equal(env.githubToken(), 'gh_canonical');
   });
 
+  it('env.githubToken faz fallback para GITHUB_TOKEN e GH_TOKEN', () => {
+    clearKeys('AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN', 'GITHUB_TOKEN', 'GH_TOKEN');
+    setEnv('GITHUB_TOKEN', 'gh_native');
+    assert.equal(env.githubToken(), 'gh_native');
+
+    clearKeys('GITHUB_TOKEN');
+    setEnv('GH_TOKEN', 'gh_cli');
+    assert.equal(env.githubToken(), 'gh_cli');
+  });
+
   it('env.executionMode lê AGENTIC_CODE_REVIEWERS_EXECUTION_MODE', () => {
     setEnv('AGENTIC_CODE_REVIEWERS_EXECUTION_MODE', 'sequential');
     assert.equal(env.executionMode(), 'sequential');

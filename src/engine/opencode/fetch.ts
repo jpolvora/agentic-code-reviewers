@@ -1,34 +1,86 @@
 import { Agent } from 'undici';
 
-/** Margem sobre TIMEOUT_MS para o cliente HTTP não vencer o AbortController com HeadersTimeoutError. */
-const FETCH_TIMEOUT_GRACE_MS = 60_000;
+const HEADERS_TIMEOUT_CODES = new Set(['UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT']);
 
 const agents = new Map<number, Agent>();
 
 function agentForTimeout(timeoutMs: number): Agent {
-  const limitMs = timeoutMs + FETCH_TIMEOUT_GRACE_MS;
-  let agent = agents.get(limitMs);
+  let agent = agents.get(timeoutMs);
   if (!agent) {
     agent = new Agent({
-      headersTimeout: limitMs,
-      bodyTimeout: limitMs,
+      headersTimeout: timeoutMs,
+      bodyTimeout: timeoutMs,
       connectTimeout: 60_000,
     });
-    agents.set(limitMs, agent);
+    agents.set(timeoutMs, agent);
   }
   return agent;
 }
 
+export function isHeadersTimeoutError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  if ('code' in error && typeof error.code === 'string' && HEADERS_TIMEOUT_CODES.has(error.code)) {
+    return true;
+  }
+  if ('cause' in error) return isHeadersTimeoutError(error.cause);
+  return false;
+}
+
+function mergeAbortSignals(
+  runSignal: AbortSignal | undefined,
+  requestSignal: AbortSignal | null | undefined,
+): AbortSignal | undefined {
+  const signals: AbortSignal[] = [];
+  if (runSignal) signals.push(runSignal);
+  if (requestSignal) signals.push(requestSignal);
+  if (signals.length === 0) return undefined;
+  if (signals.length === 1) return signals[0];
+  return AbortSignal.any(signals);
+}
+
+function toAbortError(signal: AbortSignal): Error {
+  const reason = signal.reason;
+  if (reason instanceof Error) return reason;
+  const error = new Error('The operation was aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+/** Rejeita quando `signal` aborta, mesmo se a promise subjacente não honrar AbortSignal. */
+export function withAbortSignal<T>(signal: AbortSignal, promise: Promise<T>): Promise<T> {
+  if (signal.aborted) {
+    return Promise.reject(toAbortError(signal));
+  }
+
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(toAbortError(signal));
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 /**
- * Fetch para o client OpenCode: `session.prompt` só devolve headers quando o agente termina,
- * então precisa de `headersTimeout` alinhado a {@link AGENTIC_CODE_REVIEWERS_TIMEOUT_MS}.
+ * Fetch para o client OpenCode: `session.prompt` só devolve headers quando o agente termina.
+ * `runSignal` cancela o HTTP no mesmo instante do AbortController do runner.
  */
-export function createOpencodeFetch(timeoutMs: number): typeof fetch {
+export function createOpencodeFetch(timeoutMs: number, runSignal?: AbortSignal): typeof fetch {
   const agent = agentForTimeout(timeoutMs);
 
-  return (input, init) =>
-    globalThis.fetch(input, {
+  return (input, init) => {
+    const signal = mergeAbortSignals(runSignal, init?.signal ?? undefined);
+    return globalThis.fetch(input, {
       ...init,
+      signal,
       dispatcher: agent,
     } as unknown as RequestInit);
+  };
 }

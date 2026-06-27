@@ -13,7 +13,11 @@ export async function runCodeReviewAgent(
 ): Promise<EngineRunResult> {
   const prompt = buildAgentPrompt(config, context);
 
-  logger.info('Setting sources: project (harness do repositório)');
+  if (config.engine === 'opencode') {
+    logger.info('Harness do repositório: prompt do runner + instructions OpenCode (servidor embutido)');
+  } else {
+    logger.info('Harness do repositório: settingSources project (Cursor SDK)');
+  }
 
   return engine.run(
     config,

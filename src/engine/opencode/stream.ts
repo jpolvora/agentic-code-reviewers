@@ -17,7 +17,7 @@ import {
 } from './prompt-body.js';
 import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
-import { createOpencodeFetch } from './fetch.js';
+import { createOpencodeFetch, isHeadersTimeoutError, withAbortSignal } from './fetch.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -69,16 +69,6 @@ function resolvePort(): number {
 
 function resolveAgentName(): string {
   return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
-}
-
-function isHeadersTimeoutError(error: unknown): boolean {
-  const cause = error instanceof Error ? error.cause : error;
-  return (
-    typeof cause === 'object' &&
-    cause !== null &&
-    'code' in cause &&
-    cause.code === 'UND_ERR_HEADERS_TIMEOUT'
-  );
 }
 
 function assertResponseData<T>(result: { data?: T; error?: unknown }, context: string): T {
@@ -137,10 +127,13 @@ async function createRuntime(
 ): Promise<OpencodeRuntime> {
   const directory = config.repoRoot;
   const externalUrl = resolveServerUrl();
-  const fetch = createOpencodeFetch(timeoutMs);
+  const fetch = createOpencodeFetch(timeoutMs, signal);
 
   if (externalUrl) {
     logger.info(`OpenCode: conectando ao servidor existente em ${externalUrl}`);
+    logger.info(
+      'OpenCode harness: AGENTS.md/opencode.json nativos do repo + prompt do runner (sem inject via OPENCODE_CONFIG_CONTENT)',
+    );
     return {
       client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch }),
       close: () => {},
@@ -156,17 +149,21 @@ async function createRuntime(
   );
 
   const logServerOutput = resolveServerLogEnabled();
+  const serverConfig = buildOpencodeServerConfig(model);
   const server = await createEmbeddedOpencodeServer({
     hostname,
     port,
     signal,
     timeout: 30_000,
-    config: buildOpencodeServerConfig(model),
+    config: serverConfig,
     logServerOutput,
     logger,
   });
 
   logger.info(`OpenCode server: ${server.url} (porta ${server.port})`);
+  if (serverConfig.instructions?.length) {
+    logger.info(`OpenCode harness instructions: ${serverConfig.instructions.join(', ')}`);
+  }
   if (logServerOutput) {
     logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
   }
@@ -182,11 +179,13 @@ async function resolveSessionId(
   options: RunOpencodeOptions,
   directory: string,
   logger: Logger,
+  signal: AbortSignal,
 ): Promise<string> {
   if (options.resumeSessionId) {
     const existing = await client.session.get({
       path: { id: options.resumeSessionId },
       query: { directory },
+      signal,
     });
     assertResponseData(existing, 'session.get');
     logger.info(`Sessão retomada: ${options.resumeSessionId}`);
@@ -196,6 +195,7 @@ async function resolveSessionId(
   const created = await client.session.create({
     body: { title: options.name },
     query: { directory },
+    signal,
   });
   const session = assertResponseData(created, 'session.create');
   logger.info(`Sessão criada: ${session.id}`);
@@ -215,11 +215,13 @@ async function sendSessionPrompt(
   prompt: string,
   modelSelection: OpencodeModelSelection,
   logger: Logger,
+  signal: AbortSignal,
 ): Promise<SessionPromptResponse> {
   const withModel = await client.session.prompt({
     path: { id: sessionId },
     query: { directory },
     body: buildSessionPromptBody(agentName, prompt, modelSelection),
+    signal,
   });
 
   if (!withModel.error) {
@@ -240,6 +242,7 @@ async function sendSessionPrompt(
     path: { id: sessionId },
     query: { directory },
     body: buildSessionPromptBody(agentName, prompt),
+    signal,
   });
 
   return assertResponseData(fallback, 'session.prompt (fallback sem model)');
@@ -274,7 +277,7 @@ export async function runOpencodeStream(
     runtime = await createRuntime(config, modelSelection.composite, timeoutMs, abortController.signal, logger);
     const { client } = runtime;
 
-    sessionId = await resolveSessionId(client, options, directory, logger);
+    sessionId = await resolveSessionId(client, options, directory, logger, abortController.signal);
 
     const eventStream = startOpencodeEventStream({
       client,
@@ -289,14 +292,18 @@ export async function runOpencodeStream(
 
     let response: SessionPromptResponse;
     try {
-      response = await sendSessionPrompt(
-        client,
-        sessionId,
-        directory,
-        agentName,
-        options.prompt,
-        modelSelection,
-        logger,
+      response = await withAbortSignal(
+        abortController.signal,
+        sendSessionPrompt(
+          client,
+          sessionId,
+          directory,
+          agentName,
+          options.prompt,
+          modelSelection,
+          logger,
+          abortController.signal,
+        ),
       );
     } finally {
       eventStream.stop();
@@ -325,7 +332,7 @@ export async function runOpencodeStream(
       metrics: assistantMessageToMetrics(info),
     };
   } catch (error) {
-    if (abortController.signal.aborted) {
+    if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
       if (runtime?.client && sessionId) {
         await runtime.client.session.abort({ path: { id: sessionId }, query: { directory } }).catch(() => {});
       }

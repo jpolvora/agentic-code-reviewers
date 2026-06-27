@@ -99,10 +99,14 @@ Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exc
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta preferida do embutido (`0` = só porta livre do SO) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT` | `false` | `true` = mata ocupante da porta preferida (default: fallback para porta livre) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_BIN` | — | Caminho do CLI (`PATH` ou `~/.opencode/bin/opencode`) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode (read-only) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe stdout/stderr do servidor embutido |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível do `opencode serve` embutido |
-| `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` grava `auth.json`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream SSE `[reasoning]` |
+| `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; com `opencode`, stream `[assistant]` (`--quiet` desativa) |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Canônico; fallback `GITHUB_TOKEN` / `GH_TOKEN` |
+| `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` grava `auth.json` + PATH) |
 | `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | `release` | Branch clonada pelo `run.sh` remoto |
 | `AGENTIC_CODE_REVIEWERS_LOCAL` | `false` | `1` = `run.sh --local` |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Limiar de publicação de threads |
@@ -126,9 +130,11 @@ Lista completa: [`.env.example`](.env.example), [`README.md`](README.md), [`docs
 | `src/config.ts` | Argumentos CLI e variáveis de ambiente. |
 | `src/env.ts` | Prefixo `AGENTIC_CODE_REVIEWERS_*`, credenciais sem prefixo, leitores `env.*`. |
 | `src/engine/` | Interface `ExecutionEngine` + factory `getEngine()`. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensível via PR. |
-| `src/engine/opencode/stream.ts` | Sessão OpenCode, prompt, event stream SSE, servidor embutido. |
-| `src/engine/opencode/server.ts` | `createEmbeddedOpencodeServer` — spawn `opencode serve` + pipe de logs. |
-| `src/engine/opencode/server-config.ts` | Config embutida (modelo, log level, permissões deny). |
+| `src/engine/opencode/stream.ts` | Sessão OpenCode, prompt, event stream SSE, timeout/abort. |
+| `src/engine/opencode/fetch.ts` | Fetch `undici` com `headersTimeout` alinhado a `TIMEOUT_MS` + `AbortSignal`. |
+| `src/engine/opencode/server.ts` | `createEmbeddedOpencodeServer` — spawn `opencode serve`; não reutiliza servidor alheio sem harness. |
+| `src/engine/opencode/server-config.ts` | Config embutida (modelo, log level, permissões deny, `instructions` do harness). |
+| `src/engine/opencode/harness-instructions.ts` | Globs `instructions` injetados no servidor embutido (paridade `settingSources: ['project']`). |
 | `src/engine/opencode/event-stream.ts` | Consumo de `/global/event` e auto-reply de permissões. |
 | `src/engine/cursor-sdk/stream.ts` | **Acoplamento ao `@cursor/sdk`.** Streaming, timeout, sandbox, token usage. |
 | `run.sh` | Runner portátil: modo **remoto** (clone `release`) ou **local** (`--local`, CI deste repo). |
@@ -185,7 +191,7 @@ Corrigir threads do bot   → solve-pr (GitHub) ou dev manual
 |---|---|
 | Validar gate e prompt antes de merge | `code-review-self` + `npm test` |
 | Revisão conversacional com IDs estáveis | `megabrain` |
-| Bot publicou threads; quero auto-fix | `solve-pr` (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`) |
+| Bot publicou threads; quero auto-fix | `solve-pr` (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` ou `GITHUB_TOKEN` / `GH_TOKEN`) |
 | Produção / pipeline | Nenhuma skill IDE — só runner + `skills/` |
 
 #### Adicionar ou alterar skill IDE

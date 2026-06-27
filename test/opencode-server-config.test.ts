@@ -89,4 +89,17 @@ describe('opencode server-config', () => {
       doom_loop: 'deny',
     });
   });
+
+  it('buildOpencodeServerConfig injeta instructions do harness do projeto', () => {
+    clearKeys(
+      'AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL',
+      'AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG',
+    );
+    const config = buildOpencodeServerConfig('opencode-go/deepseek-v4-flash');
+
+    assert.ok(config.instructions?.includes('AGENTS.md'));
+    assert.ok(config.instructions?.includes('.cursor/rules/*.mdc'));
+    assert.ok(config.instructions?.includes('.agents/skills/code-review/SKILL.md'));
+    assert.ok(config.instructions?.includes('docs/**/*.md'));
+  });
 });

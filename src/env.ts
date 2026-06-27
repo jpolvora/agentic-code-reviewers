@@ -29,6 +29,7 @@ export const ENV = {
   OPENCODE_LOG_LEVEL: primaryKey('OPENCODE_LOG_LEVEL'),
   OPENCODE_KILL_PORT: primaryKey('OPENCODE_KILL_PORT'),
   OPENCODE_STREAM_REASONING: primaryKey('OPENCODE_STREAM_REASONING'),
+  OPENCODE_BIN: primaryKey('OPENCODE_BIN'),
   OPENCODE_API_KEY: 'OPENCODE_API_KEY',
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
   GITHUB_TOKEN: primaryKey('GITHUB_TOKEN'),
@@ -70,9 +71,13 @@ export const env = {
   opencodeLogLevel: () => readEnv('OPENCODE_LOG_LEVEL'),
   opencodeKillPort: () => readEnv('OPENCODE_KILL_PORT'),
   opencodeStreamReasoning: () => readEnv('OPENCODE_STREAM_REASONING'),
+  opencodeBin: () => readEnv('OPENCODE_BIN'),
   opencodeApiKey: () => readCredential(ENV.OPENCODE_API_KEY),
   azureDevOpsPat: () => readEnv('AZURE_DEVOPS_PAT'),
-  githubToken: () => readEnv('GITHUB_TOKEN'),
+  githubToken: () =>
+    readEnv('GITHUB_TOKEN') ??
+    readCredential('GITHUB_TOKEN') ??
+    readCredential('GH_TOKEN'),
   targetBranch: () => readEnv('TARGET_BRANCH'),
   botTag: () => readEnv('BOT_TAG'),
   scoreMin: () => readEnv('SCORE_MIN'),

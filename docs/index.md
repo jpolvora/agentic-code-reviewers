@@ -195,7 +195,9 @@ AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
 
 Pré-requisitos: CLI `opencode` no `PATH`; credenciais em `~/.local/share/opencode/auth.json` ou `OPENCODE_API_KEY`; porta `4096` livre.
 
-Implementação: `src/engine/opencode/stream.ts`, `server.ts`, `server-config.ts`, `event-stream.ts` — permissões read-only na config embutida (`edit`/`bash`/`webfetch`/`external_directory`/`doom_loop`: `deny`; sem prompts interativos em CI).
+Implementação: `src/engine/opencode/stream.ts`, `server.ts`, `server-config.ts`, `harness-instructions.ts`, `event-stream.ts` — permissões read-only na config embutida (`edit`/`bash`/`webfetch`/`external_directory`/`doom_loop`: `deny`; sem prompts interativos em CI).
+
+**Harness do projeto (paridade com `cursor-sdk`):** o servidor embutido injeta `instructions` via `OPENCODE_CONFIG_CONTENT` (`buildOpencodeServerConfig` → `harness-instructions.ts`): `AGENTS.md`, `.opencode/AGENTS.md`, `.cursor/rules/*`, `.agents/skills/code-review/SKILL.md`, `docs/**/*.md`. OpenCode combina isso com `AGENTS.md`/`opencode.json` nativos do `repoRoot`. Com servidor **externo** (`OPENCODE_URL`), o inject não se aplica — use `opencode.json` no repo alvo ou confie no prompt pré-mapeado do runner.
 
 ### Servidor externo (opcional)
 
