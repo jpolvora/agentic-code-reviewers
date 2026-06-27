@@ -26,7 +26,7 @@ O contrato de saída, os dois gates de publicação (`review-validation` + `safe
 | Dry-run local, validar gate/prompt | **code-review-self** (esta skill) |
 | Review em CI (ADO/GitHub) | Runner automático (`npm run review`, workflows) |
 | Follow-up conversacional com `[Thread #N]` | `/megabrain` |
-| Corrigir threads do bot (commit/push) | `/solve-pr` |
+| Corrigir threads abertas da PR (commit/push) | `/solve-pr` |
 | Auto-fix após review no CI | `auto-fix.yml` / `--auto-fix` |
 
 **Esta skill é somente-leitura.** Não implementa correções, commits ou push. O loop fix→review existe porque um corretor separado (`solve-pr`, auto-fix CI) age depois — por isso a skill exige **convergência em uma rodada** (liste todos os achados reais de uma vez).

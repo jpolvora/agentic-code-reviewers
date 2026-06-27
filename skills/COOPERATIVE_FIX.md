@@ -22,9 +22,12 @@ Os runtimes são **independentes** (sem import ou acoplamento de código). Este 
 
 ## Escopo de threads
 
-- Corrigir **somente threads do bot** (`AGENTIC_CODE_REVIEWERS_BOT_TAG`, ex.: `[Cursor Reviewer]`).
-- Ignorar threads de humanos ou outros bots.
-- **Não resolver** thread sem alteração comprovada na linha ancorada (`lineNumber`).
+| Runtime | Escopo |
+|---------|--------|
+| **Auto-Fix CI** | Somente threads do bot (`AGENTIC_CODE_REVIEWERS_BOT_TAG`) |
+| **solve-pr IDE** | **Todas** as review threads abertas na PR (bot, humano, outros reviewers) |
+
+Em ambos: **não resolver** thread sem alteração comprovada na linha ancorada (`lineNumber`).
 
 ---
 
@@ -33,7 +36,7 @@ Os runtimes são **independentes** (sem import ou acoplamento de código). Este 
 Ordem **obrigatória** em ambos os runtimes:
 
 ```
-1. Ler threads ativas do bot
+1. Ler threads ativas (Auto-Fix: bot; solve-pr: todas abertas)
 2. Investigar contexto (arquivo, testes, callers)
 3. Aplicar correções cirúrgicas
 4. Validar (testes locais quando aplicável)
@@ -54,18 +57,15 @@ Toda resolução deve incluir o marcador canônico (mesmo do runner de review):
 <!-- resolution-reply -->
 ```
 
-Corpo sugerido:
+Corpo sugerido (Auto-Fix CI inclui `botTag`; solve-pr IDE usa só o marcador + explicação do desenvolvedor):
 
 ```markdown
-[Cursor Reviewer]
 <!-- resolution-reply -->
-
-Issue addressed in the current iteration. Marking as resolved.
 
 <explicação curta: causa raiz + o que mudou>
 ```
 
-Auto-Fix CI usa `provider.resolvePullRequestReviewThreads`; solve-pr usa `resolve_thread.cjs` com o mesmo marcador.
+Auto-Fix CI (`provider.resolvePullRequestReviewThreads`) prefixa com `botTag`. solve-pr (`resolve_thread.cjs`) posta reply do desenvolvedor com o marcador canônico.
 
 ---
 
@@ -102,7 +102,7 @@ Ao listar threads para correção, incluir sempre:
 | `threadId` | Resolução na API (GitHub GraphQL ID ou ADO numérico) |
 | `filePath` / `path` | Arquivo ancorado |
 | `lineNumber` / `line` | Linha da review |
-| `summary` | Primeiro comentário ou trecho do bot |
+| `summary` | Primeiro comentário da thread |
 
 Isso permite casar tentativa de fix ↔ thread ↔ próxima rodada de code review.
 

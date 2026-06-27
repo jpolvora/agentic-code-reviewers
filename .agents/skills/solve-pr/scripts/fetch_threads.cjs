@@ -1,8 +1,6 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 
-const RESOLUTION_MARKER = '<!-- resolution-reply -->';
-
 function loadDotEnv() {
   if (!fs.existsSync('.env')) return;
   const envContent = fs.readFileSync('.env', 'utf8');
@@ -25,14 +23,10 @@ function resolveToken() {
   );
 }
 
-function commentHasBotTag(body, botTag) {
-  return body && body.includes(botTag);
-}
-
-function summarizeThread(comments, botTag) {
-  const botComment = comments.find((c) => commentHasBotTag(c.body, botTag)) || comments[0];
-  if (!botComment) return '';
-  const body = botComment.body.replace(/\s+/g, ' ').trim();
+function summarizeThread(comments) {
+  const first = comments[0];
+  if (!first?.body) return '';
+  const body = first.body.replace(/\s+/g, ' ').trim();
   return body.length > 240 ? `${body.slice(0, 237)}...` : body;
 }
 
@@ -42,7 +36,6 @@ async function main() {
   const args = process.argv.slice(2);
   const jsonMode = args.includes('--json');
   const prIdStr = args.find((a) => a !== '--json');
-  const botTag = process.env.AGENTIC_CODE_REVIEWERS_BOT_TAG || '[Cursor Reviewer]';
 
   if (!prIdStr) {
     console.error('Usage: node fetch_threads.cjs <PR_ID> [--json]');
@@ -130,17 +123,14 @@ async function main() {
     process.exit(1);
   }
 
-  const threads = pr.reviewThreads.nodes.filter((t) => !t.isResolved);
-  const botThreads = threads.filter((t) =>
-    t.comments.nodes.some((c) => commentHasBotTag(c.body, botTag)),
-  );
+  const activeThreads = pr.reviewThreads.nodes.filter((t) => !t.isResolved);
 
-  const normalized = botThreads.map((t, idx) => ({
+  const normalized = activeThreads.map((t, idx) => ({
     index: idx + 1,
     threadId: t.id,
     filePath: t.path.startsWith('/') ? t.path : `/${t.path}`,
     lineNumber: t.line ?? 0,
-    summary: summarizeThread(t.comments.nodes, botTag),
+    summary: summarizeThread(t.comments.nodes),
     comments: t.comments.nodes.map((c) => ({
       author: c.author?.login ?? 'unknown',
       createdAt: c.createdAt,
@@ -155,9 +145,8 @@ async function main() {
           prNumber: prId,
           owner,
           repo,
-          botTag,
           cooperativeContract: 'skills/COOPERATIVE_FIX.md',
-          activeBotThreads: normalized,
+          activeThreads: normalized,
         },
         null,
         2,
@@ -166,11 +155,10 @@ async function main() {
     return;
   }
 
-  console.log(`=== ACTIVE BOT THREADS (cooperative-fix) PR #${prId} ${owner}/${repo} ===`);
-  console.log(`Bot tag filter: ${botTag}\n`);
+  console.log(`=== ACTIVE REVIEW THREADS (cooperative-fix) PR #${prId} ${owner}/${repo} ===\n`);
 
   if (normalized.length === 0) {
-    console.log('No active unresolved bot threads found.');
+    console.log('No active unresolved review threads found.');
     return;
   }
 
