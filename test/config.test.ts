@@ -331,6 +331,32 @@ describe('loadConfig', () => {
     );
   });
 
+  it('aceita GITHUB_TOKEN nativo como token GitHub (--gh)', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: undefined,
+        GITHUB_TOKEN: 'ghp_native',
+        GH_TOKEN: undefined,
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--gh',
+          '--org',
+          'owner',
+          '--repo',
+          'repo',
+          '--pr-id',
+          '42',
+        ]);
+        assert.equal(config.adoAccessToken, 'ghp_native');
+      },
+    );
+  });
+
   it('detecta provider com flags --gh e --ado', () => {
     withEnv(
       {

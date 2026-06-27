@@ -1,13 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  checkOpencodeStreamHealth,
   directoriesMatch,
   eventBelongsToSession,
   extractPartStreamChunk,
+  formatRawEventForLog,
   formatSessionStatus,
   formatToolPart,
+  isGlobalEvent,
+  normalizeSyncEvent,
+  OpencodeStreamInactivityError,
+  parseGlobalEvent,
   permissionReplyForType,
 } from '../src/engine/opencode/event-stream.js';
+import type { OpencodeClient } from '@opencode-ai/sdk';
 
 describe('opencode event-stream', () => {
   it('directoriesMatch compara paths resolvidos', () => {
@@ -102,6 +109,86 @@ describe('opencode event-stream', () => {
     );
   });
 
+  it('formatRawEventForLog serializa eventos desconhecidos para debug', () => {
+    assert.equal(formatRawEventForLog(undefined), 'undefined');
+    assert.equal(formatRawEventForLog('ping'), 'ping');
+    assert.equal(
+      formatRawEventForLog({ payload: { type: 'session.idle' } }),
+      '{\n  "payload": {\n    "type": "session.idle"\n  }\n}',
+    );
+  });
+
+  it('isGlobalEvent valida estrutura directory/payload do SSE', () => {
+    assert.equal(
+      isGlobalEvent({
+        directory: '/repo',
+        payload: { type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'busy' } } },
+      }),
+      true,
+    );
+    assert.equal(isGlobalEvent({ directory: '/repo' }), true);
+    assert.equal(isGlobalEvent(null), false);
+    assert.equal(isGlobalEvent('event'), false);
+    assert.equal(isGlobalEvent({ directory: 42 }), false);
+    assert.equal(isGlobalEvent({ payload: { type: 'session.idle' } }), false);
+    assert.equal(isGlobalEvent({ payload: { properties: {} } }), false);
+  });
+
+  it('normalizeSyncEvent mapeia message.part.updated.1 para formato legado', () => {
+    const part = {
+      id: 'prt_1',
+      messageID: 'msg_1',
+      sessionID: 'ses_1',
+      type: 'reasoning' as const,
+      text: 'thinking',
+      time: { start: 1 },
+    };
+    const event = normalizeSyncEvent('message.part.updated.1', { sessionID: 'ses_1', part });
+    assert.equal(event?.type, 'message.part.updated');
+    assert.deepEqual(event?.properties, { sessionID: 'ses_1', part, delta: undefined });
+  });
+
+  it('parseGlobalEvent aceita envelope sync e ignora tipos sem handler', () => {
+    const reasoningSync = {
+      directory: '/repo',
+      payload: {
+        type: 'sync',
+        syncEvent: {
+          type: 'message.part.updated.1',
+          data: {
+            sessionID: 'ses_1',
+            part: {
+              id: 'prt_1',
+              messageID: 'msg_1',
+              sessionID: 'ses_1',
+              type: 'reasoning',
+              text: 'hello',
+              time: { start: 1 },
+            },
+          },
+        },
+      },
+    };
+    const parsed = parseGlobalEvent(reasoningSync);
+    assert.notEqual(parsed, 'skip');
+    assert.notEqual(parsed, undefined);
+    if (parsed !== 'skip' && parsed !== undefined) {
+      assert.equal(parsed.payload?.type, 'message.part.updated');
+    }
+
+    assert.equal(
+      parseGlobalEvent({
+        directory: '/repo',
+        payload: {
+          type: 'sync',
+          syncEvent: { type: 'session.updated.1', data: { sessionID: 'ses_1', info: {} } },
+        },
+      }),
+      'skip',
+    );
+    assert.equal(parseGlobalEvent({ payload: { type: 'unknown' } }), undefined);
+  });
+
   it('extractPartStreamChunk usa delta ou diff de part.text', () => {
     const part = {
       id: 'p1',
@@ -118,5 +205,37 @@ describe('opencode event-stream', () => {
     assert.deepEqual(fromText, { chunk: ' world', nextLength: 11 });
 
     assert.equal(extractPartStreamChunk(part, 11, undefined), undefined);
+  });
+
+  it('checkOpencodeStreamHealth retorna true quando session.get responde', async () => {
+    const client = {
+      session: {
+        get: async () => ({ data: { id: 'ses_1' } }),
+      },
+    } as unknown as OpencodeClient;
+
+    assert.equal(
+      await checkOpencodeStreamHealth({ client, sessionId: 'ses_1', directory: '/repo' }),
+      true,
+    );
+  });
+
+  it('checkOpencodeStreamHealth retorna false quando session.get falha', async () => {
+    const client = {
+      session: {
+        get: async () => ({ error: { message: 'not found' } }),
+      },
+    } as unknown as OpencodeClient;
+
+    assert.equal(
+      await checkOpencodeStreamHealth({ client, sessionId: 'ses_1', directory: '/repo' }),
+      false,
+    );
+  });
+
+  it('OpencodeStreamInactivityError identifica falha por inatividade do stream', () => {
+    const error = new OpencodeStreamInactivityError('stream parado');
+    assert.equal(error.name, 'OpencodeStreamInactivityError');
+    assert.match(error.message, /stream parado/);
   });
 });

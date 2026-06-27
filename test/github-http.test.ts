@@ -7,6 +7,7 @@ import {
   paginateGraphqlConnection,
   parseRetryAfterSeconds,
 } from '../src/http-retry.js';
+import { isGithubIntegrationAccessError } from '../src/provider/github-client.js';
 
 describe('http-retry helpers', () => {
   it('isRetryableHttpStatus aceita 429 e 5xx', () => {
@@ -35,6 +36,14 @@ describe('http-retry helpers', () => {
     assert.equal(isJwtAccessToken('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig'), true);
     assert.equal(isJwtAccessToken('4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'), false);
     assert.equal(isJwtAccessToken('pat.with.dots.but.not.jwt'), false);
+  });
+
+  it('isGithubIntegrationAccessError detecta limite do GITHUB_TOKEN em GraphQL', () => {
+    assert.equal(
+      isGithubIntegrationAccessError(new Error('GitHub GraphQL errors:\nResource not accessible by integration')),
+      true,
+    );
+    assert.equal(isGithubIntegrationAccessError(new Error('Not found')), false);
   });
 
   it('paginateGraphqlConnection percorre todas as páginas', async () => {

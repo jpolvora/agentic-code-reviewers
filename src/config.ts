@@ -649,7 +649,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     throw new Error(
       isAdo
         ? `Token ADO ausente. Na pipeline use SYSTEM_ACCESSTOKEN; localmente use ${ENV.AZURE_DEVOPS_PAT}. Para dry-run sem consultar threads da PR, omita org/project/repo/pr-id.`
-        : `Token GitHub ausente. Use ${ENV.GITHUB_TOKEN} para permitir o acesso à API do GitHub.`
+        : `Token GitHub ausente. Use ${ENV.GITHUB_TOKEN}, GITHUB_TOKEN ou GH_TOKEN.`
     );
   }
 

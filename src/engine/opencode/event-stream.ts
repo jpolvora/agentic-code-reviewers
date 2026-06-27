@@ -9,11 +9,25 @@ export type OpencodeEventStreamOptions = {
   directory: string;
   logger: Logger;
   signal: AbortSignal;
+  /** Aborta o run principal quando o stream detecta falha fatal (ex.: servidor morto). */
+  fatalAbort?: AbortController;
+  /** Quando true (`--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE`), stream de partes `text` (`[assistant]`). */
+  verbose: boolean;
   /** Stream reasoning parts (default: env / true). */
   streamReasoning?: boolean;
-  /** Stream assistant text parts (default: env / false). */
-  streamAssistant?: boolean;
+  /** Intervalo sem eventos SSE antes de sondar o servidor (default: 30s). */
+  streamInactivityMs?: number;
 };
+
+export class OpencodeStreamInactivityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OpencodeStreamInactivityError';
+  }
+}
+
+const DEFAULT_STREAM_INACTIVITY_MS = 30_000;
+const STREAM_HEALTH_PROBE_MS = 5_000;
 
 type PermissionReply = 'once' | 'always' | 'reject';
 
@@ -70,6 +84,118 @@ export function extractPartStreamChunk(
   return { chunk: part.text.slice(printedLength), nextLength: part.text.length };
 }
 
+export function formatRawEventForLog(raw: unknown): string {
+  if (raw === undefined) return 'undefined';
+  if (typeof raw === 'string') return raw;
+  try {
+    return JSON.stringify(raw, null, 2);
+  } catch {
+    return String(raw);
+  }
+}
+
+export function isGlobalEvent(raw: unknown): raw is GlobalEvent {
+  if (!raw || typeof raw !== 'object') return false;
+  const obj = raw as Record<string, unknown>;
+  if (obj.directory !== undefined && typeof obj.directory !== 'string') return false;
+  const payload = obj.payload;
+  if (payload === undefined) return true;
+  if (typeof payload !== 'object' || payload === null) return false;
+  const event = payload as Record<string, unknown>;
+  return typeof event.type === 'string' && event.properties !== undefined;
+}
+
+function syncLegacyType(syncType: string): string {
+  return syncType.endsWith('.1') ? syncType.slice(0, -2) : syncType;
+}
+
+/** Converte eventos `payload.type === "sync"` para o formato legado consumido por `handleEvent`. */
+export function normalizeSyncEvent(syncType: string, data: Record<string, unknown>): Event | undefined {
+  const sessionID = typeof data.sessionID === 'string' ? data.sessionID : undefined;
+
+  switch (syncLegacyType(syncType)) {
+    case 'message.part.updated': {
+      const part = data.part;
+      if (!part || typeof part !== 'object') return undefined;
+      return {
+        type: 'message.part.updated',
+        properties: {
+          sessionID,
+          part,
+          delta: typeof data.delta === 'string' ? data.delta : undefined,
+        },
+      } as Event;
+    }
+    case 'session.status': {
+      const status = data.status;
+      if (!status || typeof status !== 'object') return undefined;
+      return {
+        type: 'session.status',
+        properties: { sessionID, status },
+      } as Event;
+    }
+    case 'session.idle':
+      return {
+        type: 'session.idle',
+        properties: { sessionID },
+      } as Event;
+    case 'session.error': {
+      const error = data.error;
+      return {
+        type: 'session.error',
+        properties: { sessionID, error },
+      } as Event;
+    }
+    case 'permission.updated': {
+      const permission = data.permission ?? data;
+      if (!permission || typeof permission !== 'object') return undefined;
+      return {
+        type: 'permission.updated',
+        properties: permission,
+      } as Event;
+    }
+    default:
+      return undefined;
+  }
+}
+
+function isSyncEnvelope(raw: Record<string, unknown>): boolean {
+  const payload = raw.payload;
+  return typeof payload === 'object' && payload !== null && (payload as Record<string, unknown>).type === 'sync';
+}
+
+/**
+ * Aceita envelope legado (`properties`) ou sync (`syncEvent`).
+ * Retorna `'skip'` para sync válido sem handler (ex.: `session.updated.1`).
+ */
+export function parseGlobalEvent(raw: unknown): GlobalEvent | 'skip' | undefined {
+  if (isGlobalEvent(raw)) return raw;
+
+  if (!raw || typeof raw !== 'object') return undefined;
+  const envelope = raw as Record<string, unknown>;
+  if (envelope.directory !== undefined && typeof envelope.directory !== 'string') return undefined;
+  if (!isSyncEnvelope(envelope)) return undefined;
+
+  const payload = envelope.payload as Record<string, unknown>;
+  const syncEvent = payload.syncEvent;
+  if (!syncEvent || typeof syncEvent !== 'object' || syncEvent === null) return undefined;
+
+  const se = syncEvent as Record<string, unknown>;
+  const syncType = se.type;
+  if (typeof syncType !== 'string') return undefined;
+
+  const data = se.data;
+  if (!data || typeof data !== 'object' || data === null) return undefined;
+
+  const normalizedPayload = normalizeSyncEvent(syncType, data as Record<string, unknown>);
+  if (!normalizedPayload) return 'skip';
+
+  return {
+    directory: envelope.directory as string | undefined,
+    payload: normalizedPayload,
+  } as GlobalEvent;
+}
+
 export function eventBelongsToSession(event: Event, sessionId: string): boolean {
   const properties = event.properties as { sessionID?: string } | undefined;
   if (!properties?.sessionID) {
@@ -92,10 +218,6 @@ function parseStreamFlag(value: string | undefined, defaultValue: boolean): bool
 
 function resolveStreamReasoning(options: OpencodeEventStreamOptions): boolean {
   return options.streamReasoning ?? parseStreamFlag(env.opencodeStreamReasoning(), true);
-}
-
-function resolveStreamAssistant(options: OpencodeEventStreamOptions): boolean {
-  return options.streamAssistant ?? parseStreamFlag(env.opencodeStreamAssistant(), false);
 }
 
 async function autoReplyPermission(
@@ -161,9 +283,8 @@ function handleEvent(event: GlobalEvent, options: OpencodeEventStreamOptions, st
       if (!isTextLikePart(part)) return;
 
       const streamReasoning = resolveStreamReasoning(options);
-      const streamAssistant = resolveStreamAssistant(options);
       if (part.type === 'reasoning' && !streamReasoning) return;
-      if (part.type === 'text' && !streamAssistant) return;
+      if (part.type === 'text' && !options.verbose) return;
 
       const printedLength = streamState.partChars.get(part.id) ?? 0;
       const extracted = extractPartStreamChunk(part, printedLength, payload.properties.delta);
@@ -203,6 +324,104 @@ function writeStreamDelta(
   process.stdout.write(delta);
 }
 
+function resolveStreamInactivityMs(options: OpencodeEventStreamOptions): number {
+  const configured = options.streamInactivityMs;
+  if (configured !== undefined && Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  return DEFAULT_STREAM_INACTIVITY_MS;
+}
+
+/** Sonda session.get para confirmar que o servidor OpenCode ainda responde. */
+export async function checkOpencodeStreamHealth(
+  options: Pick<OpencodeEventStreamOptions, 'client' | 'sessionId' | 'directory'>,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const probeSignal = signal
+    ? AbortSignal.any([signal, AbortSignal.timeout(STREAM_HEALTH_PROBE_MS)])
+    : AbortSignal.timeout(STREAM_HEALTH_PROBE_MS);
+
+  try {
+    const result = await options.client.session.get({
+      path: { id: options.sessionId },
+      query: { directory: options.directory },
+      signal: probeSignal,
+    });
+    return !result.error && result.data !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+function failStreamOnInactivity(
+  options: OpencodeEventStreamOptions,
+  streamAbort: AbortController,
+  inactivityMs: number,
+): void {
+  const error = new OpencodeStreamInactivityError(
+    `OpenCode server não responde após ${Math.round(inactivityMs / 1000)}s sem eventos no stream SSE`,
+  );
+  options.fatalAbort?.abort(error);
+  streamAbort.abort(error);
+}
+
+type InactivityWatchdog = {
+  touch: () => void;
+  dispose: () => void;
+};
+
+function createInactivityWatchdog(
+  options: OpencodeEventStreamOptions,
+  streamAbort: AbortController,
+  streamSignal: AbortSignal,
+): InactivityWatchdog {
+  const inactivityMs = resolveStreamInactivityMs(options);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let checkRunning = false;
+
+  const clearTimer = () => {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  };
+
+  const schedule = () => {
+    clearTimer();
+    if (streamSignal.aborted) return;
+    timer = setTimeout(() => void runCheck(), inactivityMs);
+  };
+
+  const runCheck = async () => {
+    if (streamSignal.aborted || checkRunning) return;
+    checkRunning = true;
+    try {
+      const healthy = await checkOpencodeStreamHealth(options, streamSignal);
+      if (streamSignal.aborted) return;
+      if (healthy) {
+        options.logger.info(
+          `OpenCode: sem eventos há ${Math.round(inactivityMs / 1000)}s, servidor OK — aguardando...`,
+        );
+        schedule();
+        return;
+      }
+      options.logger.error(
+        `OpenCode: sem eventos há ${Math.round(inactivityMs / 1000)}s e session.get falhou — encerrando stream`,
+      );
+      failStreamOnInactivity(options, streamAbort, inactivityMs);
+    } finally {
+      checkRunning = false;
+    }
+  };
+
+  schedule();
+
+  return {
+    touch: schedule,
+    dispose: clearTimer,
+  };
+}
+
 export async function consumeOpencodeEventStream(options: OpencodeEventStreamOptions): Promise<void> {
   const streamState: StreamState = {
     lastStream: 'other',
@@ -210,15 +429,37 @@ export async function consumeOpencodeEventStream(options: OpencodeEventStreamOpt
     partChars: new Map(),
   };
 
-  const events = await options.client.global.event({ signal: options.signal });
+  const streamAbort = new AbortController();
+  const streamSignal = options.signal
+    ? AbortSignal.any([options.signal, streamAbort.signal])
+    : streamAbort.signal;
 
-  for await (const raw of events.stream) {
-    if (options.signal.aborted) break;
-    handleEvent(raw as GlobalEvent, options, streamState);
-  }
+  const watchdog = createInactivityWatchdog(options, streamAbort, streamSignal);
 
-  if (streamState.lastStream !== 'other') {
-    process.stdout.write('\n');
+  try {
+    const events = await options.client.global.event({ signal: streamSignal });
+
+    for await (const raw of events.stream) {
+      if (streamSignal.aborted) break;
+      watchdog.touch();
+      const parsed = parseGlobalEvent(raw);
+      if (parsed === undefined) {
+        options.logger.warn(`OpenCode: evento ignorado (formato inesperado):\n${formatRawEventForLog(raw)}`);
+        continue;
+      }
+      if (parsed === 'skip') continue;
+      handleEvent(parsed, options, streamState);
+    }
+
+    const reason = streamAbort.signal.reason;
+    if (reason instanceof OpencodeStreamInactivityError) {
+      throw reason;
+    }
+  } finally {
+    watchdog.dispose();
+    if (streamState.lastStream !== 'other') {
+      process.stdout.write('\n');
+    }
   }
 }
 
@@ -232,6 +473,12 @@ export function startOpencodeEventStream(options: OpencodeEventStreamOptions): {
     ...options,
     signal: linkedSignal,
   }).catch((error) => {
+    if (controller.signal.aborted) return;
+    if (error instanceof OpencodeStreamInactivityError) {
+      options.logger.error(error.message);
+      options.fatalAbort?.abort(error);
+      return;
+    }
     if (linkedSignal.aborted) return;
     options.logger.warn(
       `OpenCode event stream encerrado: ${error instanceof Error ? error.message : String(error)}`,

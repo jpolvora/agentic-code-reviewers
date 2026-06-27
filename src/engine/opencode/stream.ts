@@ -9,7 +9,7 @@ import type { ReviewerConfig } from '../../config.js';
 import { env, ENV } from '../../env.js';
 import type { Logger } from '../../logger.js';
 import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
-import { startOpencodeEventStream } from './event-stream.js';
+import { startOpencodeEventStream, OpencodeStreamInactivityError } from './event-stream.js';
 import { type OpencodeModelSelection, resolveOpencodeModelSelection } from './model.js';
 import {
   buildSessionPromptBody,
@@ -17,6 +17,12 @@ import {
 } from './prompt-body.js';
 import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
+import {
+  closeAllOpencodeAgents,
+  createOpencodeFetch,
+  isHeadersTimeoutError,
+  withAbortSignal,
+} from './fetch.js';
 
 export interface OpencodeRunResult {
   sessionId: string;
@@ -39,6 +45,8 @@ const DEFAULT_AGENT = 'explore';
 
 type OpencodeRuntime = {
   client: OpencodeClient;
+  /** Cliente sem runSignal — operações de cleanup após timeout/abort. */
+  cleanupClient: OpencodeClient;
   close: () => void;
 };
 
@@ -120,16 +128,23 @@ function assistantMessageToMetrics(info: AssistantMessage): Record<string, numbe
 async function createRuntime(
   config: ReviewerConfig,
   model: string,
+  timeoutMs: number,
   signal: AbortSignal,
   logger: Logger,
 ): Promise<OpencodeRuntime> {
   const directory = config.repoRoot;
   const externalUrl = resolveServerUrl();
+  const runFetch = createOpencodeFetch(timeoutMs, signal);
+  const cleanupFetch = createOpencodeFetch(timeoutMs);
 
   if (externalUrl) {
     logger.info(`OpenCode: conectando ao servidor existente em ${externalUrl}`);
+    logger.info(
+      'OpenCode harness: AGENTS.md/opencode.json nativos do repo + prompt do runner (sem inject via OPENCODE_CONFIG_CONTENT)',
+    );
     return {
-      client: createOpencodeClient({ baseUrl: externalUrl, directory }),
+      client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: runFetch }),
+      cleanupClient: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: cleanupFetch }),
       close: () => {},
     };
   }
@@ -143,23 +158,28 @@ async function createRuntime(
   );
 
   const logServerOutput = resolveServerLogEnabled();
+  const serverConfig = buildOpencodeServerConfig(model);
   const server = await createEmbeddedOpencodeServer({
     hostname,
     port,
     signal,
     timeout: 30_000,
-    config: buildOpencodeServerConfig(model),
+    config: serverConfig,
     logServerOutput,
     logger,
   });
 
   logger.info(`OpenCode server: ${server.url} (porta ${server.port})`);
+  if (serverConfig.instructions?.length) {
+    logger.info(`OpenCode harness instructions: ${serverConfig.instructions.join(', ')}`);
+  }
   if (logServerOutput) {
     logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
   }
 
   return {
-    client: createOpencodeClient({ baseUrl: server.url, directory }),
+    client: createOpencodeClient({ baseUrl: server.url, directory, fetch: runFetch }),
+    cleanupClient: createOpencodeClient({ baseUrl: server.url, directory, fetch: cleanupFetch }),
     close: () => server.close(),
   };
 }
@@ -169,11 +189,13 @@ async function resolveSessionId(
   options: RunOpencodeOptions,
   directory: string,
   logger: Logger,
+  signal: AbortSignal,
 ): Promise<string> {
   if (options.resumeSessionId) {
     const existing = await client.session.get({
       path: { id: options.resumeSessionId },
       query: { directory },
+      signal,
     });
     assertResponseData(existing, 'session.get');
     logger.info(`Sessão retomada: ${options.resumeSessionId}`);
@@ -183,6 +205,7 @@ async function resolveSessionId(
   const created = await client.session.create({
     body: { title: options.name },
     query: { directory },
+    signal,
   });
   const session = assertResponseData(created, 'session.create');
   logger.info(`Sessão criada: ${session.id}`);
@@ -202,11 +225,13 @@ async function sendSessionPrompt(
   prompt: string,
   modelSelection: OpencodeModelSelection,
   logger: Logger,
+  signal: AbortSignal,
 ): Promise<SessionPromptResponse> {
   const withModel = await client.session.prompt({
     path: { id: sessionId },
     query: { directory },
     body: buildSessionPromptBody(agentName, prompt, modelSelection),
+    signal,
   });
 
   if (!withModel.error) {
@@ -227,6 +252,7 @@ async function sendSessionPrompt(
     path: { id: sessionId },
     query: { directory },
     body: buildSessionPromptBody(agentName, prompt),
+    signal,
   });
 
   return assertResponseData(fallback, 'session.prompt (fallback sem model)');
@@ -258,31 +284,37 @@ export async function runOpencodeStream(
   let sessionId: string | undefined;
 
   try {
-    runtime = await createRuntime(config, modelSelection.composite, abortController.signal, logger);
+    runtime = await createRuntime(config, modelSelection.composite, timeoutMs, abortController.signal, logger);
     const { client } = runtime;
 
-    sessionId = await resolveSessionId(client, options, directory, logger);
+    sessionId = await resolveSessionId(client, options, directory, logger, abortController.signal);
 
     const eventStream = startOpencodeEventStream({
       client,
       sessionId,
       directory,
       logger,
+      verbose: config.verbose,
       signal: abortController.signal,
+      fatalAbort: abortController,
     });
 
     logger.info('Enviando prompt ao agente OpenCode (aguarde — progresso via event stream)...');
 
     let response: SessionPromptResponse;
     try {
-      response = await sendSessionPrompt(
-        client,
-        sessionId,
-        directory,
-        agentName,
-        options.prompt,
-        modelSelection,
-        logger,
+      response = await withAbortSignal(
+        abortController.signal,
+        sendSessionPrompt(
+          client,
+          sessionId,
+          directory,
+          agentName,
+          options.prompt,
+          modelSelection,
+          logger,
+          abortController.signal,
+        ),
       );
     } finally {
       eventStream.stop();
@@ -311,13 +343,33 @@ export async function runOpencodeStream(
       metrics: assistantMessageToMetrics(info),
     };
   } catch (error) {
-    if (abortController.signal.aborted) {
-      if (runtime?.client && sessionId) {
-        await runtime.client.session.abort({ path: { id: sessionId }, query: { directory } }).catch(() => {});
+    if (error instanceof OpencodeStreamInactivityError) {
+      process.exitCode = 1;
+      throw error;
+    }
+
+    if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      const reason = abortController.signal.reason;
+      if (reason instanceof OpencodeStreamInactivityError) {
+        process.exitCode = 1;
+        throw reason;
+      }
+      if (runtime?.cleanupClient && sessionId) {
+        await runtime.cleanupClient.session
+          .abort({ path: { id: sessionId }, query: { directory } })
+          .catch(() => {});
       }
       throw new Error(
         `Timeout: agente OpenCode excedeu ${(timeoutMs / 1000).toFixed(0)}s. ` +
           `Aumente ${ENV.TIMEOUT_MS} se necessário.`,
+      );
+    }
+
+    if (isHeadersTimeoutError(error)) {
+      throw new Error(
+        `OpenCode session.prompt excedeu o limite HTTP antes de devolver resposta. ` +
+          `Aumente ${ENV.TIMEOUT_MS} (atual: ${timeoutMs}ms).`,
+        { cause: error instanceof Error ? error : undefined },
       );
     }
 
@@ -335,10 +387,13 @@ export async function runOpencodeStream(
   } finally {
     clearTimeout(timeoutHandle);
 
-    if (runtime?.client && sessionId && !options.resumeSessionId) {
-      await runtime.client.session.delete({ path: { id: sessionId }, query: { directory } }).catch(() => {});
+    if (runtime?.cleanupClient && sessionId && !options.resumeSessionId) {
+      await runtime.cleanupClient.session
+        .delete({ path: { id: sessionId }, query: { directory } })
+        .catch(() => {});
     }
 
     runtime?.close();
+    await closeAllOpencodeAgents().catch(() => {});
   }
 }

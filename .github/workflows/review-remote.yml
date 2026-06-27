@@ -68,6 +68,9 @@ on:
         required: false
       OPENCODE_API_KEY:
         required: false
+      AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN:
+        required: false
+        description: PAT com repo/pull_requests write para resolveReviewThread (opcional; default github.token)
 
 permissions:
   pull-requests: write
@@ -103,7 +106,7 @@ jobs:
 
       - name: Run remote reviewer
         env:
-          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ inputs.engine }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ inputs.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REPO_URL: https://github.com/${{ inputs.runner_repository }}.git

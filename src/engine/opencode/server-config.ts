@@ -1,4 +1,6 @@
+import type { Config } from '@opencode-ai/sdk';
 import { env } from '../../env.js';
+import { resolveOpencodeHarnessInstructions } from './harness-instructions.js';
 
 export type OpencodeLogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
@@ -16,12 +18,13 @@ export function resolveServerLogLevel(): OpencodeLogLevel | undefined {
   return resolveServerLogEnabled() ? 'DEBUG' : undefined;
 }
 
-/** Config inline do servidor embutido (modelo + sandbox read-only). */
-export function buildOpencodeServerConfig(model: string) {
+/** Config inline do servidor embutido (modelo, harness do projeto, sandbox read-only). */
+export function buildOpencodeServerConfig(model: string): Config {
   const logLevel = resolveServerLogLevel();
   return {
     model,
     ...(logLevel ? { logLevel } : {}),
+    instructions: [...resolveOpencodeHarnessInstructions()],
     permission: {
       edit: 'deny' as const,
       bash: 'deny' as const,

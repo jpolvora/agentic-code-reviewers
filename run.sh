@@ -124,6 +124,16 @@ prepare_opencode() {
     curl -fsSL https://opencode.ai/install | bash
   fi
 
+  # GITHUB_PATH só vale no próximo step do Actions; garantir PATH nesta sessão.
+  if [[ -d "${HOME}/.opencode/bin" ]]; then
+    export PATH="${HOME}/.opencode/bin:${PATH}"
+  fi
+
+  if ! command -v opencode >/dev/null 2>&1; then
+    echo "Erro: CLI opencode não encontrado após instalação (esperado em ${HOME}/.opencode/bin)." >&2
+    exit 1
+  fi
+
   if [[ -n "$api_key" ]]; then
     echo "=== [Runner] Configurando credenciais OpenCode Go ==="
     mkdir -p "${HOME}/.local/share/opencode"

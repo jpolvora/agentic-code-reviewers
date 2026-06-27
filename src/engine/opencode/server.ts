@@ -1,5 +1,8 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import type { Config } from '@opencode-ai/sdk';
 import { ENV, env } from '../../env.js';
 import type { Logger } from '../../logger.js';
@@ -15,6 +18,8 @@ export type EmbeddedOpencodeServerOptions = {
   logger?: Logger;
   /** Tentativas sequenciais a partir da preferida antes de porta aleatória (default: 10). */
   portAttempts?: number;
+  /** Reutilizar `opencode serve` já em execução na porta (default: false — harness embutido exige spawn próprio). */
+  reuseExisting?: boolean;
   /** Mata processo que ocupa a porta (default: env `AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT`). */
   killPortOccupier?: boolean;
 };
@@ -111,6 +116,51 @@ export function parseOpencodeServerListenUrl(line: string): string | undefined {
   if (!line.startsWith('opencode server listening')) return undefined;
   const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
   return match?.[1];
+}
+
+const OPENCODE_INSTALL_BIN = path.join(os.homedir(), '.opencode', 'bin');
+
+export function formatOpencodeNotFoundError(): string {
+  return (
+    `CLI opencode não encontrado no PATH. Instale: curl -fsSL https://opencode.ai/install | bash ` +
+    `(binário em ${OPENCODE_INSTALL_BIN}). ` +
+    `Em CI use run.sh (exporta PATH na mesma sessão) ou defina ${ENV.OPENCODE_BIN}.`
+  );
+}
+
+/** Resolve o executável do CLI OpenCode (PATH, install padrão ou env). */
+export function resolveOpencodeBinary(explicit?: string): string {
+  const fromEnv = explicit?.trim() || env.opencodeBin()?.trim();
+  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
+
+  const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+  const which = spawnSync(whichCmd, ['opencode'], { encoding: 'utf8', windowsHide: true });
+  if (which.status === 0 && which.stdout?.trim()) {
+    const resolved = which.stdout.trim().split(/\r?\n/)[0]?.trim();
+    if (resolved) return resolved;
+  }
+
+  const installedName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
+  const installedPath = path.join(OPENCODE_INSTALL_BIN, installedName);
+  if (fs.existsSync(installedPath)) return installedPath;
+
+  return 'opencode';
+}
+
+export function isOpencodeNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  if ('code' in error && error.code === 'ENOENT') return true;
+  if ('cause' in error) return isOpencodeNotFoundError(error.cause);
+  return false;
+}
+
+/** Harness embutido (permission/instructions) exige spawn com OPENCODE_CONFIG_CONTENT — não reutilizar servidor alheio. */
+export function shouldOwnEmbeddedOpencodeServer(
+  config: Config | undefined,
+  reuseExisting?: boolean,
+): boolean {
+  if (reuseExisting === true) return false;
+  return Boolean(config?.permission ?? config?.instructions?.length);
 }
 
 export function isTcpPortOpen(hostname: string, port: number, timeoutMs = PORT_PROBE_TIMEOUT_MS): Promise<boolean> {
@@ -261,7 +311,8 @@ async function spawnEmbeddedOpencodeServer(
     args.push(`--log-level=${options.config.logLevel}`);
   }
 
-  const proc = spawn('opencode', args, {
+  const opencodeBin = resolveOpencodeBinary();
+  const proc = spawn(opencodeBin, args, {
     env: {
       ...process.env,
       OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config ?? {}),
@@ -313,6 +364,10 @@ async function spawnEmbeddedOpencodeServer(
     proc.on('error', (error) => {
       if (resolved) return;
       clearTimeout(timer);
+      if (isOpencodeNotFoundError(error)) {
+        reject(new Error(formatOpencodeNotFoundError(), { cause: error }));
+        return;
+      }
       reject(error);
     });
 
@@ -351,6 +406,13 @@ async function tryStartOnPort(
     if (killPortOccupier(hostname, port, logger)) {
       probe = await probeOpencodePort(hostname, port, options.signal);
     }
+  }
+
+  if (probe === 'reuse' && shouldOwnEmbeddedOpencodeServer(options.config, options.reuseExisting)) {
+    logger?.info(
+      `OpenCode: ignorando servidor existente em ${hostname}:${port} (harness embutido requer OPENCODE_CONFIG_CONTENT)`,
+    );
+    probe = 'occupied';
   }
 
   if (probe === 'reuse') {

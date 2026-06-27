@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildOpencodeServerUrl,
+  formatOpencodeNotFoundError,
+  isOpencodeNotFoundError,
   isServeErrorOutput,
   parseOpencodeServerListenUrl,
   parseUrlPort,
   probeOpencodePort,
+  resolveOpencodeBinary,
   reserveFreePort,
+  shouldOwnEmbeddedOpencodeServer,
 } from '../src/engine/opencode/server.js';
 
 describe('opencode server', () => {
@@ -44,5 +48,33 @@ describe('opencode server', () => {
   it('probeOpencodePort retorna free em porta não utilizada', async () => {
     const port = await reserveFreePort('127.0.0.1');
     assert.equal(await probeOpencodePort('127.0.0.1', port), 'free');
+  });
+
+  it('resolveOpencodeBinary prefere caminho explícito existente', () => {
+    assert.equal(resolveOpencodeBinary(process.execPath), process.execPath);
+  });
+
+  it('formatOpencodeNotFoundError menciona install e OPENCODE_BIN', () => {
+    const message = formatOpencodeNotFoundError();
+    assert.match(message, /opencode\.ai\/install/);
+    assert.match(message, /OPENCODE_BIN/);
+  });
+
+  it('isOpencodeNotFoundError detecta ENOENT', () => {
+    assert.equal(isOpencodeNotFoundError({ code: 'ENOENT' }), true);
+    assert.equal(isOpencodeNotFoundError(new Error('x', { cause: { code: 'ENOENT' } })), true);
+    assert.equal(isOpencodeNotFoundError(new Error('other')), false);
+  });
+
+  it('shouldOwnEmbeddedOpencodeServer ignora reuse quando há harness embutido', () => {
+    assert.equal(
+      shouldOwnEmbeddedOpencodeServer({
+        permission: { edit: 'deny' },
+        instructions: ['read AGENTS.md'],
+      }),
+      true,
+    );
+    assert.equal(shouldOwnEmbeddedOpencodeServer({ permission: { edit: 'deny' } }, true), false);
+    assert.equal(shouldOwnEmbeddedOpencodeServer(undefined), false);
   });
 });

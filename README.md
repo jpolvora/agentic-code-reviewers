@@ -89,13 +89,18 @@ Modelos: IDs do Cursor (`composer-2.5`, `claude-sonnet-4-6`, etc.). Validação 
 
 Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `session.prompt` (com `model: { providerID, modelID }` derivado de `AGENTIC_CODE_REVIEWERS_MODEL`) → resposta do agente. Se o servidor rejeitar o model explícito, o engine repete o prompt usando o default do host. Credenciais ficam no **servidor** (`~/.local/share/opencode/auth.json`), não no `.env` do reviewer.
 
-**Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `createEmbeddedOpencodeServer` (`opencode serve`) e conecta o client automaticamente. Requer CLI `opencode` no `PATH` e porta livre (default `4096`). Durante o prompt, o runner assina o stream SSE (`/global/event`) e registra progresso (`[status]`, `[tool]`, deltas de assistant/reasoning). Permissões interativas (`external_directory`, etc.) são negadas na config embutida para evitar bloqueio em CI.
+**Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `createEmbeddedOpencodeServer` (`opencode serve`) com harness read-only (`OPENCODE_CONFIG_CONTENT`: permissões `deny`, `instructions` do projeto). **Não reutiliza** um `opencode serve` alheio na porta — sempre spawn próprio com a config embutida (use `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` só para servidor externo explícito).
+
+Requer CLI `opencode` no `PATH` (ou `~/.opencode/bin` — `run.sh` exporta PATH após instalar em CI). Porta preferida `4096`; se ocupada, tenta sequência ou porta livre (`AGENTIC_CODE_REVIEWERS_OPENCODE_PORT=0` = só porta efêmera).
+
+Durante o prompt, o runner assina SSE (`/global/event`): `[status]`, `[tool]`, `[reasoning]` (quando o modelo expõe; `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING`, default ON), `[assistant]` com `--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE` (default ON). Timeout alinhado a `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` via `AbortSignal` + `undici.fetch` com `headersTimeout`/`bodyTimeout` iguais ao timeout configurado (`src/engine/opencode/fetch.ts`); sessões abortadas usam `cleanupClient` sem herdar o sinal de cancelamento.
 
 ```bash
 AGENTIC_CODE_REVIEWERS_ENGINE=opencode
 AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
-# opcional: OPENCODE_HOSTNAME, OPENCODE_PORT, OPENCODE_AGENT
-# logging do servidor embutido (default: server log ON, nível DEBUG)
+OPENCODE_API_KEY=sk-...                    # CI: run.sh grava auth.json (não lido por env.ts)
+# opcional: AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME, _PORT (4096 | 0), _AGENT, _BIN
+# AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT=false
 # AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true
 # AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL=DEBUG
 ```
@@ -123,43 +128,63 @@ Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthro
 
 ## 🛠️ Configuração de variáveis de ambiente
 
-Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`**. Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
+Todas as variáveis do runner TypeScript usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**, exceto credenciais **`CURSOR_API_KEY`** e **`OPENCODE_API_KEY`** (sem prefixo; `OPENCODE_API_KEY` é consumida por `run.sh`/CI, não por `env.*`). Leitura centralizada: `src/env.ts` (`readEnv`, `ENV`, `env.*`). Detalhes e roteamento de skills: [`AGENTS.md`](AGENTS.md).
 
-Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example)):
+> **Migração:** nomes legados `CURSOR_REVIEWER_*` **não são mais lidos**. Use `AGENTIC_CODE_REVIEWERS_*`. Macros ADO não expandidas (ex.: `$(CURSOR_REVIEWER_MODEL)`) continuam caindo no default — atualize pipelines para `AGENTIC_CODE_REVIEWERS_MODEL`, etc.
+
+Crie um arquivo `.env` na raiz do projeto (veja [.env.example](.env.example) — só o essencial):
 
 ```bash
 cp .env.example .env
 ```
 
+### Essenciais
+
 | Variável | Padrão | Descrição |
 | :--- | :--- | :--- |
 | `CURSOR_API_KEY` | — | Chave do Cursor (obrigatória com engine `cursor-sdk`). |
+| `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` instala CLI + `auth.json`). |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
-| `AGENTIC_CODE_REVIEWERS_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL de servidor OpenCode **externo** (opcional). Omitir = servidor embutido (padrão). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido (quando `OPENCODE_URL` vazio). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta do servidor embutido (quando `OPENCODE_URL` vazio). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe de stdout/stderr do `opencode serve` embutido (`[opencode-server]`). |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível passado ao servidor embutido (`DEBUG` \| `INFO` \| `WARN` \| `ERROR`). |
-| `OPENCODE_API_KEY` | — | Chave OpenCode Go (obrigatória com engine `opencode` em CI). |
-| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | `release` | Branch clonada pelo `run.sh` em modo remoto. |
-| `AGENTIC_CODE_REVIEWERS_LOCAL` | `false` | `1` / `true` = mesmo que `run.sh --local`. |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
-| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub para API REST/GraphQL. |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub (`solve-pr`, publicação, **resolver threads**). Fallback: `GITHUB_TOKEN`, `GH_TOKEN`. Em CI, `github.token` publica comentários mas **não** fecha threads — veja [Resolução de threads](#resolução-automática-de-threads-github). |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
+| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff (CI deste repo). |
+
+Preferir flags CLI quando possível: `--dry-run`, `--quiet`, `--stack`, `--score-min`, `--engine`, `--model`.
+
+### Configuração avançada
+
+Defaults sensatos — omita salvo necessidade explícita.
+
+| Variável | Padrão | Descrição |
+| :--- | :--- | :--- |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta preferida (`0` = porta livre). |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_KILL_PORT` | `false` | Mata ocupante da porta preferida. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_BIN` | PATH / `~/.opencode/bin` | Caminho do CLI OpenCode. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente read-only na sessão. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG` | `true` | Pipe stdout/stderr do `opencode serve`. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL` | `DEBUG` | Nível do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream SSE `[reasoning]`. |
+| `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; `[assistant]` no SSE (`--quiet` desativa). |
+| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão (10 min). |
+| `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
 | `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread. |
-| `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão. |
-| `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
-| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | auto | Raiz do repositório alvo. |
-| `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff; adiciona `*.yml`, `*.yaml`, `*.sh` aos includes da stack. |
-| `AGENTIC_CODE_REVIEWERS_STACK` | `ABP/Angular` | Stack ativa ou autodetecção. |
+| `AGENTIC_CODE_REVIEWERS_STACK` | autodetect | Stack ou `Custom`. |
 | `AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT` | — | Prompt quando `stack=Custom`. |
-| `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | — | Globs de inclusão (CSV). |
-| `AGENTIC_CODE_REVIEWERS_REPO_URL` | GitHub | URL clonada pelo `run.sh`. |
-| `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | `parallel` | CI: `parallel` ou `sequential`. |
+| `AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS` | stack | Globs de inclusão (CSV). |
+| `AGENTIC_CODE_REVIEWERS_EXTRA_EXCLUDE_PATTERNS` | — | Globs extras de exclusão. |
+| `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | auto | Raiz do repositório alvo. |
+| `AGENTIC_CODE_REVIEWERS_DRY_RUN` | `false` | Preferir `--dry-run`. |
+| `AGENTIC_CODE_REVIEWERS_PR_ID` / `ADO_*` | CI auto | Overrides locais de contexto PR. |
+
+**Só `run.sh`** (shell; não passam por `env.ts`): `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
+
+**Só workflow CI:** variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`parallel` \| `sequential`); controla a matrix do workflow — **não** é lida pelo runner TypeScript.
 
 ---
 
@@ -186,6 +211,7 @@ npm run review -- [argumentos]
 *   `--include-patterns <VAL>` : Lista separada por vírgulas de padrões glob de inclusão (ex.: `**/*.py,**/*.go`). Sobrescreve o padrão de arquivos a incluir no diff.
 *   `--model <id>` : Modelo LLM — ID Cursor no engine `cursor-sdk` (`composer-2.5`) ou `provider/model` no `opencode` (`opencode-go/deepseek-v4-flash`). Sobrescreve `AGENTIC_CODE_REVIEWERS_MODEL`.
 *   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `AGENTIC_CODE_REVIEWERS_ENGINE`.
+*   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
 *   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6.
 
 > Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência.
@@ -345,15 +371,29 @@ Dispara **somente** em PRs com destino **`main`**. Um check por engine via matri
 | :--- | :--- |
 | `pull_request` | Paralelo por padrão |
 | `workflow_dispatch` | Input `execution_mode`: **parallel** ou **sequential** (+ PR/branchs obrigatórios) |
-| Variável `REVIEWER_EXECUTION_MODE` | Sobrescreve o default em PRs (`parallel` ou `sequential`) |
+| Variável de repositório `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` | Sobrescreve o default em PRs (`parallel` ou `sequential`). **Workflow only** — não passa por `env.ts`. |
 
 Em modo **sequential**, a matrix usa `max-parallel: 1`: as engines rodam uma após a outra no mesmo workflow (ordem da matrix: `cursor-sdk` → `opencode`).
 
-Cada job executa `bash run.sh --local --gh ...` no checkout da PR (código da PR, não a branch `release`). OpenCode: CLI + `auth.json` são preparados pelo próprio `run.sh` quando `OPENCODE_API_KEY` está definido.
+Cada job executa `bash run.sh --local --gh ...` no checkout da PR. Com engine `opencode`, `run.sh` instala o CLI (`curl opencode.ai/install`), exporta `~/.opencode/bin` no PATH (mesmo step) e grava `auth.json` quando `OPENCODE_API_KEY` está definido.
 
 Cada job tem `concurrency` próprio (`review-<engine>-#N`), então re-runs de uma engine não cancelam a outra. Todos usam `continue-on-error: true` (falhas do agente não bloqueiam o merge por padrão).
 
 Para adicionar uma nova engine ao CI, inclua uma entrada em `strategy.matrix.include` no workflow (modelo, bot tag e steps condicionais de setup).
+
+##### Resolução automática de threads (GitHub)
+
+Quando o agente confirma correções, o runner posta uma reply com `<!-- resolution-reply -->` e chama a mutação GraphQL `resolveReviewThread` para fechar a thread na PR.
+
+O `GITHUB_TOKEN` padrão do Actions (`github.token`) tem `pull-requests: write` e **publica** comentários, mas a GitHub API **rejeita** `resolveReviewThread` para tokens de integração — erro típico: `Resource not accessible by integration`. O runner trata isso como aviso (a pipeline não falha), porém a thread permanece aberta na UI.
+
+**Recomendado:** crie um secret `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` com um PAT (classic `repo` ou fine-grained **Pull requests: Read and write**). Os workflows [`code-review.yml`](.github/workflows/code-review.yml) e [`review-remote.yml`](.github/workflows/review-remote.yml) já preferem esse secret quando presente:
+
+```yaml
+AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+```
+
+Sem o PAT, resolva threads manualmente na PR ou use a skill [`solve-pr`](.agents/skills/solve-pr/SKILL.md) localmente com um token que tenha escopo de escrita.
 
 ##### Release e deploy (`release.yml`)
 
@@ -371,6 +411,12 @@ Após merge em **`main`**, o workflow de release:
 | :--- | :--- |
 | `CURSOR_API_KEY` | Job `cursor-sdk` |
 | `OPENCODE_API_KEY` | Job `opencode` |
+
+**Secret opcional (recomendado para GitHub):**
+
+| Secret | Uso |
+| :--- | :--- |
+| `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | PAT para `resolveReviewThread` quando o agente marca `resolvedThreads`. Sem ele, `github.token` continua publicando reviews, mas threads podem ficar abertas. Ver [Resolução de threads](#resolução-automática-de-threads-github). |
 
 #### Em repositórios consumidores
 
@@ -392,9 +438,11 @@ jobs:
     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
     secrets:
       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      # opcional — resolve threads fechadas pelo agente (resolvedThreads):
+      AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
 ```
 
-Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/deepseek-v4-flash }` e o secret `OPENCODE_API_KEY`.
+Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/deepseek-v4-flash }` e o secret `OPENCODE_API_KEY`. O reusable workflow usa `secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token` internamente.
 
 **Opção B — `curl` + `run.sh`** (sem reusable workflow):
 
@@ -408,7 +456,7 @@ Com **OpenCode**, passe também `with: { engine: opencode, model: opencode-go/de
       - name: Run remote reviewer
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
         run: |
           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
             --gh \
@@ -445,9 +493,10 @@ curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/rel
 | :--- | :--- |
 | `--local` / `AGENTIC_CODE_REVIEWERS_LOCAL=1` | Modo local (sem clone `release`) |
 | `--engine`, `-e` / `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` (default) ou `opencode` |
-| `AGENTIC_CODE_REVIEWERS_REPO_URL` | URL git do reviewer (modo remoto) |
-| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Branch dos artefatos (default: `release`) |
-| `OPENCODE_API_KEY` | Credencial OpenCode Go; `run.sh` instala CLI e grava `auth.json` |
+| `AGENTIC_CODE_REVIEWERS_REPO_URL` | URL git do reviewer (modo remoto; só `run.sh`) |
+| `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH` | Branch dos artefatos (default: `release`; só `run.sh`) |
+| `AGENTIC_CODE_REVIEWERS_USE_TSX=true` | Força `npx tsx src/index.ts` em `--local` |
+| `OPENCODE_API_KEY` | Credencial OpenCode Go; `run.sh` instala CLI, exporta PATH e grava `auth.json` |
 
 Demais argumentos (`--dry-run`, `--stack`, `--gh`, `--pr-id`, …) são repassados ao `src/index.js` / `dist/index.js`.
 
@@ -503,8 +552,16 @@ Ver [`examples/consumer-github-workflow.yml`](examples/consumer-github-workflow.
 ### Pré-requisitos
 
 *   Node.js **22.13+**
-*   **Engine `cursor-sdk`:** `CURSOR_API_KEY` no `.env`
-*   **Engine `opencode`:** CLI [OpenCode](https://opencode.ai/) instalado; por padrão o runner sobe o servidor embutido (porta `4096` livre). Opcionalmente aponte `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` para um servidor externo. Credenciais em `~/.local/share/opencode/auth.json`
+*   **Engine `cursor-sdk`:** `CURSOR_API_KEY` no `.env` — use `AGENTIC_CODE_REVIEWERS_MODEL=composer-2.5` (ou passe `--model`).
+*   **Engine `opencode`:** CLI [OpenCode](https://opencode.ai/) no PATH; servidor embutido por padrão. `OPENCODE_API_KEY` em CI. `CURSOR_API_KEY` **não** é exigida.
+
+```bash
+# cursor-sdk
+npm run review -- --dry-run --engine cursor-sdk --model composer-2.5
+
+# opencode
+npm run review -- --dry-run --engine opencode --model opencode-go/deepseek-v4-flash
+```
 
 ### Comandos Úteis
 
