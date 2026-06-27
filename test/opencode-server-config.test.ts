@@ -38,7 +38,7 @@ afterEach(() => {
 
 describe('opencode server-config', () => {
   it('resolveServerLogEnabled é true por padrão', () => {
-    clearKeys('AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG', 'CURSOR_REVIEWER_OPENCODE_SERVER_LOG');
+    clearKeys('AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG');
     assert.equal(resolveServerLogEnabled(), true);
   });
 
@@ -57,8 +57,6 @@ describe('opencode server-config', () => {
     clearKeys(
       'AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL',
       'AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG',
-      'CURSOR_REVIEWER_OPENCODE_LOG_LEVEL',
-      'CURSOR_REVIEWER_OPENCODE_SERVER_LOG',
     );
     assert.equal(resolveServerLogLevel(), 'DEBUG');
   });
@@ -69,7 +67,7 @@ describe('opencode server-config', () => {
   });
 
   it('resolveServerLogLevel retorna undefined quando server log desabilitado', () => {
-    clearKeys('AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL', 'CURSOR_REVIEWER_OPENCODE_LOG_LEVEL');
+    clearKeys('AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL');
     setEnv('AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG', 'false');
     assert.equal(resolveServerLogLevel(), undefined);
   });

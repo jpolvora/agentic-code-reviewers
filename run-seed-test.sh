@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Instala fixtures → dry-run (se AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY) → avalia → remove seeds
+# Instala fixtures → dry-run (se CURSOR_API_KEY) → avalia → remove seeds
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"

@@ -37,7 +37,7 @@ describe('run.sh', () => {
   it('normaliza cursor para cursor-sdk via env', () => {
     const output = execFileSync(
       'bash',
-      ['-c', `AGENTIC_CODE_REVIEWERS_LOCAL=1 AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY=test bash "${runSh}" --engine cursor --help`],
+      ['-c', `AGENTIC_CODE_REVIEWERS_LOCAL=1 CURSOR_API_KEY=test bash "${runSh}" --engine cursor --help`],
       { cwd: repoRoot, encoding: 'utf8' },
     );
     assert.match(output, /--local/);

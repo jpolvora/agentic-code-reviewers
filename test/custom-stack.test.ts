@@ -18,9 +18,9 @@ const ISOLATED_CI_ENV: Record<string, undefined> = {
   SYSTEM_PULLREQUEST_PULLREQUESTID: undefined,
   SYSTEM_ACCESSTOKEN: undefined,
   AZURE_DEVOPS_EXT_PAT: undefined,
-  CURSOR_REVIEWER_STACK: undefined,
-  CURSOR_REVIEWER_CUSTOM_PROMPT: undefined,
-  CURSOR_REVIEWER_INCLUDE_PATTERNS: undefined,
+  AGENTIC_CODE_REVIEWERS_STACK: undefined,
+  AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT: undefined,
+  AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS: undefined,
 };
 
 function withEnv(env: Record<string, string | undefined>, action: () => void): void {
@@ -49,7 +49,7 @@ function withEnv(env: Record<string, string | undefined>, action: () => void): v
 }
 
 describe('Custom Stack and Prompts', () => {
-  it('cai para o fallback se a stack é Custom e --custom-prompt / CURSOR_REVIEWER_CUSTOM_PROMPT não for definido', () => {
+  it('cai para o fallback se a stack é Custom e --custom-prompt / AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT não for definido', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
@@ -183,11 +183,11 @@ describe('Custom Stack and Prompts', () => {
     }
   });
 
-  it('respeita a variável de ambiente CURSOR_REVIEWER_CUSTOM_PROMPT', () => {
+  it('respeita a variável de ambiente AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
-        CURSOR_REVIEWER_CUSTOM_PROMPT: 'Prompt da Env Var',
+        AGENTIC_CODE_REVIEWERS_CUSTOM_PROMPT: 'Prompt da Env Var',
       },
       () => {
         const config = loadConfig([
@@ -203,7 +203,7 @@ describe('Custom Stack and Prompts', () => {
     );
   });
 
-  it('permite sobrescrever includePatterns via --include-patterns ou CURSOR_REVIEWER_INCLUDE_PATTERNS', () => {
+  it('permite sobrescrever includePatterns via --include-patterns ou AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
@@ -227,7 +227,7 @@ describe('Custom Stack and Prompts', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
-        CURSOR_REVIEWER_INCLUDE_PATTERNS: '**/*.java',
+        AGENTIC_CODE_REVIEWERS_INCLUDE_PATTERNS: '**/*.java',
       },
       () => {
         const config = loadConfig([

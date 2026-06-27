@@ -2,8 +2,8 @@
 # Executa via run.sh --local (checkout atual, sem clone da branch release).
 # Sequential: workflow_dispatch input ou vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE=sequential
 #
-# Secrets: AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY (obrigatório)
-#          AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY (job opencode)
+# Secrets: CURSOR_API_KEY (obrigatório)
+#          OPENCODE_API_KEY (job opencode)
 name: Agentic Code Review
 
 on:
@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 env:
-  EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || vars.REVIEWER_EXECUTION_MODE || 'parallel' }}
+  EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || 'parallel' }}
   PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   SOURCE_BRANCH: ${{ github.head_ref || github.event.inputs.source_branch }}
   TARGET_BRANCH: ${{ github.event.pull_request.base.ref || github.event.inputs.target_branch || 'main' }}
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: ${{ (github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || vars.REVIEWER_EXECUTION_MODE || 'parallel') == 'sequential' && 1 || 10 }}
+      max-parallel: ${{ (github.event.inputs.execution_mode || vars.AGENTIC_CODE_REVIEWERS_EXECUTION_MODE || 'parallel') == 'sequential' && 1 || 10 }}
       matrix:
         include:
           - engine: cursor-sdk
@@ -77,27 +77,27 @@ jobs:
 
       - name: Validate secrets
         env:
-          CURSOR_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
-          OPENCODE_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY || secrets.OPENCODE_GO_API_KEY }}
+          CURSOR_KEY: ${{ secrets.CURSOR_API_KEY }}
+          OPENCODE_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           if [ -z "$CURSOR_KEY" ]; then
-            echo "::error::Configure AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY em Settings → Secrets."
+            echo "::error::Configure CURSOR_API_KEY em Settings → Secrets."
             exit 1
           fi
           if [ "${{ matrix.engine }}" = "opencode" ] && [ -z "$OPENCODE_KEY" ]; then
-            echo "::error::Configure AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY em Settings → Secrets."
+            echo "::error::Configure OPENCODE_API_KEY em Settings → Secrets."
             exit 1
           fi
 
       - name: Run reviewer (${{ matrix.engine }})
         env:
-          AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY || secrets.CURSOR_API_KEY }}
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
-          AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY: ${{ secrets.AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY || secrets.OPENCODE_GO_API_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         run: |
           bash run.sh --local --gh \
             --pr-id "$PR_NUMBER" \

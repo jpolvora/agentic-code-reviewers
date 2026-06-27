@@ -7,8 +7,6 @@ param(
 if (-not $TargetBranch) {
     $TargetBranch = if ($env:AGENTIC_CODE_REVIEWERS_TARGET_BRANCH) {
         $env:AGENTIC_CODE_REVIEWERS_TARGET_BRANCH
-    } elseif ($env:CURSOR_REVIEWER_TARGET_BRANCH) {
-        $env:CURSOR_REVIEWER_TARGET_BRANCH
     } else {
         'refs/heads/master'
     }
@@ -33,18 +31,14 @@ foreach ($relative in $requiredSkills) {
   }
 }
 
-$cursorKey = if ($env:AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY) {
-    $env:AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY
-} else {
-    $env:CURSOR_API_KEY
-}
+$cursorKey = $env:CURSOR_API_KEY
 
 $envPath = Join-Path $PSScriptRoot '.env'
 $hasCursorApiKeyInEnvFile = (Test-Path $envPath) -and [bool](
-    Select-String -Path $envPath -Pattern '^\s*(AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY|CURSOR_API_KEY)\s*=\s*[^\s#]+' -Quiet
+    Select-String -Path $envPath -Pattern '^\s*CURSOR_API_KEY\s*=\s*[^\s#]+' -Quiet
 )
 if (-not $cursorKey -and -not $hasCursorApiKeyInEnvFile) {
-    Write-Error 'Defina AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY antes de executar: $env:AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY = "cursor_..." ou configure .env na raiz do projeto'
+    Write-Error 'Defina CURSOR_API_KEY antes de executar: $env:CURSOR_API_KEY = "cursor_..." ou configure .env na raiz do projeto'
 }
 
 if ($SourceBranch -notmatch '^refs/heads/') {

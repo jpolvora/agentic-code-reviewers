@@ -10,10 +10,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CALLER_DIR="$(pwd)"
-REPO_URL="${AGENTIC_CODE_REVIEWERS_REPO_URL:-${CURSOR_REVIEWER_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}}"
+REPO_URL="${AGENTIC_CODE_REVIEWERS_REPO_URL:-https://github.com/jpolvora/agentic-code-reviewers.git}"
 RELEASE_BRANCH="${AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH:-release}"
 TEMP_DIR=".tmp-agentic-code-reviewers"
-ENGINE_RAW="${AGENTIC_CODE_REVIEWERS_ENGINE:-${CURSOR_REVIEWER_ENGINE:-cursor-sdk}}"
+ENGINE_RAW="${AGENTIC_CODE_REVIEWERS_ENGINE:-cursor-sdk}"
 LOCAL_MODE="${AGENTIC_CODE_REVIEWERS_LOCAL:-false}"
 FORWARD_ARGS=()
 
@@ -48,7 +48,7 @@ Variáveis de ambiente:
   AGENTIC_CODE_REVIEWERS_USE_TSX=true  Força npx tsx src/index.ts (default em --local)
   AGENTIC_CODE_REVIEWERS_REPO_URL      URL git do reviewer (modo remoto)
   AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH Branch dos artefatos (default: release)
-  AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY  Credencial OpenCode Go (CI / local)
+  OPENCODE_API_KEY                      Credencial OpenCode Go
 
 Modo remoto em outro projeto (CI):
   curl -fsSL https://raw.githubusercontent.com/OWNER/agentic-code-reviewers/release/run.sh | bash -s -- \\
@@ -117,7 +117,7 @@ prepare_opencode() {
     return 0
   fi
 
-  local api_key="${AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY:-${OPENCODE_GO_API_KEY:-}}"
+  local api_key="${OPENCODE_API_KEY:-}"
 
   if ! command -v opencode >/dev/null 2>&1; then
     echo "=== [Runner] Instalando OpenCode CLI ==="
@@ -127,17 +127,17 @@ prepare_opencode() {
   if [[ -n "$api_key" ]]; then
     echo "=== [Runner] Configurando credenciais OpenCode Go ==="
     mkdir -p "${HOME}/.local/share/opencode"
-    OPENCODE_GO_API_KEY="$api_key" node <<'NODE'
+    OPENCODE_API_KEY="$api_key" node <<'NODE'
 const fs = require('node:fs');
 const path = require('node:path');
 const authPath = path.join(process.env.HOME, '.local/share/opencode/auth.json');
 const auth = {
-  'opencode-go': { type: 'api', key: process.env.OPENCODE_GO_API_KEY },
+  'opencode-go': { type: 'api', key: process.env.OPENCODE_API_KEY },
 };
 fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
 NODE
   elif [[ ! -f "${HOME}/.local/share/opencode/auth.json" ]]; then
-    echo "AVISO: credenciais OpenCode ausentes (defina AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY ou ~/.local/share/opencode/auth.json)" >&2
+    echo "AVISO: credenciais OpenCode ausentes (defina OPENCODE_API_KEY ou ~/.local/share/opencode/auth.json)" >&2
   fi
 }
 

@@ -146,10 +146,11 @@ Mudar o desenho **somente se** algum destes virar problema **medido**:
 | `src/agent/prompt.ts` | Monta prompt único; `buildTwoPhaseWorkflow()` |
 | `src/agent/runner.ts` | `buildAgentPrompt` + `runAgentStream` |
 | `src/engine/cursor-sdk/stream.ts` | `Agent.create`, `agent.send`, stream, `run.wait()` (engine `cursor-sdk`) |
-| `src/engine/opencode/stream.ts` | Sessão OpenCode via `@opencode-ai/sdk` (engine `opencode`) |
+| `src/engine/opencode/stream.ts` | Sessão OpenCode via `@opencode-ai/sdk`: prompt, SSE, servidor embutido (`event-stream.ts`, `server.ts`) |
 | `src/index.ts` | Orquestração; uma chamada a `runCodeReviewAgent` |
 | `src/ado/review-validation.ts` | Gate determinístico pós-LLM |
 | `skills/SYSTEM_PROMPT.md` | Contrato JSON e filtro de publicação |
+| `run.sh` | Runner remoto/local; ver [README](../README.md#-runner-runsh) |
 | `docs/flow-analysis.md` | Fluxo operacional completo (contexto ADO, parser, gate, CI) |
 
 ---
