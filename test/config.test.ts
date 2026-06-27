@@ -131,6 +131,42 @@ describe('loadConfig', () => {
     );
   });
 
+  it('--engine tem precedência sobre CURSOR_REVIEWER_ENGINE', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        CURSOR_REVIEWER_ENGINE: 'cursor-sdk',
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--engine',
+          'opencode',
+        ]);
+        assert.equal(config.engine, 'opencode');
+      },
+    );
+  });
+
+  it('aceita alias --engine=cursor', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--engine=cursor',
+        ]);
+        assert.equal(config.engine, 'cursor-sdk');
+      },
+    );
+  });
+
   it('aceita modelo provider/model com engine opencode', () => {
     withEnv(
       {

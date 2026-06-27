@@ -223,6 +223,7 @@ export interface CliArgs {
   customPrompt?: string;
   includePatterns?: string;
   scoreMin?: number;
+  engine?: string;
 }
 
 const DEFAULT_INCLUDE = ['**/*.cs', '**/*.ts', '**/*.html', '*.cs', '*.ts', '*.html'];
@@ -345,6 +346,10 @@ function parseArgs(argv: string[]): CliArgs {
       args.scoreMin = Number(arg.slice(12));
       continue;
     }
+    if (arg.startsWith('--engine=')) {
+      args.engine = arg.slice(9);
+      continue;
+    }
 
     switch (arg) {
       case '--help':
@@ -422,6 +427,10 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case '--score-min':
         args.scoreMin = Number(next);
+        i++;
+        break;
+      case '--engine':
+        args.engine = next;
         i++;
         break;
       default:
@@ -735,7 +744,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
       )
     : null;
 
-  const engine = parseEngine(process.env.CURSOR_REVIEWER_ENGINE);
+  const engine = parseEngine(cli.engine ?? process.env.CURSOR_REVIEWER_ENGINE);
 
   return {
     repoRoot,
@@ -793,8 +802,9 @@ Opções:
   --target-branch REF    Branch de comparação do diff (default: refs/heads/master)
   --org, --project, --repo, --pr-id   Contexto Azure DevOps/GitHub
   --bot-tag TAG          Tag do bot
-  --model ID             Modelo Cursor (default canônico: composer-2.5)
-  --repo-root PATH       Raiz do repositório (default: detectado via scripts/cursor-reviewer)
+  --model ID             Modelo LLM (default por engine)
+  --engine NAME          Engine: cursor-sdk, cursor ou opencode (default: cursor-sdk)
+  --repo-root PATH       Raiz do repositório alvo
   --ado / --gh           Define a estratégia de execução/plataforma (Azure DevOps ou GitHub)
   --stack NAME           Stack tecnológica para o review (ABP/Angular, PHP/Laravel, Next.js/React, TypeScript, Custom. Default: ABP/Angular)
   --custom-prompt VAL    Caminho do arquivo ou string de prompt quando a stack é Custom (requerido para --stack=Custom)

@@ -357,6 +357,7 @@ Pipeline: SUCESSO (exit 0)
 | `--org`, `--project`, `--repo`, `--pr-id` | Contexto ADO |
 | `--bot-tag TAG` | Tag do bot |
 | `--model ID` | Modelo Cursor |
+| `--engine NAME` | Engine: `cursor-sdk`, `cursor` ou `opencode` |
 | `--repo-root PATH` | Raiz do repositório alvo |
 | `--score-min N` | Score mínimo para thread (default: `6`; opt-in) |
 | `--help` / `-h` | Ajuda |

@@ -1,4 +1,5 @@
-name: CI and Release Deploy
+# Merge em main → testes, build de todas as engines, bump de versão e deploy na branch release.
+name: Release and Deploy
 
 on:
   push:
@@ -8,8 +9,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
+    name: Build engines and deploy release
     runs-on: ubuntu-latest
 
     steps:
@@ -29,30 +35,31 @@ jobs:
       - name: Run Tests
         run: npm test
 
+      - name: Build TypeScript (all engines)
+        run: npm run build
+
+      - name: Verify engine adapters compiled
+        run: |
+          test -f dist/engine/index.js
+          test -f dist/engine/cursor-sdk/engine.js
+          test -f dist/engine/opencode/engine.js
+          echo "Engines compiladas: cursor-sdk, opencode"
+
       - name: Bump Version
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Bump version in package.json and package-lock.json
           npm version patch -m "chore(release): bump version to %s [skip ci]"
-          
-          # Push commit and tag back to main branch
           git push origin HEAD:main --follow-tags
-
-      - name: Build TypeScript
-        run: npm run build
 
       - name: Deploy Compiled Code to Release Branch
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Limpar diretório temporário anterior
+
           rm -rf .release-tmp
           mkdir -p .release-tmp
-          
-          # Copiar os arquivos de runtime necessários para a pasta temporária
+
           cp -r dist .release-tmp/dist
           cp -r skills .release-tmp/skills
           cp package.json .release-tmp/package.json
@@ -61,17 +68,17 @@ jobs:
           cp LICENSE .release-tmp/LICENSE 2>/dev/null || true
           cp AGENTS.md .release-tmp/AGENTS.md 2>/dev/null || true
           cp run.sh .release-tmp/run.sh
-          
-          # Criar o .gitignore para a branch de release
+          chmod +x .release-tmp/run.sh
+
           echo "node_modules/" > .release-tmp/.gitignore
           echo ".release-tmp/" >> .release-tmp/.gitignore
-          
+
           cd .release-tmp
           git init -b release
           git add -A
-          
+
           NEW_VERSION=$(node -e "console.log(require('./package.json').version)")
           git commit -m "chore: release build v$NEW_VERSION from GitHub Actions ($GITHUB_SHA)"
-          
-          echo "Publicando artefatos compilados para a branch release..."
+
+          echo "Publicando artefatos compilados (todas as engines) na branch release..."
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git release --force

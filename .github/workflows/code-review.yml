@@ -1,12 +1,11 @@
-# Revisão agêntica em PRs — um check por engine (matrix).
-# Modo padrão em PRs: paralelo. Escolha sequential via workflow_dispatch ou vars.REVIEWER_EXECUTION_MODE.
+# Revisão agêntica — um check por engine (matrix). Dispara apenas em PRs para main.
+# Modo padrão: paralelo. Sequential via workflow_dispatch ou vars.REVIEWER_EXECUTION_MODE.
 name: Agentic Code Review
 
 on:
   pull_request:
     branches:
       - main
-      - develop
   workflow_dispatch:
     inputs:
       execution_mode:
@@ -26,8 +25,9 @@ on:
         required: true
         type: string
       target_branch:
-        description: Branch de destino (base ref, ex. develop)
+        description: Branch de destino (base ref, ex. main)
         required: true
+        default: main
         type: string
 
 permissions:
