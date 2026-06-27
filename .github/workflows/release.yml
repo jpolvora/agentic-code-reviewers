@@ -49,12 +49,7 @@ jobs:
           test -f dist/engine/opencode/engine.js
           echo "Engines compiladas: cursor-sdk, opencode"
 
-      - name: Bump Version
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          npm version patch -m "chore(release): bump version to %s [skip ci]"
-          git push origin HEAD:main --follow-tags
+
 
       - name: Deploy Compiled Code to Release Branch
         run: |
