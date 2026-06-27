@@ -270,13 +270,6 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         }
 
         const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
-        
-        if (config.dryRun) {
-          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
-        } else {
-          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
-          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
-        }
 
         const localResolvedItems: ResolvedThreadItem[] = [];
 
@@ -301,6 +294,20 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
               `Thread ${thread.threadId} na linha ${thread.lineNumber} de ${filePath} não foi afetada pelas substituições e continuará aberta.`,
             );
           }
+        }
+
+        if (localResolvedItems.length === 0) {
+          logger.warn(
+            `Arquivo ${filePath} teria alterações sem threads resolvíveis — correção descartada.`,
+          );
+          return undefined;
+        }
+
+        if (config.dryRun) {
+          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
+        } else {
+          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
+          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
         return { relativePath, resolvedItems: localResolvedItems };
@@ -351,5 +358,10 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
   }
 
   logger.section('Push das alterações (após resolução)');
-  await pushAutoFixChanges(config, logger);
+  const pushed = await pushAutoFixChanges(config, logger);
+  if (!pushed) {
+    throw new Error(
+      'Gate cooperativo: push falhou após resolução de threads — PR e remoto podem estar inconsistentes.',
+    );
+  }
 }
