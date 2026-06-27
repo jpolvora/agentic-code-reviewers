@@ -14,7 +14,7 @@ A execução do LLM é **plugável** via `AGENTIC_CODE_REVIEWERS_ENGINE`:
 | Engine | Pacote | Quando usar |
 | :--- | :--- | :--- |
 | **`cursor-sdk`** (padrão) | [`@cursor/sdk`](https://cursor.com/docs/sdk/typescript) | CI/CD, pipelines, modelos Cursor nativos |
-| **`opencode`** | [`@opencode-ai/sdk`](https://opencode.ai/docs/sdk/) | Dev local com [OpenCode](https://opencode.ai/) — Zen, Go, LM Studio, etc. |
+| **`opencode`** | [`@opencode-ai/sdk`](https://opencode.ai/docs/sdk/) | Dev local com [OpenCode](https://opencode.ai/) — servidor embutido por padrão; Zen, Go, LM Studio, etc. |
 | **Custom** | Seu adapter | Fork, implemente `ExecutionEngine`, abra PR |
 
 > **Contribua:** fork o repositório, adicione sua engine agêntica ou provedor de plataforma, revise localmente com `npm test` e `npm run test:seed`, e abra um PR. Novas engines e providers são bem-vindas.
@@ -89,25 +89,26 @@ Modelos: IDs do Cursor (`composer-2.5`, `claude-sonnet-4-6`, etc.). Validação 
 
 Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `session.prompt` (com `model: { providerID, modelID }` derivado de `AGENTIC_CODE_REVIEWERS_MODEL`) → resposta do agente. Se o servidor rejeitar o model explícito, o engine repete o prompt usando o default do host. Credenciais ficam no **servidor** (`~/.local/share/opencode/auth.json`), não no `.env` do reviewer.
 
-**Modo A — servidor já em execução** (recomendado em dev):
+**Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `@opencode-ai/sdk` (`createOpencodeServer` → `opencode serve`) e conecta o client automaticamente. Requer CLI `opencode` no `PATH` e porta livre (default `4096`).
 
 ```bash
-opencode serve --hostname=127.0.0.1 --port=43147
-# ou: opencode --port 43147
+AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+# opcional: AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME, AGENTIC_CODE_REVIEWERS_OPENCODE_PORT, AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT
 ```
 
+Não defina `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` (ou deixe vazio). Logs esperados: `OpenCode: iniciando servidor embutido em 127.0.0.1:4096`.
+
+**Modo alternativo — servidor externo** (TUI ou `opencode serve` já em execução):
+
 ```bash
+# Terminal 1 (opcional)
+opencode serve --hostname=127.0.0.1 --port=43147
+
+# Terminal 2 — apontar para o servidor existente
 AGENTIC_CODE_REVIEWERS_ENGINE=opencode
 AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
 AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
-```
-
-**Modo B — servidor embutido** (o runner sobe `opencode serve` via SDK; requer CLI `opencode` no `PATH`):
-
-```bash
-AGENTIC_CODE_REVIEWERS_ENGINE=opencode
-AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
-# opcional: AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME, AGENTIC_CODE_REVIEWERS_OPENCODE_PORT
 ```
 
 Modelos: formato `provider/model` (ex.: `opencode-go/deepseek-v4-flash`, `anthropic/claude-sonnet-4-6`). Liste com `opencode models <provider>`.
@@ -132,9 +133,9 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | — | Chave do Cursor. Obrigatória no bootstrap. |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | ver abaixo | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL do servidor OpenCode existente. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido. |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta do servidor embutido. |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | URL de servidor OpenCode **externo** (opcional). Omitir = servidor embutido (padrão). |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido (quando `OPENCODE_URL` vazio). |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta do servidor embutido (quando `OPENCODE_URL` vazio). |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode na sessão. |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_GO_API_KEY` | — | Chave OpenCode Go (CI / auth.json). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
@@ -432,7 +433,7 @@ curl -fsSL .../run.sh | bash -s -- --engine opencode --dry-run
 ```
 
 > [!IMPORTANT]
-> `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` é obrigatória no bootstrap. Pipelines com `cursor-sdk` precisam de chave válida; com `opencode`, exporte também `AGENTIC_CODE_REVIEWERS_ENGINE`, `AGENTIC_CODE_REVIEWERS_MODEL` e `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` (credenciais LLM no servidor OpenCode).
+> `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` é obrigatória no bootstrap. Pipelines com `cursor-sdk` precisam de chave válida; com `opencode`, exporte `AGENTIC_CODE_REVIEWERS_ENGINE` e `AGENTIC_CODE_REVIEWERS_MODEL` (credenciais LLM no servidor OpenCode; por padrão o runner sobe o servidor embutido — não é necessário `OPENCODE_URL` nem `opencode serve` manual).
 
 ### 📋 Principais opções de linha de comando (forwarded arguments)
 
@@ -465,18 +466,17 @@ export AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY="sua_chave_aqui"
 curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/main/run.sh | bash -s -- --dry-run --stack typescript
 ```
 
-#### 2. Dry-run com OpenCode Go (servidor local)
+#### 2. Dry-run com OpenCode Go (servidor embutido — padrão)
+
+Requer CLI [OpenCode](https://opencode.ai/) no `PATH` e credenciais em `~/.local/share/opencode/auth.json` (`opencode providers`).
 
 ```bash
-# Terminal 1
-opencode serve --port 43147
-
-# Terminal 2
 export AGENTIC_CODE_REVIEWERS_ENGINE=opencode
 export AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
-export AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
 npm run review:local
 ```
+
+Para reutilizar um `opencode serve` já em execução, defina também `AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147`.
 
 #### 3. Diff local vs `develop` + uncommitted
 ```bash
@@ -514,7 +514,7 @@ Executa remotamente especificando a organização e projeto:
 
 *   Node.js **22.13+**
 *   **Engine `cursor-sdk`:** `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` no `.env`
-*   **Engine `opencode`:** CLI [OpenCode](https://opencode.ai/) instalado; servidor em execução **ou** porta livre para modo embutido; credenciais em `~/.local/share/opencode/auth.json`
+*   **Engine `opencode`:** CLI [OpenCode](https://opencode.ai/) instalado; por padrão o runner sobe o servidor embutido (porta `4096` livre). Opcionalmente aponte `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` para um servidor externo. Credenciais em `~/.local/share/opencode/auth.json`
 
 ### Comandos Úteis
 

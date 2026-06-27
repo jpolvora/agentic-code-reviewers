@@ -6,12 +6,12 @@
   "author": "Jone Polvora",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jpolvora/cursor-reviewer.git"
+    "url": "git+https://github.com/jpolvora/agentic-code-reviewers.git"
   },
   "bugs": {
-    "url": "https://github.com/jpolvora/cursor-reviewer/issues"
+    "url": "https://github.com/jpolvora/agentic-code-reviewers/issues"
   },
-  "homepage": "https://github.com/jpolvora/cursor-reviewer#readme",
+  "homepage": "https://github.com/jpolvora/agentic-code-reviewers#readme",
   "type": "module",
   "scripts": {
     "build": "tsc",

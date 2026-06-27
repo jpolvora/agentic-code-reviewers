@@ -95,6 +95,10 @@ Todas as variáveis do projeto usam o prefixo **`AGENTIC_CODE_REVIEWERS_`**. Lei
 | `AGENTIC_CODE_REVIEWERS_CURSOR_API_KEY` | — | Obrigatória no bootstrap (mesmo com `opencode`) |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | `cursor-sdk` \| `opencode` |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | ID Cursor ou `provider/model` |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode externo (opcional). **Vazio = embutido (padrão).** |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | `127.0.0.1` | Host do servidor embutido |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | `4096` | Porta do servidor embutido |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | `explore` | Agente OpenCode (read-only) |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Limiar de publicação de threads |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Escalonamento (`0` desativa) |
 | `AGENTIC_CODE_REVIEWERS_STACK` | autodetect | Stack ou `Custom` |

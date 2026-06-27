@@ -125,6 +125,10 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_ADO_REPO` | Não | Repositório ADO |
 | `AGENTIC_CODE_REVIEWERS_PR_ID` | Não | ID da PR |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | Não | Engine LLM: `cursor-sdk` (default) ou `opencode` |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | Não | URL de servidor OpenCode externo. **Omitir = embutido (padrão).** |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_HOSTNAME` | Não | Host do servidor embutido (default: `127.0.0.1`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT` | Não | Porta do servidor embutido (default: `4096`) |
+| `AGENTIC_CODE_REVIEWERS_OPENCODE_AGENT` | Não | Agente OpenCode na sessão (default: `explore`, read-only) |
 | `AGENTIC_CODE_REVIEWERS_REPO_ROOT` | Não | Raiz do repositório alvo |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | Não | Score mínimo para publicar thread (default: `6`). **Opcional** |
 
@@ -157,6 +161,34 @@ npm run review -- --dry-run --model claude-4.6-sonnet-medium-thinking
 ```
 
 IDs comuns: `composer-2.5`, `composer-2.5-fast`, `claude-4.6-sonnet-medium-thinking`, `gpt-5.4-medium`.
+
+---
+
+## Engine OpenCode (`opencode`)
+
+Com `AGENTIC_CODE_REVIEWERS_ENGINE=opencode`, o runner usa `@opencode-ai/sdk`. **Por padrão** sobe sua própria instância do servidor (`createOpencodeServer` → `opencode serve` em `127.0.0.1:4096`) e conecta o client — não é necessário `opencode serve` manual nem definir `OPENCODE_URL`.
+
+### Configuração mínima (servidor embutido)
+
+```bash
+AGENTIC_CODE_REVIEWERS_ENGINE=opencode
+AGENTIC_CODE_REVIEWERS_MODEL=opencode-go/deepseek-v4-flash
+# opcional: OPENCODE_HOSTNAME, OPENCODE_PORT, OPENCODE_AGENT
+```
+
+Pré-requisitos: CLI `opencode` no `PATH`; credenciais LLM em `~/.local/share/opencode/auth.json` (`opencode providers`); porta `4096` livre (ou altere `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT`).
+
+Implementação: `src/engine/opencode/stream.ts` — permissões read-only (`edit`/`bash`/`webfetch`: `deny`) na config do servidor embutido.
+
+### Servidor externo (opcional)
+
+Use quando já houver TUI ou `opencode serve` em execução:
+
+```bash
+AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147
+```
+
+Documentação OpenCode: [SDK](https://opencode.ai/docs/sdk/) · [Servidor](https://opencode.ai/docs/server/).
 
 ---
 
@@ -439,7 +471,7 @@ A camada LLM/harness é plugável via `AGENTIC_CODE_REVIEWERS_ENGINE`. Contrato 
 | Engine | Status | Pacote |
 |--------|--------|--------|
 | `cursor-sdk` | Estável (default) | `@cursor/sdk` |
-| `opencode` | Estável | `@opencode-ai/sdk` |
+| `opencode` | Estável | `@opencode-ai/sdk` — **padrão:** servidor embutido (`createOpencodeServer`); `OPENCODE_URL` opcional para servidor externo |
 | Custom | Via PR | Seu adapter |
 
 Para adicionar uma engine:
