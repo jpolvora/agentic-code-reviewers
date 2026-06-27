@@ -45,7 +45,6 @@ export interface PlatformProvider {
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
-    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]>;
 
   setPullRequestReviewSummary(

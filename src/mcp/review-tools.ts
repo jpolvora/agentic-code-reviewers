@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { resolve, relative } from 'node:path';
 import type { ReviewerConfig } from '../config.js';
 import type { PromptContext } from '../agent/prompt.js';
 import { getDiffPatch } from '../git/diff.js';
@@ -24,7 +24,7 @@ const DEFAULT_GREP_MAX = 200;
 function assertInsideRepo(repoRoot: string, targetPath: string): string {
   const abs = resolve(repoRoot, targetPath);
   const rel = relative(resolve(repoRoot), abs);
-  if (rel.startsWith('..') || isAbsolute(rel)) {
+  if (rel.startsWith('..')) {
     throw new Error(`Path outside repo: ${targetPath}`);
   }
   return abs;
@@ -102,6 +102,7 @@ export function toolGrep(
     const output = execFileSync('git', args, {
       cwd: ctx.repoRoot,
       encoding: 'utf8',
+      timeout: 120_000,
       maxBuffer: 2 * 1024 * 1024,
     });
     const lines = output.split(/\r?\n/).filter(Boolean);

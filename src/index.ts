@@ -309,7 +309,6 @@ async function main(): Promise<void> {
     getCodeReviewPostingPlan(parsed, gatePendingBeforePost.length > 0).reviewsJson,
     reviewContext.existingKeys,
     config.scoreMin,
-    safeOutputOptions,
   );
 
   // Frente C — orçamento de rodadas + escalonamento (garantia de convergência).
@@ -341,7 +340,6 @@ async function main(): Promise<void> {
         getCodeReviewPostingPlan(effectiveParsed, gatePendingBeforePost.length > 0).reviewsJson,
         reviewContext.existingKeys,
         config.scoreMin,
-        safeOutputOptions,
       )
     : wouldPostReviewsPre;
 
@@ -410,7 +408,6 @@ async function main(): Promise<void> {
       postingPlan.reviewsJson,
       reviewContext.existingKeys,
       (msg) => logger.info(msg),
-      safeOutputOptions,
     );
     postedReviews = postedThreads.map((item) => item.review);
 

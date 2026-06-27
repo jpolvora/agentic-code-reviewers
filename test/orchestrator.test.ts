@@ -47,11 +47,18 @@ describe('mergeReviews', () => {
     assert.ok(result.reviewSummary.includes('Chunk 2'));
   });
 
-  it('mergeCodeReviewResponses usa summary único quando há apenas um chunk', () => {
+  it('mergeCodeReviewResponses usa summary único quando há apenas um chunk sem reviews', () => {
     const result = mergeCodeReviewResponses([
       { reviews: [], reviewSummary: 'Tudo certo.' },
     ]);
     assert.equal(result.reviewSummary, 'Tudo certo.');
+  });
+
+  it('mergeCodeReviewResponses limpa o summary quando há reviews', () => {
+    const result = mergeCodeReviewResponses([
+      { reviews: [{ fileName: 'a.ts', lineNumber: 1, severity: 'warning', comment: 'msg', score: 7, developerAction: 'fix-code', analysis: '...', impactPaths: [] }], reviewSummary: 'Tudo certo.' },
+    ]);
+    assert.equal(result.reviewSummary, '');
   });
 
   it('preserves non-critical reviews when merging with filtered critical subset', () => {

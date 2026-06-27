@@ -328,7 +328,6 @@ export async function setPullRequestComments(
   existingKeys: Map<string, boolean>,
   log: (msg: string) => void,
   scoreMin: number = DEFAULT_SCORE_MIN,
-  safeOptions?: SafeOutputOptions,
 ): Promise<PostedReviewThread[]> {
   const posted: PostedReviewThread[] = [];
   const connection = await client.getConnectionData();
@@ -336,9 +335,6 @@ export async function setPullRequestComments(
 
   const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
   let reviews = (reviewsObject.reviews ?? []).filter((review) => isPublishableReview(review, scoreMin));
-  if (safeOptions) {
-    reviews = filterSafeOutputs(reviews, safeOptions);
-  }
 
   if (reviews.length === 0) {
     log('No reviews to post.');
@@ -413,14 +409,10 @@ export function getNewReviewsFromPlan(
   reviewsJson: string,
   existingKeys: Map<string, boolean>,
   scoreMin: number = DEFAULT_SCORE_MIN,
-  safeOptions?: SafeOutputOptions,
 ): CodeReviewItem[] {
   const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
-  let reviews = (reviewsObject.reviews ?? [])
+  const reviews = (reviewsObject.reviews ?? [])
     .filter((review) => isPublishableReview(review, scoreMin));
-  if (safeOptions) {
-    reviews = filterSafeOutputs(reviews, safeOptions);
-  }
   return reviews.filter((review) => !isDuplicateReview(review, existingKeys));
 }
 

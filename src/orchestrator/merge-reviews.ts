@@ -60,9 +60,7 @@ export function mergeCodeReviewResponses(
   const reviewSummary =
     reviews.length === 0 && summaries.length > 0
       ? summaries.join('\n\n---\n\n')
-      : summaries.length === 1
-        ? summaries[0]!
-        : '';
+      : '';
 
   return { reviews, resolvedThreads, reviewSummary };
 }

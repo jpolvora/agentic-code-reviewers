@@ -377,16 +377,12 @@ These issues were reported in a previous round and already resolved/closed. Do *
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
-    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]> {
     const posted: PostedReviewThread[] = [];
     const reviewsObject = JSON.parse(reviewsJson) as { reviews: CodeReviewItem[] };
     let reviews = (reviewsObject.reviews ?? []).filter((review) =>
       isPublishableReview(review, this.config.scoreMin),
     );
-    if (safeOptions) {
-      reviews = filterSafeOutputs(reviews, safeOptions);
-    }
     const newReviews = reviews.filter((review) => !isDuplicateReview(review, existingKeys));
 
     if (newReviews.length === 0) {

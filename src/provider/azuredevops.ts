@@ -70,7 +70,6 @@ export class AdoProvider implements PlatformProvider {
     reviewsJson: string,
     existingKeys: Map<string, boolean>,
     log: (msg: string) => void,
-    safeOptions?: SafeOutputOptions,
   ): Promise<PostedReviewThread[]> {
     return setPullRequestComments(
       this.ado,
@@ -80,7 +79,6 @@ export class AdoProvider implements PlatformProvider {
       existingKeys,
       log,
       this.config.scoreMin,
-      safeOptions,
     );
   }
 
