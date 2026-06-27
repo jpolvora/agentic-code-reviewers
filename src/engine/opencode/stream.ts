@@ -268,6 +268,7 @@ export async function runOpencodeStream(
       sessionId,
       directory,
       logger,
+      verbose: config.verbose,
       signal: abortController.signal,
     });
 

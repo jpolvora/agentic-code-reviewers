@@ -9,10 +9,10 @@ export type OpencodeEventStreamOptions = {
   directory: string;
   logger: Logger;
   signal: AbortSignal;
+  /** Quando true (`--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE`), stream de partes `text` (`[assistant]`). */
+  verbose: boolean;
   /** Stream reasoning parts (default: env / true). */
   streamReasoning?: boolean;
-  /** Stream assistant text parts (default: env / false). */
-  streamAssistant?: boolean;
 };
 
 type PermissionReply = 'once' | 'always' | 'reject';
@@ -94,10 +94,6 @@ function resolveStreamReasoning(options: OpencodeEventStreamOptions): boolean {
   return options.streamReasoning ?? parseStreamFlag(env.opencodeStreamReasoning(), true);
 }
 
-function resolveStreamAssistant(options: OpencodeEventStreamOptions): boolean {
-  return options.streamAssistant ?? parseStreamFlag(env.opencodeStreamAssistant(), false);
-}
-
 async function autoReplyPermission(
   client: OpencodeClient,
   sessionId: string,
@@ -161,9 +157,8 @@ function handleEvent(event: GlobalEvent, options: OpencodeEventStreamOptions, st
       if (!isTextLikePart(part)) return;
 
       const streamReasoning = resolveStreamReasoning(options);
-      const streamAssistant = resolveStreamAssistant(options);
       if (part.type === 'reasoning' && !streamReasoning) return;
-      if (part.type === 'text' && !streamAssistant) return;
+      if (part.type === 'text' && !options.verbose) return;
 
       const printedLength = streamState.partChars.get(part.id) ?? 0;
       const extracted = extractPartStreamChunk(part, printedLength, payload.properties.delta);

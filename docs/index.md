@@ -118,7 +118,7 @@ cp .env.example .env
 | `AGENTIC_CODE_REVIEWERS_MODEL` | Não | Modelo (default: `composer-2.5`) |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | Não | Branch de diff (default: `refs/heads/master`) |
 | `AGENTIC_CODE_REVIEWERS_BOT_TAG` | Não | Tag do bot (default: `[Cursor Reviewer]`) |
-| `AGENTIC_CODE_REVIEWERS_VERBOSE` | Não | Logs (default: `true`) |
+| `AGENTIC_CODE_REVIEWERS_VERBOSE` | Não | Logs (default: `true`); com engine `opencode`, também stream `[assistant]` no SSE |
 | `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | Não | Timeout (default: `600000`) |
 | `AGENTIC_CODE_REVIEWERS_SANDBOX` | Não | Sandbox read-only (default: `true`) |
 | `AGENTIC_CODE_REVIEWERS_DRY_RUN` | Não | Dry-run via env |
@@ -175,12 +175,12 @@ IDs comuns: `composer-2.5`, `composer-2.5-fast`, `claude-4.6-sonnet-medium-think
 
 Com `AGENTIC_CODE_REVIEWERS_ENGINE=opencode`, o runner usa `@opencode-ai/sdk`. **Por padrão** sobe servidor embutido (`createEmbeddedOpencodeServer` → `opencode serve` em `127.0.0.1:4096`) e conecta o client — não é necessário `opencode serve` manual nem `OPENCODE_URL`.
 
-Durante `session.prompt`, o runner assina eventos SSE (`client.global.event`) e registra `[status]`, `[tool]`, `[reasoning]` (quando o modelo emite `message.part.updated` com `type: "reasoning"`) e, opcionalmente, `[assistant]`. O stdout/stderr do processo `opencode serve` pode ser piped com `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true` (default).
+Durante `session.prompt`, o runner assina eventos SSE (`client.global.event`) e registra `[status]`, `[tool]`, `[reasoning]` (quando o modelo emite `message.part.updated` com `type: "reasoning"`) e, com `--verbose` (default), `[assistant]`. O stdout/stderr do processo `opencode serve` pode ser piped com `AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=true` (default).
 
-| Variável | Default | Uso |
+| Variável / flag | Default | Uso |
 |---|---|---|
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING` | `true` | Stream de partes `reasoning` via SSE (`delta` ou diff de `part.text`) |
-| `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_ASSISTANT` | `false` | Stream de partes `text` (resposta final; pode ser JSON longo) |
+| `--verbose` / `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Stream de partes `text` (`[assistant]`); `--quiet` desativa |
 
 Nem todo modelo/provedor expõe raciocínio em stream — se só aparecem `[tool]`/`[status]`, o provider pode não emitir partes `reasoning`.
 

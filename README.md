@@ -89,7 +89,7 @@ Modelos: IDs do Cursor (`composer-2.5`, `claude-sonnet-4-6`, etc.). Validação 
 
 Cliente para servidor [OpenCode](https://opencode.ai/docs/sdk/): sessão → `session.prompt` (com `model: { providerID, modelID }` derivado de `AGENTIC_CODE_REVIEWERS_MODEL`) → resposta do agente. Se o servidor rejeitar o model explícito, o engine repete o prompt usando o default do host. Credenciais ficam no **servidor** (`~/.local/share/opencode/auth.json`), não no `.env` do reviewer.
 
-**Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `createEmbeddedOpencodeServer` (`opencode serve`) e conecta o client automaticamente. Requer CLI `opencode` no `PATH` e porta livre (default `4096`). Durante o prompt, o runner assina o stream SSE (`/global/event`) e registra progresso (`[status]`, `[tool]`, deltas de assistant/reasoning). Permissões interativas (`external_directory`, etc.) são negadas na config embutida para evitar bloqueio em CI.
+**Modo padrão — servidor embutido** (recomendado): o runner sobe sua própria instância via `createEmbeddedOpencodeServer` (`opencode serve`) e conecta o client automaticamente. Requer CLI `opencode` no `PATH` e porta livre (default `4096`). Durante o prompt, o runner assina o stream SSE (`/global/event`) e registra progresso (`[status]`, `[tool]`, `[reasoning]` quando o modelo expõe, `[assistant]` com `--verbose`). Permissões interativas (`external_directory`, etc.) são negadas na config embutida para evitar bloqueio em CI.
 
 ```bash
 AGENTIC_CODE_REVIEWERS_ENGINE=opencode
