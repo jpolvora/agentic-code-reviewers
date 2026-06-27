@@ -1,26 +1,65 @@
-# Revisão agêntica em PRs — duas engines em paralelo (jobs independentes).
-# Cada job aparece como check separado no GitHub; não há dependência `needs:` entre eles.
-name: Cursor Code Review
+# Revisão agêntica em PRs — um check por engine (matrix).
+# Modo padrão em PRs: paralelo. Escolha sequential via workflow_dispatch ou vars.REVIEWER_EXECUTION_MODE.
+name: Agentic Code Review
 
 on:
   pull_request:
     branches:
       - main
       - develop
+  workflow_dispatch:
+    inputs:
+      execution_mode:
+        description: Executar reviews das engines em paralelo ou sequencialmente
+        required: false
+        default: parallel
+        type: choice
+        options:
+          - parallel
+          - sequential
+      pr_number:
+        description: Número da PR (obrigatório em execução manual)
+        required: true
+        type: string
+      source_branch:
+        description: Branch de origem (head ref, ex. feat/minha-feature)
+        required: true
+        type: string
+      target_branch:
+        description: Branch de destino (base ref, ex. develop)
+        required: true
+        type: string
 
 permissions:
   pull-requests: write
   contents: read
 
+env:
+  EXECUTION_MODE: ${{ github.event.inputs.execution_mode || vars.REVIEWER_EXECUTION_MODE || 'parallel' }}
+  PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+  SOURCE_BRANCH: ${{ github.head_ref || github.event.inputs.source_branch }}
+  TARGET_BRANCH: refs/heads/${{ github.event.pull_request.base.ref || github.event.inputs.target_branch }}
+
 jobs:
-  # ---------------------------------------------------------------------------
-  # Engine padrão — @cursor/sdk (produção / CI principal)
-  # ---------------------------------------------------------------------------
-  review-cursor-sdk:
-    name: Review (cursor-sdk)
+  review:
+    name: Review (${{ matrix.engine }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ env.EXECUTION_MODE == 'sequential' && 1 || 10 }}
+      matrix:
+        include:
+          - engine: cursor-sdk
+            model: composer-2.5
+            bot_tag: '[Cursor Reviewer]'
+            opencode_setup: false
+          - engine: opencode
+            model: opencode-go/deepseek-v4-flash
+            bot_tag: '[Cursor Reviewer · OpenCode]'
+            opencode_setup: true
+
     concurrency:
-      group: review-cursor-sdk-${{ github.event.pull_request.number }}
+      group: review-${{ matrix.engine }}-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: true
 
     steps:
@@ -38,52 +77,15 @@ jobs:
         run: npm ci
 
       - name: Typecheck TypeScript
+        if: matrix.engine == 'cursor-sdk'
         run: npm run typecheck
 
-      - name: Run Reviewer Agent (cursor-sdk)
-        env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURSOR_REVIEWER_ENGINE: cursor-sdk
-          CURSOR_REVIEWER_MODEL: composer-2.5
-          CURSOR_REVIEWER_BOT_TAG: '[Cursor Reviewer]'
-          CURSOR_REVIEWER_REVIEW_SELF: 'true'
-        run: |
-          npx tsx src/index.ts --gh \
-            --pr-id ${{ github.event.pull_request.number }} \
-            --source-branch "${{ github.head_ref }}" \
-            --target-branch "refs/heads/${{ github.event.pull_request.base.ref }}"
-        continue-on-error: true
-
-  # ---------------------------------------------------------------------------
-  # Engine OpenCode — @opencode-ai/sdk (referência; servidor embutido no runner)
-  # Requer secret OPENCODE_GO_API_KEY (mesma chave do provider opencode-go local).
-  # ---------------------------------------------------------------------------
-  review-opencode:
-    name: Review (opencode)
-    runs-on: ubuntu-latest
-    concurrency:
-      group: review-opencode-${{ github.event.pull_request.number }}
-      cancel-in-progress: true
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-
-      - name: Install Dependencies
-        run: npm ci
-
       - name: Install OpenCode CLI
+        if: matrix.opencode_setup
         run: curl -fsSL https://opencode.ai/install | bash
 
       - name: Configure OpenCode Go credentials
+        if: matrix.opencode_setup
         env:
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
         run: |
@@ -102,21 +104,21 @@ jobs:
           fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
           NODE
 
-      - name: Run Reviewer Agent (opencode)
+      - name: Run Reviewer Agent (${{ matrix.engine }})
         env:
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CURSOR_REVIEWER_ENGINE: opencode
-          CURSOR_REVIEWER_MODEL: opencode-go/deepseek-v4-flash
+          CURSOR_REVIEWER_ENGINE: ${{ matrix.engine }}
+          CURSOR_REVIEWER_MODEL: ${{ matrix.model }}
+          CURSOR_REVIEWER_BOT_TAG: ${{ matrix.bot_tag }}
+          CURSOR_REVIEWER_REVIEW_SELF: 'true'
           CURSOR_REVIEWER_OPENCODE_HOSTNAME: 127.0.0.1
           CURSOR_REVIEWER_OPENCODE_PORT: '4096'
           CURSOR_REVIEWER_OPENCODE_AGENT: explore
-          CURSOR_REVIEWER_BOT_TAG: '[Cursor Reviewer · OpenCode]'
-          CURSOR_REVIEWER_REVIEW_SELF: 'true'
           OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
         run: |
           npx tsx src/index.ts --gh \
-            --pr-id ${{ github.event.pull_request.number }} \
-            --source-branch "${{ github.head_ref }}" \
-            --target-branch "refs/heads/${{ github.event.pull_request.base.ref }}"
+            --pr-id "$PR_NUMBER" \
+            --source-branch "$SOURCE_BRANCH" \
+            --target-branch "$TARGET_BRANCH"
         continue-on-error: true

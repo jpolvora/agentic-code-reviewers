@@ -311,14 +311,26 @@ Utilize o template pronto do projeto: [`azure-pipelines-cursor-code-review.yml`]
 
 #### Neste repositório (`.github/workflows/code-review.yml`)
 
-A cada PR em `main` / `develop`, **dois jobs rodam em paralelo** — checks independentes no GitHub, sem `needs:` entre eles:
+A cada PR em `main` / `develop`, **um check por engine** roda via **matrix** — por padrão **em paralelo** (cada engine aparece como check separado no GitHub):
 
-| Check na PR | Job | Engine | Bot tag |
+| Check na PR | Engine | Modelo | Bot tag |
 | :--- | :--- | :--- | :--- |
-| **Review (cursor-sdk)** | `review-cursor-sdk` | `@cursor/sdk` · `composer-2.5` | `[Cursor Reviewer]` |
-| **Review (opencode)** | `review-opencode` | `@opencode-ai/sdk` · `opencode-go/deepseek-v4-flash` | `[Cursor Reviewer · OpenCode]` |
+| **Review (cursor-sdk)** | `@cursor/sdk` | `composer-2.5` | `[Cursor Reviewer]` |
+| **Review (opencode)** | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `[Cursor Reviewer · OpenCode]` |
 
-Cada job tem `concurrency` próprio (`review-cursor-sdk-#N` / `review-opencode-#N`), então um não cancela o outro. Ambos usam `continue-on-error: true` (falhas do agente não bloqueiam o merge por padrão).
+**Modo de execução**
+
+| Gatilho | Comportamento |
+| :--- | :--- |
+| `pull_request` | Paralelo por padrão |
+| `workflow_dispatch` | Input `execution_mode`: **parallel** ou **sequential** (+ PR/branchs obrigatórios) |
+| Variável `REVIEWER_EXECUTION_MODE` | Sobrescreve o default em PRs (`parallel` ou `sequential`) |
+
+Em modo **sequential**, a matrix usa `max-parallel: 1`: as engines rodam uma após a outra no mesmo workflow (ordem da matrix: `cursor-sdk` → `opencode`).
+
+Cada job tem `concurrency` próprio (`review-<engine>-#N`), então re-runs de uma engine não cancelam a outra. Todos usam `continue-on-error: true` (falhas do agente não bloqueiam o merge por padrão).
+
+Para adicionar uma nova engine ao CI, inclua uma entrada em `strategy.matrix.include` no workflow (modelo, bot tag e steps condicionais de setup).
 
 **Secrets obrigatórios** (Settings → Secrets and variables → Actions):
 
@@ -330,7 +342,7 @@ Cada job tem `concurrency` próprio (`review-cursor-sdk-#N` / `review-opencode-#
 
 O job OpenCode instala o CLI (`curl -fsSL https://opencode.ai/install | bash`), grava `auth.json` no runner e sobe o servidor **embutido** na porta `4096` (sem `opencode serve` manual).
 
-Para desativar o check de referência OpenCode, remova o job `review-opencode` ou comente-o no workflow.
+Para desativar o check de referência OpenCode, remova a entrada `opencode` de `strategy.matrix.include` ou comente-a no workflow.
 
 #### Em repositórios consumidores (`run.sh`)
 
