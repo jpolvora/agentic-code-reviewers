@@ -70,6 +70,17 @@ export function extractPartStreamChunk(
   return { chunk: part.text.slice(printedLength), nextLength: part.text.length };
 }
 
+export function isGlobalEvent(raw: unknown): raw is GlobalEvent {
+  if (!raw || typeof raw !== 'object') return false;
+  const obj = raw as Record<string, unknown>;
+  if (obj.directory !== undefined && typeof obj.directory !== 'string') return false;
+  const payload = obj.payload;
+  if (payload === undefined) return true;
+  if (typeof payload !== 'object' || payload === null) return false;
+  const event = payload as Record<string, unknown>;
+  return typeof event.type === 'string' && event.properties !== undefined;
+}
+
 export function eventBelongsToSession(event: Event, sessionId: string): boolean {
   const properties = event.properties as { sessionID?: string } | undefined;
   if (!properties?.sessionID) {
@@ -209,7 +220,11 @@ export async function consumeOpencodeEventStream(options: OpencodeEventStreamOpt
 
   for await (const raw of events.stream) {
     if (options.signal.aborted) break;
-    handleEvent(raw as GlobalEvent, options, streamState);
+    if (!isGlobalEvent(raw)) {
+      options.logger.warn('OpenCode: evento ignorado (formato inesperado)');
+      continue;
+    }
+    handleEvent(raw, options, streamState);
   }
 
   if (streamState.lastStream !== 'other') {

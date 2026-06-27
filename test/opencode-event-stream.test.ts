@@ -6,6 +6,7 @@ import {
   extractPartStreamChunk,
   formatSessionStatus,
   formatToolPart,
+  isGlobalEvent,
   permissionReplyForType,
 } from '../src/engine/opencode/event-stream.js';
 
@@ -100,6 +101,22 @@ describe('opencode event-stream', () => {
       }),
       'read — completed — Read file',
     );
+  });
+
+  it('isGlobalEvent valida estrutura directory/payload do SSE', () => {
+    assert.equal(
+      isGlobalEvent({
+        directory: '/repo',
+        payload: { type: 'session.status', properties: { sessionID: 'ses_1', status: { type: 'busy' } } },
+      }),
+      true,
+    );
+    assert.equal(isGlobalEvent({ directory: '/repo' }), true);
+    assert.equal(isGlobalEvent(null), false);
+    assert.equal(isGlobalEvent('event'), false);
+    assert.equal(isGlobalEvent({ directory: 42 }), false);
+    assert.equal(isGlobalEvent({ payload: { type: 'session.idle' } }), false);
+    assert.equal(isGlobalEvent({ payload: { properties: {} } }), false);
   });
 
   it('extractPartStreamChunk usa delta ou diff de part.text', () => {
