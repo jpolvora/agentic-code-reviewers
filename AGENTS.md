@@ -169,6 +169,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `src/orchestrator/autofix-runner.ts` | Auto-fix flow: subagents per file, replacements, partial thread resolution |
 | `src/git/autofix-commit.ts` | Consolidated commit and push after auto-fix |
 | `skills/AUTO_FIX.md` | Auto-fix subagent prompt (surgical fixes, JSON replacements) |
+| `skills/COOPERATIVE_FIX.md` | Shared fix contract (Auto-Fix CI ↔ solve-pr IDE, no code coupling) |
 | `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |
 | `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
 | `src/provider/` | `PlatformProvider` interface + `AdoProvider` and `GithubProvider` implementations. |
@@ -222,8 +223,8 @@ Fix bot-published threads  → solve-pr (GitHub) or manual dev
 |---|---|
 | Validate gate and prompt before merge | `code-review-self` + `npm test` |
 | Conversational review with stable IDs | `megabrain` |
-| Bot published threads; want auto-fix in CI | `auto-fix.yml` workflow + `--auto-fix` (GitHub); requires PAT for push |
-| Bot published threads; want auto-fix locally | `solve-pr` skill (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` or `GITHUB_TOKEN` / `GH_TOKEN`) |
+| Bot published threads; want auto-fix in CI | `auto-fix.yml` + `--auto-fix` (see `skills/COOPERATIVE_FIX.md`) |
+| Bot published threads; want auto-fix locally | `/solve-pr` (same cooperative contract as Auto-Fix CI) |
 | Production / pipeline | No IDE skill — runner + `skills/` only |
 
 #### Adding or Modifying an IDE Skill

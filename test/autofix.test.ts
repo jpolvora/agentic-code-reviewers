@@ -308,4 +308,38 @@ describe('runAutoFixFlow', () => {
     assert.equal(resolvedItemsArg[0].threadId, 1);
     assert.equal(resolvedItemsArg[0].lineNumber, 1);
   });
+
+  it('aborta push quando resolução de threads falha (gate cooperativo)', async () => {
+    const tmpDir = setupTempWorkspace();
+    const remoteUrl = execSync('git remote get-url origin', { cwd: tmpDir, encoding: 'utf8' }).trim();
+    const remoteHeadBefore = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
+
+    const config = {
+      repoRoot: tmpDir,
+      runnerRoot: tmpDir,
+      dryRun: false,
+      autoFix: true,
+      pullRequestId: 99,
+    } as any;
+    const reviewContext = {
+      activeThreads: [{ filePath: '/file.txt', lineNumber: 1, summary: 'test issue', threadId: '1' }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText:
+          '```json\n{"explanation":"ok","replacements":[{"startLine":1,"endLine":1,"replacementContent":"linha 1 alterada"}]}\n```',
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+    const localLog = execSync('git log -1 --oneline', { cwd: tmpDir, encoding: 'utf8' });
+    assert.match(localLog, /fix\(review\): resolve issues from review threads of PR #99/);
+    const remoteHeadAfter = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
+    assert.equal(remoteHeadBefore, remoteHeadAfter, 'push não deve ocorrer quando resolução falha');
+  });
 });

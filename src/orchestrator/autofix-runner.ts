@@ -6,7 +6,7 @@ import type { PlatformProvider } from '../provider/types.js';
 import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
-import { runAutoFixCommit } from '../git/autofix-commit.js';
+import { commitAutoFixChanges, pushAutoFixChanges } from '../git/autofix-commit.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
@@ -186,7 +186,10 @@ export async function runAutoFixFlow(
 
       const fileContent = fs.readFileSync(fullFilePath, 'utf8');
       const threadListText = threads
-        .map((t) => `- Linha ${t.lineNumber}: ${t.summary}`)
+        .map(
+          (t) =>
+            `- Thread ${t.threadId} | Linha ${t.lineNumber}: ${t.summary}`,
+        )
         .join('\n');
 
       const prompt = `${autoFixSystemPrompt}
@@ -295,24 +298,37 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
     return;
   }
 
-  // Consolidar commit e push
-  logger.section('Consolidando alterações com Git');
-  const commitSuccess = await runAutoFixCommit(config, logger, modifiedFiles);
+  // Gate cooperativo (COOPERATIVE_FIX.md): commit local → resolver threads → push
+  logger.section('Consolidando alterações com Git (commit local)');
+  const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles);
+  if (!commitSuccess) {
+    logger.info('Commit local não realizado; abortando resolução e push.');
+    return;
+  }
 
-  // Responder e resolver threads na PR
   logger.section('Respondendo e resolvendo threads na PR');
   if (config.dryRun) {
     logger.info(`[dry-run] Simulando resolução de ${resolvedItems.length} thread(s).`);
     simulateThreadResolution(activeThreads, reviewContext.pendingThreads ?? [], resolvedItems);
-  } else if (commitSuccess) {
-    const resolvedCount = await provider.resolvePullRequestReviewThreads(
-      config.botTag,
-      activeThreads,
-      resolvedItems,
-      (msg) => logger.info(msg),
-    );
-    logger.info(`Total de threads resolvidas: ${resolvedCount}`);
-  } else {
-    logger.info('Commit não realizado; abortando resolução de threads.');
+    return;
   }
+
+  const resolvedCount = await provider.resolvePullRequestReviewThreads(
+    config.botTag,
+    activeThreads,
+    resolvedItems,
+    (msg) => logger.info(msg),
+  );
+  logger.info(`Total de threads resolvidas: ${resolvedCount}/${resolvedItems.length}`);
+
+  if (resolvedCount < resolvedItems.length) {
+    logger.warn(
+      'Gate cooperativo: resolução incompleta — push abortado. Commit local preservado; ' +
+        'corrija token/permissões ou resolva manualmente (skill solve-pr).',
+    );
+    return;
+  }
+
+  logger.section('Push das alterações (após resolução)');
+  await pushAutoFixChanges(config, logger);
 }

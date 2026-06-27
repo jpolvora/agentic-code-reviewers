@@ -13,7 +13,7 @@ O ciclo de Auto-Fix envolve a coordenação de duas pipelines separadas: a **rev
    - Lê as *threads* ativas (comentários não resolvidos) na PR.
    - Analisa o código e propõe correções para cada problema.
    - Aplica as mudanças no código local.
-   - Gera um commit de correção (`style(agent): apply auto-fixes...`) e faz o `git push` para a branch da PR.
+   - Gera commit local, resolve threads e faz push (gate cooperativo — ver [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md)).
 5. **Re-avaliação (O Loop):** O *push* gerado pelo Auto-Fix re-aciona a pipeline de Code Review (passo 2). O revisor avalia o novo código. Se a thread foi consertada, ele a marca como resolvida. Caso contrário, deixa novos apontamentos.
 
 ## Proteções do Sistema
@@ -28,21 +28,27 @@ O revisor controla quantas rodadas de revisão/correção já ocorreram utilizan
 - Isso garante que a pipeline de Auto-Fix não ficará gastando minutos de CI tentando consertar algo além de sua capacidade ou que esteja sofrendo alucinação.
 
 ### 2. Detecção de Mudanças (No-op)
-Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudanças concretas no código, o script de validação de Git (`git status --porcelain`) detectará que a *working tree* está limpa. Neste caso, o agente termina silenciosamente sem fazer o commit e push. **Sem o push, o loop se encerra automaticamente.**
+Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudanças concretas no código, o script detecta working tree limpa e termina sem commit. **Sem commit, sem resolução, sem push.**
 
-### 3. Concorrência e Execução Sequencial (Sem sobreposição)
-Para evitar que múltiplos agentes corram em paralelo sobre a mesma branch (causando falhas de push *non-fast-forward* ou re-resolvendo as mesmas threads indevidamente):
+### 3. Gate cooperativo (resolve → push)
+Ordem alinhada à skill IDE [`solve-pr`](../.agents/skills/solve-pr/SKILL.md) e ao contrato [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md):
 
-- **`concurrency` por PR** no job (`auto-fix-<pr_number>`) — execuções sobrepostas do auto-fix na mesma PR ficam enfileiradas (`cancel-in-progress: false`).
-- **Engines sequenciais** dentro do job:
-  1. **Primeiro**: agente `cursor-sdk` (`--auto-fix`).
-  2. **Sincronização**: `git fetch` + `git reset --hard origin/<branch>` — incorpora commits do passo anterior.
-  3. **Segundo**: agente `opencode` a partir do estado atualizado.
-- **Resolução parcial de threads**: só threads cuja **linha teve conteúdo alterado** pelos replacements são fechadas (evita falso positivo em intervals amplos do subagente).
-- **Falha explícita**: se todos os engines **configurados** falharem (timeout, API key, push), o workflow reporta erro — não conclui silenciosamente em verde.
+1. Commit **local**
+2. Responder e resolver threads na PR
+3. Push **somente** se todas as resoluções tentadas tiverem sucesso
 
-### 4. Gatilho após review manual
-O job aceita `workflow_run` bem-sucedido independentemente do evento original (`pull_request` ou `workflow_dispatch`), para que re-runs manuais do code review também disparem auto-fix quando configurado.
+Se a resolução falhar (token, permissão), o commit local é preservado e o push é abortado.
+
+### 4. Concorrência e Execução Sequencial (Sem sobreposição)
+
+- **`concurrency` por PR** no job (`auto-fix-<pr_number>`) — execuções sobrepostas enfileiradas.
+- **Engines sequenciais:** cursor-sdk → `git reset --hard` → opencode.
+- **Resolução parcial:** só threads cuja linha teve conteúdo alterado.
+- **Falha explícita** se todos os engines configurados falharem.
+
+### 5. Gatilho após review manual
+
+O job aceita `workflow_run` bem-sucedido independentemente do evento original (`pull_request` ou `workflow_dispatch`).
 
 ## Configuração Necessária (GitHub Actions)
 
