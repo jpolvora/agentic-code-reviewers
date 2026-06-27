@@ -8,6 +8,7 @@ import {
 import {
   extractAgenticBotTagLine,
   isAgenticReviewerComment,
+  stripAgenticBotTags,
 } from '../bot-tag.js';
 
 import type {
@@ -34,7 +35,7 @@ export function getReviewSummaryFromComment(content: string, botTag: string): st
 /** Texto integral do comentário da thread (sem truncar) para análise do auto-fix. */
 export function getThreadDescription(content: string, botTag: string): string {
   let description = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
-  description = description.replaceAll(botTag, '').trim();
+  description = stripAgenticBotTags(description);
   return description;
 }
 
@@ -280,7 +281,7 @@ export function testReviewSummaryAlreadyPosted(
         continue;
       }
 
-      let existing = comment.content.replaceAll(botTag, '');
+      let existing = stripAgenticBotTags(comment.content);
       existing = existing.replace(REVIEW_SUMMARY_MARKER, '');
       existing = existing.replace(/\s+/g, ' ').trim();
 

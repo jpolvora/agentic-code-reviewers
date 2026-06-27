@@ -19,7 +19,8 @@ import {
   type RoundStateLocation,
 } from '../ado/round-state.js';
 import { normalizeFilePath, reviewDedupKey } from '../ado/utils.js';
-import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment } from '../bot-tag.js';
+import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment, LEGACY_BOT_TAG_PREFIX } from '../bot-tag.js';
+
 import {
   commentBodyHasResolutionReply,
   RESOLUTION_MARKER,
@@ -449,10 +450,12 @@ These issues were reported in a previous round and already resolved/closed. Do *
     const normalizedSummary = summaryText.replace(/\s+/g, ' ').trim();
     for (const c of existingComments) {
       const commentContent = c.comments?.[0]?.content ?? '';
-      if (commentContent.includes(botTag) && commentContent.includes(REVIEW_SUMMARY_MARKER)) {
-        let existing = commentContent.replaceAll(botTag, '');
+      if (isAgenticReviewerComment(commentContent) && commentContent.includes(REVIEW_SUMMARY_MARKER)) {
+        let existing = commentContent.replaceAll(LEGACY_BOT_TAG_PREFIX, '');
+        existing = existing.replace(/^Agentic Code Reviewer(?: \S+)?\s*\r?\n?/, '');
         existing = existing.replace(REVIEW_SUMMARY_MARKER, '');
         existing = existing.replace(/\s+/g, ' ').trim();
+
         if (existing === normalizedSummary) {
           log('Review summary already posted with identical content. Skipping.');
           return false;
@@ -482,7 +485,8 @@ These issues were reported in a previous round and already resolved/closed. Do *
       const comment = t.comments?.[0];
       if (!comment || comment.isDeleted) continue;
 
-      if (comment.content.includes(BOT_TAG_PREFIX) && comment.content.includes(ROUND_STATE_MARKER)) {
+      if (isAgenticReviewerComment(comment.content) && comment.content.includes(ROUND_STATE_MARKER)) {
+
         const match = comment.content.match(/Rodada:\s*(\d+)/i);
         const round = match ? Number.parseInt(match[1], 10) : 0;
         return {
