@@ -36,12 +36,9 @@ export function isHeadersTimeoutError(error: unknown): boolean {
 }
 
 function mergeAbortSignals(
-  runSignal: AbortSignal | undefined,
-  requestSignal: AbortSignal | null | undefined,
+  ...inputs: (AbortSignal | null | undefined)[]
 ): AbortSignal | undefined {
-  const signals: AbortSignal[] = [];
-  if (runSignal) signals.push(runSignal);
-  if (requestSignal) signals.push(requestSignal);
+  const signals = inputs.filter((signal): signal is AbortSignal => signal != null);
   if (signals.length === 0) return undefined;
   if (signals.length === 1) return signals[0];
   return AbortSignal.any(signals);
@@ -77,6 +74,47 @@ export function withAbortSignal<T>(signal: AbortSignal, promise: Promise<T>): Pr
   });
 }
 
+type UndiciFetchInit = Parameters<typeof undiciFetch>[1];
+
+/** O SDK OpenCode chama `fetch(request)` com `Request` global; undici não reconhece essa classe. */
+function toUndiciFetchArgs(
+  input: Parameters<typeof fetch>[0],
+  init: RequestInit | undefined,
+  agent: Agent,
+  runSignal: AbortSignal | undefined,
+): [string | URL, UndiciFetchInit] {
+  const signal = mergeAbortSignals(
+    runSignal,
+    input instanceof Request ? input.signal : undefined,
+    init?.signal ?? undefined,
+  );
+
+  if (input instanceof Request) {
+    return [
+      input.url,
+      {
+        method: input.method,
+        headers: input.headers,
+        body: input.body,
+        redirect: input.redirect,
+        signal,
+        dispatcher: agent,
+        ...(input.body != null ? { duplex: 'half' as const } : {}),
+      } as unknown as UndiciFetchInit,
+    ];
+  }
+
+  return [
+    input as string | URL,
+    {
+      ...init,
+      signal,
+      dispatcher: agent,
+      ...(init?.body != null ? { duplex: 'half' as const } : {}),
+    } as UndiciFetchInit,
+  ];
+}
+
 /**
  * Fetch para o client OpenCode: `session.prompt` só devolve headers quando o agente termina.
  * `runSignal` cancela o HTTP no mesmo instante do AbortController do runner.
@@ -85,11 +123,7 @@ export function createOpencodeFetch(timeoutMs: number, runSignal?: AbortSignal):
   const agent = agentForTimeout(timeoutMs);
 
   return (input, init) => {
-    const signal = mergeAbortSignals(runSignal, init?.signal ?? undefined);
-    return undiciFetch(input as Parameters<typeof undiciFetch>[0], {
-      ...init,
-      signal,
-      dispatcher: agent,
-    } as Parameters<typeof undiciFetch>[1]) as ReturnType<typeof fetch>;
+    const [url, undiciInit] = toUndiciFetchArgs(input, init, agent, runSignal);
+    return undiciFetch(url, undiciInit) as ReturnType<typeof fetch>;
   };
 }

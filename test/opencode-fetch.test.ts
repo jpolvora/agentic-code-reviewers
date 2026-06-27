@@ -28,6 +28,16 @@ describe('opencode fetch', () => {
     await assert.rejects(pending, (error: Error) => error.name === 'AbortError');
   });
 
+  it('createOpencodeFetch aceita Request global (SDK OpenCode passa só Request)', async () => {
+    const runFetch = createOpencodeFetch(600_000);
+    const request = new Request('http://127.0.0.1:9/test', { method: 'GET' });
+    await assert.rejects(
+      runFetch(request),
+      (error: Error & { cause?: { code?: string } }) =>
+        error.cause?.code === 'ECONNREFUSED' || error.message.includes('fetch failed'),
+    );
+  });
+
   it('createOpencodeFetch com runSignal rejeita imediatamente após abort', async () => {
     const runController = new AbortController();
     const runFetch = createOpencodeFetch(600_000, runController.signal);
