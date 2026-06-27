@@ -67,6 +67,13 @@ describe('checkSafeReview', () => {
     assert.equal(result.reason, 'analysis-structure');
   });
 
+  it('accepts analysis with bold section labels (markdown from LLM)', () => {
+    const boldAnalysis =
+      '1. **Evidência:** li Foo.cs. 2. **Cenário:** falha. 3. **Proteção:** sem testes. 4. **Descarte:** nits.';
+    const result = checkSafeReview(validReview({ analysis: boldAnalysis }), baseOptions());
+    assert.equal(result.safe, true);
+  });
+
   it('rejects protected path in fileName', () => {
     const result = checkSafeReview(
       validReview({ fileName: '.github/workflows/ci.yml', lineNumber: 1 }),

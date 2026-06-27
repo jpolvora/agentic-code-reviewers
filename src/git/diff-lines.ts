@@ -92,12 +92,8 @@ export function isLineInChangedDiff(
   const lines = changedLines.get(normalized);
   if (!lines) {
     const withoutLeading = normalized.startsWith('/') ? normalized.slice(1) : normalized;
-    const withLeading = normalized.startsWith('/') ? normalized : `/${normalized}`;
-    const altLines = changedLines.get(withoutLeading) ?? changedLines.get(withLeading);
-    if (!altLines) {
-      return false;
-    }
-    return altLines.has(lineNumber);
+    const altLines = changedLines.get(withoutLeading);
+    return altLines ? altLines.has(lineNumber) : false;
   }
   return lines.has(lineNumber);
 }

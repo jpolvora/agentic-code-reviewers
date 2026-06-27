@@ -15,8 +15,7 @@ export async function runMetaReviewer(
     return [];
   }
 
-  const criticalOnly = candidates.filter((r) => r.severity === 'critical');
-  const toReview = criticalOnly.length > 0 ? criticalOnly : candidates;
+  const toReview = candidates;
 
   const prompt = [
     '# Meta-Reviewer — síntese e filtro',

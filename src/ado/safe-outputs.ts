@@ -67,10 +67,10 @@ const DANGEROUS_MARKDOWN_PATTERNS: RegExp[] = [
 function hasAnalysisStructure(analysis: string): boolean {
   const text = analysis.trim();
   if (!text) return false;
-  const hasEvidence = /1\.\s*(?:Evidência|Evidencia)/i.test(text);
-  const hasScenario = /2\.\s*(?:Cenário|Cenario)/i.test(text);
-  const hasProtection = /3\.\s*(?:Proteção|Protecao)/i.test(text);
-  const hasDiscard = /4\.\s*(?:Descarte|Descartes)/i.test(text);
+  const hasEvidence = /1\.\s*\*{0,2}\s*(?:Evidência|Evidencia)/i.test(text);
+  const hasScenario = /2\.\s*\*{0,2}\s*(?:Cenário|Cenario)/i.test(text);
+  const hasProtection = /3\.\s*\*{0,2}\s*(?:Proteção|Protecao)/i.test(text);
+  const hasDiscard = /4\.\s*\*{0,2}\s*(?:Descarte|Descartes)/i.test(text);
   return hasEvidence && hasScenario && hasProtection && hasDiscard;
 }
 

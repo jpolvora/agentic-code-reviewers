@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { chunkFilesByCount } from '../src/orchestrator/chunk-diff.js';
-import { mergeReviews } from '../src/orchestrator/merge-reviews.js';
+import { mergeReviews, mergeCodeReviewResponses } from '../src/orchestrator/merge-reviews.js';
 import type { CodeReviewItem } from '../src/ado/types.js';
 
 describe('chunkFilesByCount', () => {
@@ -35,6 +35,23 @@ describe('mergeReviews', () => {
     const merged = mergeReviews([[a], [b]]);
     assert.equal(merged.length, 1);
     assert.equal(merged[0]!.score, 8);
+  });
+
+  it('mergeCodeReviewResponses preserva reviewSummary quando múltiplos chunks retornam sem reviews', () => {
+    const result = mergeCodeReviewResponses([
+      { reviews: [], reviewSummary: 'Chunk 1: nenhum problema.' },
+      { reviews: [], reviewSummary: 'Chunk 2: código limpo.' },
+    ]);
+    assert.equal(result.reviews.length, 0);
+    assert.ok(result.reviewSummary.includes('Chunk 1'));
+    assert.ok(result.reviewSummary.includes('Chunk 2'));
+  });
+
+  it('mergeCodeReviewResponses usa summary único quando há apenas um chunk', () => {
+    const result = mergeCodeReviewResponses([
+      { reviews: [], reviewSummary: 'Tudo certo.' },
+    ]);
+    assert.equal(result.reviewSummary, 'Tudo certo.');
   });
 
   it('preserves non-critical reviews when merging with filtered critical subset', () => {
