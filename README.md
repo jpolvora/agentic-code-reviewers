@@ -380,6 +380,22 @@ Utilize o template pronto do projeto: [`azure-pipelines-cursor-code-review.yml`]
 | [`.github/workflows/review-remote.yml`](.github/workflows/review-remote.yml) | `workflow_call` | Reusable workflow para **outros repositórios** (modo remoto) |
 | [`.github/workflows/release.yml`](.github/workflows/release.yml) | Push/merge → **`main`** | Testes, build de todas as engines, bump e deploy na branch `release` |
 
+##### Política de merge (`main`)
+
+O ruleset [`agentic-main`](.github/rulesets/agentic-main.json) (Settings → Rules) exige:
+
+- Alterações em **`main`** somente via PR (sem push direto)
+- **Todas as threads de review resolvidas** antes do merge (`required_review_thread_resolution`)
+- Sem force-push ou exclusão da branch default
+
+Fonte versionada em [`.github/rulesets/`](.github/rulesets/). Aplicar após editar:
+
+```bash
+bash scripts/apply-rulesets.sh
+```
+
+Os checks de code review (`continue-on-error: true`) **não** bloqueiam o merge por si só — apenas threads abertas na PR impedem o merge.
+
 ##### Code review (`code-review.yml`)
 
 Dispara **somente** em PRs com destino **`main`**. Um check por engine via matrix — por padrão **em paralelo**:
@@ -417,7 +433,7 @@ O `GITHUB_TOKEN` padrão do Actions (`github.token`) tem `pull-requests: write` 
 AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
 ```
 
-Sem o PAT, resolva threads manualmente na PR ou use a skill [`solve-pr`](.agents/skills/solve-pr/SKILL.md) localmente com um token que tenha escopo de escrita.
+Sem o PAT, resolva threads manualmente na PR ou use a skill [`solve-pr`](.agents/skills/solve-pr/SKILL.md) localmente com um token que tenha escopo de escrita. O ruleset [`agentic-main`](.github/rulesets/agentic-main.json) bloqueia merge em **`main`** enquanto houver threads de review abertas.
 
 ##### Release e deploy (`release.yml`)
 

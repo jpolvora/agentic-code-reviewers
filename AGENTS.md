@@ -154,6 +154,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `src/engine/cursor-sdk/stream.ts` | **Coupled to `@cursor/sdk`.** Streaming, timeout, sandbox, token usage. |
 | `run.sh` | Portable runner: **remote** mode (clone `release`) or **local** (`--local`, CI of this repo). |
 | `.github/workflows/code-review.yml` | CI of this repo — `run.sh --local`, engine matrix. |
+| `.github/rulesets/agentic-main.json` | Branch ruleset on **`main`**: PR required, all review threads resolved before merge. Apply via `scripts/apply-rulesets.sh`. |
 | `.github/workflows/review-remote.yml` | Reusable workflow for consumer repositories. |
 | `examples/consumer-github-workflow.yml` | Copy-paste template for GitHub consumers. |
 | `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
