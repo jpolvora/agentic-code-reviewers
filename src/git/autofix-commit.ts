@@ -48,7 +48,7 @@ export async function runAutoFixCommit(config: ReviewerConfig, logger: Logger, c
     logger.info('Push concluído com sucesso.');
     return true;
   } catch (error: any) {
-    logger.error(`Falha ao consolidar alterações no Git: ${error.message}`);
+    logger.error(`Falha ao consolidar alterações no Git: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }

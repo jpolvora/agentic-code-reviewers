@@ -193,7 +193,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         try {
           updatedContent = applyReplacements(fileContent, parsed.replacements);
         } catch (err: any) {
-          logger.error(`Erro ao aplicar substituições em ${filePath}: ${err.message}`);
+          logger.error(`Erro ao aplicar substituições em ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
           return;
         }
 
@@ -233,7 +233,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           }
         }
       } catch (err: any) {
-        logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err.message}`);
+        logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
       }
   });
 
