@@ -36,4 +36,35 @@ describe('mergeReviews', () => {
     assert.equal(merged.length, 1);
     assert.equal(merged[0]!.score, 8);
   });
+
+  it('preserves non-critical reviews when merging with filtered critical subset', () => {
+    const critical: CodeReviewItem = {
+      fileName: '/src/A.cs',
+      lineNumber: 10,
+      severity: 'critical',
+      comment: 'critical issue',
+      score: 9,
+      developerAction: 'fix-code',
+      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      impactPaths: ['/src/A.cs'],
+    };
+    const warning: CodeReviewItem = {
+      fileName: '/src/B.cs',
+      lineNumber: 20,
+      severity: 'warning',
+      comment: 'warning issue',
+      score: 7,
+      developerAction: 'fix-code',
+      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      impactPaths: ['/src/B.cs'],
+    };
+    const filtered = [critical];
+    const nonCritical = [warning];
+    const merged = mergeReviews([nonCritical, filtered]);
+    assert.equal(merged.length, 2);
+    assert.deepEqual(
+      merged.map((r) => r.fileName).sort(),
+      ['/src/A.cs', '/src/B.cs'],
+    );
+  });
 });

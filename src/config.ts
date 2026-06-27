@@ -497,15 +497,6 @@ function parseArgs(argv: string[]): CliArgs {
         args.engine = next;
         i++;
         break;
-      case '--generate-commit-message':
-        args.generateCommitMessage = true;
-        break;
-      case '--generate-pr-description':
-        args.generatePrDescription = true;
-        break;
-      case '--artifacts-only':
-        args.artifactsOnly = true;
-        break;
       default:
         break;
     }

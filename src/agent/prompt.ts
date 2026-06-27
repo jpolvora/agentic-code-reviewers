@@ -3,7 +3,11 @@ import type { ReviewerConfig } from '../config.js';
 import type { DiffPromptSection } from '../git/diff-prompt.js';
 import type { LocalReviewGitContext } from '../git/diff.js';
 import { loadPromptModuleContents, selectPromptModuleIds } from './prompt-modules.js';
-import { buildMcpPromptSection, prefetchMcpObservations } from '../mcp/mcp-prompt.js';
+import {
+  buildMcpPromptSection,
+  prefetchMcpObservations,
+  type McpObservation,
+} from '../mcp/mcp-prompt.js';
 
 export interface PromptContext {
   workItemContext: string;
@@ -13,6 +17,8 @@ export interface PromptContext {
   diffSection: DiffPromptSection;
   diffStats: { fileCount: number; files: string[] };
   gitContext: LocalReviewGitContext;
+  /** When set (e.g. parallel chunks), skips per-chunk MCP prefetch in buildAgentPrompt. */
+  mcpObservations?: McpObservation[];
 }
 
 const CODE_REVIEW_SKILL = 'skills/CODE_REVIEW.md';
@@ -265,7 +271,7 @@ export function buildAgentPrompt(config: ReviewerConfig, context: PromptContext)
     );
   }
 
-  const mcpObservations = prefetchMcpObservations(config, context);
+  const mcpObservations = context.mcpObservations ?? prefetchMcpObservations(config, context);
   const mcpSection = buildMcpPromptSection(config, mcpObservations);
   if (mcpSection) {
     sections.push('', mcpSection);

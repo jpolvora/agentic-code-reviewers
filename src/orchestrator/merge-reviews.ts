@@ -1,5 +1,5 @@
 import { reviewDedupKey } from '../ado/utils.js';
-import type { CodeReviewItem } from '../ado/types.js';
+import type { CodeReviewItem, ResolvedThreadItem } from '../ado/types.js';
 
 function commentPrefix(comment: string, length = 80): string {
   return comment.trim().slice(0, length).toLowerCase();
@@ -48,8 +48,6 @@ export function mergeReviews(chunks: CodeReviewItem[][]): CodeReviewItem[] {
 
   return merged;
 }
-
-import type { ResolvedThreadItem } from '../ado/types.js';
 
 export function mergeCodeReviewResponses(
   responses: Array<{ reviews: CodeReviewItem[]; resolvedThreads?: ResolvedThreadItem[]; reviewSummary?: string }>,

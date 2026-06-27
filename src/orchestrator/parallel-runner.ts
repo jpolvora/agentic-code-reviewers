@@ -7,9 +7,10 @@ import { runCodeReviewAgent } from '../agent/runner.js';
 import type { PromptContext } from '../agent/prompt.js';
 import { parseAgentReviewOutput } from '../parser/review-response.js';
 import { chunkFilesByCount } from './chunk-diff.js';
-import { mergeCodeReviewResponses } from './merge-reviews.js';
+import { mergeCodeReviewResponses, mergeReviews } from './merge-reviews.js';
 import { runMetaReviewer } from './meta-reviewer.js';
 import { getDiffPatch } from '../git/diff.js';
+import { prefetchMcpObservations } from '../mcp/mcp-prompt.js';
 
 export interface ParallelReviewOptions {
   parallelChunks: number;
@@ -29,6 +30,8 @@ export async function runParallelReview(
   const fileChunks = chunkFilesByCount(options.filteredFiles, options.parallelChunks);
   logger.info(`Parallel review: ${fileChunks.length} chunk(s), ${options.filteredFiles.length} file(s)`);
 
+  const mcpObservations = config.mcpEnabled ? prefetchMcpObservations(config, baseContext) : undefined;
+
   const chunkResults = await Promise.all(
     fileChunks.map(async (files, index) => {
       const diffSection = buildDiffPromptSection(
@@ -44,6 +47,7 @@ export async function runParallelReview(
           fileCount: files.length,
           files,
         },
+        ...(mcpObservations !== undefined ? { mcpObservations } : {}),
       };
 
       logger.info(`Chunk ${index + 1}/${fileChunks.length}: ${files.length} file(s)`);
@@ -60,7 +64,8 @@ export async function runParallelReview(
       files: options.filteredFiles,
     });
     const filtered = await runMetaReviewer(config, engine, logger, merged.reviews, diffExcerpt);
-    merged = { ...merged, reviews: filtered };
+    const nonCritical = merged.reviews.filter((r) => r.severity !== 'critical');
+    merged = { ...merged, reviews: mergeReviews([nonCritical, filtered]) };
   }
 
   const fullText = JSON.stringify({
