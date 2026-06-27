@@ -381,3 +381,5 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
     );
   }
 }
+
+
