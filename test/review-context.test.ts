@@ -267,18 +267,19 @@ describe('getPullRequestReviewContext', () => {
 
     assert.ok(context.contextForLlm.includes('- Erro com abreviação ex.: HTTP/REST e arquivo config.json.'));
   });
+});
 
-  describe('shouldPostReviewSummary', () => {
-    it('retorna postSummary=true e mensagem padrão quando não há threads pendentes do bot', () => {
-      const plan = shouldPostReviewSummary(false);
-      assert.equal(plan.postSummary, true);
-      assert.equal(plan.reviewSummary, CLEAN_PR_SUMMARY_MESSAGE);
-    });
+describe('shouldPostReviewSummary', () => {
+  it('retorna postSummary=true e mensagem padrão quando não há threads pendentes do bot', () => {
+    const plan = shouldPostReviewSummary(false);
+    assert.equal(plan.postSummary, true);
+    assert.equal(plan.reviewSummary, CLEAN_PR_SUMMARY_MESSAGE);
+  });
 
-    it('retorna postSummary=false e reviewSummary vazio quando há threads ativas/pendentes do bot', () => {
-      const plan = shouldPostReviewSummary(true);
-      assert.equal(plan.postSummary, false);
-      assert.equal(plan.reviewSummary, '');
-    });
+  it('retorna postSummary=false e reviewSummary vazio quando há threads ativas/pendentes do bot', () => {
+    const plan = shouldPostReviewSummary(true);
+    assert.equal(plan.postSummary, false);
+    assert.equal(plan.reviewSummary, '');
   });
 });
+
