@@ -14,7 +14,8 @@ import {
   RESOLUTION_MARKER,
 } from '../src/git/markers.js';
 import type { ActiveThreadInfo, CodeReviewItem, ResolvedThreadItem } from '../src/ado/types.js';
-
+import { ROUND_STATE_MARKER } from '../src/ado/round-state.js';
+import { GithubProvider } from '../src/provider/github.js';
 import { buildBotTag } from '../src/bot-tag.js';
 
 const BOT = buildBotTag('cursor-sdk');
@@ -170,5 +171,69 @@ describe('GitHub parity — marcadores de resolução', () => {
 
   it('ignora comentário sem marcador de resolução', () => {
     assert.equal(commentBodyHasResolutionReply(`${BOT}\n⚠️ **WARNING:** bug`, BOT), false);
+  });
+});
+
+describe('GithubProvider — parseRoundStateFromThreads', () => {
+  it('retorna round 0 quando não há thread de estado', () => {
+    const provider = new GithubProvider();
+    assert.deepEqual(provider.parseRoundStateFromThreads(null, BOT), {
+      round: 0,
+      threadId: null,
+      commentId: null,
+    });
+
+    const threads = {
+      value: [
+        {
+          id: '1',
+          comments: [{ id: 9, content: `${BOT}\nissue`, isDeleted: false }],
+        },
+      ],
+    };
+    assert.equal(provider.parseRoundStateFromThreads(threads, BOT).round, 0);
+  });
+
+  it('extrai round, threadId e commentId do marcador na thread geral do bot', () => {
+    const provider = new GithubProvider();
+    const threads = {
+      value: [
+        {
+          id: '42',
+          comments: [
+            {
+              id: 7,
+              content: `${BOT}\n${ROUND_STATE_MARKER}\n\n**Automatic review state** — Round: 2 / 3`,
+              isDeleted: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    assert.deepEqual(provider.parseRoundStateFromThreads(threads, BOT), {
+      round: 2,
+      threadId: '42',
+      commentId: 7,
+    });
+  });
+
+  it('parses legacy Rodada-format round-state threads', () => {
+    const provider = new GithubProvider();
+    const threads = {
+      value: [
+        {
+          id: '99',
+          comments: [
+            {
+              id: 1,
+              content: `${BOT}\n${ROUND_STATE_MARKER}\n\n**Estado da revisão automática** — Rodada: 5 / 10`,
+              isDeleted: false,
+            },
+          ],
+        },
+      ],
+    };
+    assert.equal(provider.parseRoundStateFromThreads(threads, BOT).round, 5);
   });
 });
