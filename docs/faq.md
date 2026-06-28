@@ -147,7 +147,7 @@ flowchart TD
 
 ### Quais variáveis de ambiente são mais usadas?
 
-**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (fallback `GITHUB_TOKEN`/`GH_TOKEN`), `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
+**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (fallback `GITHUB_TOKEN`/`GH_TOKEN`), `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 10), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
 
 *Evidência:* `src/config.ts`; `test/config.test.ts`.
 
@@ -443,9 +443,9 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Como funciona o escalonamento?
 
-**Resposta:** Contador em thread geral (`<!-- reviewer-round-state -->`). `currentRound = rodadasAnteriores + 1`. Se `currentRound > maxRounds` **e** há issues abertas: publica **só** `critical`; suprime novos `warning`/`suggestion`; avisa **revisão humana recomendada**. Default `maxRounds`: **5** (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; `0` desabilita).
+**Resposta:** Contador em thread geral (`<!-- reviewer-round-state -->`). `currentRound = rodadasAnteriores + 1`. Se `currentRound > maxRounds` **e** há issues abertas: publica **só** `critical`; suprime novos `warning`/`suggestion`; avisa **revisão humana recomendada**. Default `maxRounds`: **10** (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; `0` desabilita).
 
-*Evidência:* `src/ado/round-state.ts`; `src/index.ts` ~261–283; `src/config.ts` — `DEFAULT_MAX_ROUNDS = 5`.
+*Evidência:* `src/ado/round-state.ts`; `src/index.ts` ~261–283; `src/config.ts` — `DEFAULT_MAX_ROUNDS = 10`.
 
 ---
 

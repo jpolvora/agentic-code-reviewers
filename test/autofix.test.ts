@@ -195,7 +195,7 @@ describe('runAutoFixFlow', () => {
       run: async () => ({
         fullText: agentJson({
           replacements: [{ startLine: 1, endLine: 1, replacementContent: 'fixed' }],
-          resolvedThreads: [{ threadId: '1', explanation: 'Corrigido validação na linha 1.' }],
+          resolvedThreads: [{ threadId: '1', explanation: 'Fixed validation on line 1.' }],
         }),
       }),
     } as any;
@@ -248,7 +248,7 @@ describe('runAutoFixFlow', () => {
           return {
             fullText: agentJson({
               replacements: [{ startLine: 1, endLine: 1, replacementContent: 'linha 1 alterada' }],
-              resolvedThreads: [{ threadId: '1', explanation: 'Corrigido issue na linha 1.' }],
+              resolvedThreads: [{ threadId: '1', explanation: 'Fixed issue on line 1.' }],
             }),
           };
         } else {

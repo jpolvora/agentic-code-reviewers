@@ -235,7 +235,7 @@ export async function resolvePullRequestReviewThreads(
       continue;
     }
 
-    const reason = match.note?.trim() || 'Issue verificado como corrigido na iteração atual.';
+    const reason = match.note?.trim() || 'Issue verified as fixed in the current iteration.';
 
     const replyContent = [
       botTag,

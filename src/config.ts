@@ -274,7 +274,7 @@ const DEFAULT_MODEL = DEFAULT_CURSOR_REVIEWER_MODEL;
 
 const BASE_EXCLUDE = ['*/proxy/*', '*/bin/*', '*/obj/*', '*.md', '*.csproj', 'secret.txt'];
 
-const DEFAULT_MAX_ROUNDS = 5;
+const DEFAULT_MAX_ROUNDS = 10;
 const DEFAULT_ENGINE: ReviewerEngineName = 'cursor-sdk';
 const DEFAULT_SCORE_MIN = 6;
 const MAX_SCORE_MIN = 10;

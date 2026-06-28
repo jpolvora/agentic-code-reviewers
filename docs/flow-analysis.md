@@ -283,7 +283,7 @@ Garante a terminação do loop **correção ↔ reviewer** (manual, `solve-pr`, 
 
 - **Estado persistido:** thread geral (sem `filePath`) com marcador `<!-- reviewer-round-state -->` e `Rodada: N`. Lida via `parseRoundStateFromThreads` (a partir de `allThreads`), atualizada via PATCH (uma única thread, sem spam).
 - **Rodada atual** = rodadas anteriores + 1 (só com contexto ADO).
-- **Escalonamento** (`decideRoundEscalation`): quando `currentRound > maxRounds` (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`, default 5; `0` desabilita) **e** há reviews novos ou threads pendentes do bot.
+- **Escalonamento** (`decideRoundEscalation`): quando `currentRound > maxRounds` (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`, default 10; `0` desabilita) **e** há reviews novos ou threads pendentes do bot.
 - **Em escalonamento:** `splitReviewsForEscalation` mantém só `critical`; warnings/suggestions são suprimidos; `persistRoundState` grava o aviso de **revisão humana recomendada**. Resolução de threads confirmadas segue normal.
 - **Persistência:** somente quando a rodada teve issues (`hasOpenIssues || escalate`). Dry-run apenas loga a decisão (sem POST/PATCH).
 
@@ -371,7 +371,7 @@ Resumo positivo (PR limpa):
 [Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
 
-Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
+All pending issues have been successfully resolved! The PR is ready to be merged. 🚀
 ```
 
 ---

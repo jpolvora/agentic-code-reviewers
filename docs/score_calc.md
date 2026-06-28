@@ -253,7 +253,7 @@ Em `src/parser/review-response.ts`:
 | **Corpo da thread** | `format-thread.ts` — prefixo por severity + bloco `<details>` com `Score: N/10` |
 | **Pipeline Azure DevOps** | `pipeline-logging.ts` — `critical` → `##vso[task.logissue type=error]`; demais → `type=warning` |
 | **Resumo positivo** | No fim do review, só se zero threads ativas/pendentes do bot; mensagem fixa do runner |
-| **Escalonamento** | `currentRound > AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 5) + issues abertas → publica **só** `critical`; suprime `warning`/`suggestion` novos |
+| **Escalonamento** | `currentRound > AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 10) + issues abertas → publica **só** `critical`; suprime `warning`/`suggestion` novos |
 | **Dedup** | Chave `arquivoNormalizado\|line:N` — mesma linha não gera thread duplicada |
 
 ---

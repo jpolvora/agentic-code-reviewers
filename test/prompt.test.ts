@@ -89,14 +89,14 @@ describe('buildAgentPrompt', () => {
 
     const prompt = buildAgentPrompt(minimalConfig(skillPath, systemPromptPath), promptContext);
 
-    assert.ok(prompt.includes('Modo somente leitura (obrigatório'));
-    assert.ok(prompt.includes('Contrato de saída (JSON)'));
-    assert.ok(prompt.includes('Rules do projeto'));
-    assert.ok(prompt.includes('# Harness do projeto'));
+    assert.ok(prompt.includes('Read-Only Mode (mandatory'));
+    assert.ok(prompt.includes('Output Contract (JSON)'));
+    assert.ok(prompt.includes('Project Rules'));
+    assert.ok(prompt.includes('# Project Harness'));
     assert.ok(prompt.includes(skillOnDisk));
     assert.ok(prompt.includes('git diff origin/master'));
-    assert.ok(prompt.includes('### Fase 1 — Triagem'));
-    assert.ok(prompt.includes('### Fase 2 — Investigação profunda'));
+    assert.ok(prompt.includes('### Phase 1 — Triage'));
+    assert.ok(prompt.includes('### Phase 2 — Deep Investigation'));
 
     const jsonSchemaOccurrences = prompt.split('```json').length - 1;
     assert.equal(jsonSchemaOccurrences, 1);
@@ -115,7 +115,7 @@ describe('buildAgentPrompt', () => {
 
     assert.ok(prompt.includes('**Pull Request ID (Azure DevOps):** #789'));
     assert.ok(prompt.includes('SYSTEM_PULLREQUEST_PULLREQUESTID'));
-    assert.ok(prompt.includes('não confunda o ID da PR com IDs de Work Items'));
+    assert.ok(prompt.includes('do not confuse the PR ID with linked Work Item IDs'));
   });
 
   it('inclui diff embutido e descrição da PR quando fornecidos', () => {
@@ -136,10 +136,10 @@ describe('buildAgentPrompt', () => {
       ctx,
     );
 
-    assert.ok(prompt.includes('## Diff da PR (pré-carregado)'));
+    assert.ok(prompt.includes('## PR Diff (pre-loaded)'));
     assert.ok(prompt.includes('+added line'));
     assert.ok(prompt.includes('Equipamentos Florestais'));
-    assert.ok(prompt.includes('Use o **diff pré-carregado**'));
+    assert.ok(prompt.includes('Use the **pre-loaded diff**'));
   });
 
   it('inclui metadados da stack e arquivo de recomendação no prompt', () => {
@@ -152,8 +152,8 @@ describe('buildAgentPrompt', () => {
     const prompt = buildAgentPrompt(config, promptContext);
 
     assert.ok(prompt.includes('- **Stack:** `PHP/Laravel`'));
-    assert.ok(prompt.includes('# Recomendações Específicas da Stack (PHP/Laravel)'));
-    assert.ok(prompt.includes('Problema de Query N+1'));
+    assert.ok(prompt.includes('# Specific Stack Recommendations (PHP/Laravel)'));
+    assert.ok(prompt.includes('N+1 Query Problem'));
   });
 
   it('injeta scoreMin no contexto da execução e nas fases do workflow', () => {
@@ -164,10 +164,10 @@ describe('buildAgentPrompt', () => {
 
     const prompt = buildAgentPrompt(config, promptContext);
 
-    assert.ok(prompt.includes('**Score mínimo para threads'));
+    assert.ok(prompt.includes('Minimum score for threads'));
     assert.ok(prompt.includes('**4**'));
     assert.ok(prompt.includes('scoreMin = 4'));
-    assert.ok(prompt.includes('score < 4 → omita'));
+    assert.ok(prompt.includes('score < 4 → omit'));
     assert.ok(prompt.includes('score ≥ 4'));
   });
 });

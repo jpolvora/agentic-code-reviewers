@@ -26,7 +26,7 @@ describe('buildRulesMap', () => {
 
     assert.ok(result.alwaysApplyRules.length > 0);
     assert.ok(result.uniqueRules.length > 0);
-    assert.ok(result.contextForPrompt.includes('Rules do projeto'));
+    assert.ok(result.contextForPrompt.includes('Project Rules'));
     assert.ok(result.contextForPrompt.includes('main.mdc') || result.alwaysApplyRules.some((r) => r.includes('main.mdc')));
   });
 });

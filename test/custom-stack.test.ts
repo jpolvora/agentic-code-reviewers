@@ -337,7 +337,7 @@ describe('Custom Stack and Prompts', () => {
     };
 
     const prompt = buildAgentPrompt(config, promptContext);
-    assert.ok(prompt.includes('# Recomendações Específicas da Stack (Custom)'));
+    assert.ok(prompt.includes('# Specific Stack Recommendations (Custom)'));
     assert.ok(prompt.includes('Este é o prompt customizado secreto 12345'));
   });
 

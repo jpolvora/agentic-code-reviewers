@@ -200,12 +200,12 @@ Rules pré-mapeadas + `.agents/skills/code-review/SKILL.md` + `AGENTS.md` + `doc
 
 #### 2.3 — Prova obrigatória (`analysis`)
 
-Para incluir em `reviews`, documente **4 seções numeradas** (exigido pelo Safe Outputs):
+Para incluir em `reviews`, documente **4 seções numeradas em inglês** (exigido pelo Safe Outputs):
 
-1. **Evidência lida** — arquivos/símbolos (liste em `impactPaths`).
-2. **Cenário de falha executável** — entrada/estado que dispara o problema.
-3. **Proteção ausente** — por que testes/validações **não** cobrem (cite o que verificou).
-4. **Descartes** — hipóteses alternativas rejeitadas.
+1. **Evidence** — arquivos/símbolos (liste em `impactPaths`).
+2. **Scenario** — cenário de falha executável (entrada/estado que dispara o problema).
+3. **Protection** — por que testes/validações **não** cobrem (cite o que verificou).
+4. **Discards** — hipóteses alternativas rejeitadas.
 
 Não completou os 4 → **não inclua**.
 
@@ -249,7 +249,7 @@ Retorne **exclusivamente** um bloco fenced ` ```json ` válido.
       "comment": "Descrição objetiva e causal (sem blocos de código).",
       "score": 9,
       "developerAction": "fix-code",
-      "analysis": "1. **Evidência lida:** ... 2. **Cenário de falha:** ... 3. **Proteção ausente:** ... 4. **Descartes:** ...",
+      "analysis": "1. **Evidence:** ... 2. **Scenario:** ... 3. **Protection:** ... 4. **Discards:** ...",
       "impactPaths": ["/src/Foo.cs", "/test/FooTests.cs"],
       "suggestedFix": "```csharp\n// patch cirúrgico\n```",
       "relatedOccurrences": [
@@ -311,7 +311,7 @@ Quando `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS=true` (default), aplique **antes** d
 | **Diff-line** | `lineNumber` em linha **alterada** no diff (`REQUIRE_DIFF_LINE`, default true) |
 | **Protected paths** | Não referenciar CI, locks, manifests, `.env*` (globs em `DEFAULT_PROTECTED_PATTERNS` + `PROTECTED_PATTERNS`) |
 | **Severity ↔ score** | `critical`: max(9, scoreMin)–10; `warning`: scoreMin–8; `suggestion`: scoreMin–7 |
-| **Analysis structure** | Seções numeradas 1–4: Evidência, Cenário, Proteção, Descarte |
+| **Analysis structure** | Four numbered sections in English (Evidence, Scenario, Protection, Discards) |
 | **Size limits** | `comment`/`analysis` ≤ 8000 chars; `suggestedFix` ≤ 16000 |
 | **Secrets** | Bloqueia padrões de credencial (PAT, AWS keys, private keys, etc.) |
 | **Markdown perigoso** | Bloqueia `<script>`, `javascript:`, `onerror=`, `<iframe>` |
@@ -324,7 +324,7 @@ Reviews rejeitados aqui **não** viram threads — ajuste ou descarte antes de e
 
 - Marcador: `<!-- reviewer-round-state -->` em thread geral do bot (`Rodada: N`).
 - `currentRound = priorRound.round + 1` (0 sem contexto).
-- `escalate = maxRounds > 0 && currentRound > maxRounds && hasOpenIssues` (default `maxRounds=5`).
+- `escalate = maxRounds > 0 && currentRound > maxRounds && hasOpenIssues` (default `maxRounds=10`).
 - Em escalonamento: mantenha só `critical`; suprima `warning`/`suggestion`; aviso de handoff humano; limpe `reviewSummary`.
 - `hasOpenIssues` = novos reviews publicáveis **ou** threads bot pendentes.
 

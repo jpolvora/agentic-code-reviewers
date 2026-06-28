@@ -98,7 +98,7 @@ O runner publica threads na PR mas **não reprova a build** (exit 0). Desenvolve
 - **Dedup:** chave `arquivoNormalizado\|line:N`
 - **Resolução:** match por `threadId` ou `fileName`+`lineNumber`
 - **Threads:** publicadas quando `score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6) — critério para auto-fix enxergar issues
-- **ReviewSummary:** publicado **no fim** do review, só quando **zero** threads ativas/pendentes do bot; mensagem fixa: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`
+- **ReviewSummary:** publicado **no fim** do review, só quando **zero** threads ativas/pendentes do bot; mensagem fixa: `All pending issues have been successfully resolved! The PR is ready to be merged. 🚀`
 
 | Exit code | Significado |
 |-----------|-------------|
@@ -424,7 +424,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 ```
 [Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
-Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
+All pending issues have been successfully resolved! The PR is ready to be merged. 🚀
 ```
 
 ---

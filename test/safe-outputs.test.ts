@@ -9,7 +9,7 @@ import type { CodeReviewItem } from '../src/ado/types.js';
 import { parseChangedLinesFromDiff } from '../src/git/diff-lines.js';
 
 const VALID_ANALYSIS =
-  '1. Evidência: li Foo.cs. 2. Cenário: falha ao salvar. 3. Proteção: sem testes. 4. Descarte: nits de estilo.';
+  '1. Evidence: read Foo.cs. 2. Scenario: fail to save. 3. Protection: no tests. 4. Discards: style nits.';
 
 function validReview(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
   return {
@@ -87,9 +87,24 @@ describe('checkSafeReview', () => {
 
   it('accepts analysis with bold section labels (markdown from LLM)', () => {
     const boldAnalysis =
-      '1. **Evidência:** li Foo.cs. 2. **Cenário:** falha. 3. **Proteção:** sem testes. 4. **Descarte:** nits.';
+      '1. **Evidence:** read Foo.cs. 2. **Scenario:** fail. 3. **Protection:** no tests. 4. **Discards:** nits.';
     const result = checkSafeReview(validReview({ analysis: boldAnalysis }), baseOptions());
     assert.equal(result.safe, true);
+  });
+
+  it('accepts analysis in English (standard format)', () => {
+    const englishAnalysis =
+      '1. Evidence: read Foo.cs. 2. Scenario: error on save. 3. Protection: missing validations. 4. Discards: not a nit.';
+    const result = checkSafeReview(validReview({ analysis: englishAnalysis }), baseOptions());
+    assert.equal(result.safe, true);
+  });
+
+  it('rejects analysis with Portuguese variations (since we only allow English contracts now)', () => {
+    const ptVarAnalysis =
+      '1. Evidência: linha 90 usa DateTime.Now. 2. Causal: servidor grava local. 3. Proteções ausentes: sem conversão na API. 4. Descartes: não é offset explícito.';
+    const result = checkSafeReview(validReview({ analysis: ptVarAnalysis }), baseOptions());
+    assert.equal(result.safe, false);
+    assert.equal(result.reason, 'analysis-structure');
   });
 
   it('rejects protected path in fileName', () => {

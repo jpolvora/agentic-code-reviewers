@@ -1,22 +1,22 @@
-# Recomendações Específicas: ABP/Angular (C#/.NET/ABP/Angular)
+# Specific Recommendations: ABP/Angular (C#/.NET/ABP/Angular)
 
-Você deve focar nos seguintes padrões e problemas comuns ao revisar código desta stack:
+You should focus on the following common patterns and issues when reviewing code in this stack:
 
-## 1. Frontend Angular & Typescript
-*   **Vazamento de Memória (Memory Leaks) em Componentes:**
-    *   Certifique-se de que todas as subscrições a `Observable`s no componente sejam limpas ao destruir o componente (usando o operador `takeUntil` com um `Subject` disparado no `ngOnDestroy`, ou convertendo para promises/usando o pipe `async` no template HTML).
-*   **Segurança e Permissões:**
-    *   Verifique se as ações e elementos interativos do template usam diretivas de permissão do ABP como `*abpPermission` ou se os componentes injetam `PermissionCheckerService` antes de exibir botões confidenciais ou executar lógicas restritas.
-*   **Tipagem estrita:**
-    *   Evite o uso do tipo `any` sem justificativa sólida. Prefira DTOs e interfaces typescript mapeadas a partir das APIs C#.
+## 1. Angular & TypeScript Frontend
+*   **Memory Leaks in Components:**
+    *   Ensure that all subscriptions to `Observable`s in the component are cleaned up when the component is destroyed (using the `takeUntil` operator with a `Subject` triggered in `ngOnDestroy`, converting to promises, or using the `async` pipe in the HTML template).
+*   **Security and Permissions:**
+    *   Check if actions and interactive elements in the template use ABP permission directives like `*abpPermission` or if components inject `PermissionCheckerService` before displaying sensitive buttons or executing restricted logic.
+*   **Strict Typing:**
+    *   Avoid using the `any` type without a solid justification. Prefer TypeScript DTOs and interfaces mapped from C# APIs.
 
-## 2. Backend C# / .NET / ABP Framework
-*   **Programação Assíncrona:**
-    *   Evite bloquear chamadas assíncronas utilizando propriedades ou métodos síncronos como `.Result`, `.Wait()` ou `.GetAwaiter().GetResult()`. Isso pode travar a thread pool (thread pool starvation). Use sempre `async` e `await` propagando até o entrypoint.
-*   **Autorização e Segurança:**
-    *   Endpoints em classes que herdam de `ApplicationService` ou Controllers devem possuir decoradores de autorização explícitos (ex: `[Authorize]`, `[AbpAuthorize]`).
-*   **Validação de DTOs:**
-    *   Verifique se DTOs de entrada possuem anotações de validação apropriadas (ex: `[Required]`, `[StringLength]`, `[EmailAddress]`). Evite receber strings ou tipos primitivos sem validação.
+## 2. C# / .NET / ABP Framework Backend
+*   **Asynchronous Programming:**
+    *   Avoid blocking asynchronous calls using synchronous properties or methods like `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`. This can cause thread pool starvation. Always use `async` and `await`, propagating them up to the entry point.
+*   **Authorization and Security:**
+    *   Endpoints in classes inheriting from `ApplicationService` or Controllers must have explicit authorization decorators (e.g., `[Authorize]`, `[AbpAuthorize]`).
+*   **DTO Validation:**
+    *   Check if input DTOs have appropriate validation annotations (e.g., `[Required]`, `[StringLength]`, `[EmailAddress]`). Avoid receiving raw strings or primitive types without validation.
 *   **EF Core / Performance:**
-    *   Cuidado com consultas que carregam grandes volumes de dados desnecessariamente. Use `.AsNoTracking()` para queries de somente leitura.
-    *   Certifique-se de que não haja queries N+1 causadas por laços que executam consultas individualmente (use `.Include` ou projete com `.Select`).
+    *   Watch out for queries that load large volumes of data unnecessarily. Use `.AsNoTracking()` for read-only queries.
+    *   Ensure there are no N+1 queries caused by loops executing queries individually (use `.Include` or project with `.Select`).

@@ -195,9 +195,9 @@ export class GithubProvider implements PlatformProvider {
 `;
 
         contextForLlm += `
-### Padrões de Risco Detectados Nesta PR (Memória Intra-PR)
+### Risk Patterns Detected in This PR (Intra-PR Memory)
 
-Nas rodadas anteriores, foram identificados os seguintes problemas na base de código:
+In previous rounds, the following issues were identified in the codebase:
 `;
         const allSummaries = new Set<string>();
         for (const row of [...activeContextRows, ...resolvedContextRows]) {
@@ -209,8 +209,7 @@ Nas rodadas anteriores, foram identificados os seguintes problemas na base de c�
         for (const summary of allSummaries) {
           contextForLlm += `${summary}\n`;
         }
-        contextForLlm += `
-**Ação Obrigatória (Fase 1 e 2):** Ao analisar o diff atual, priorize a busca por variações destes mesmos erros. O desenvolvedor pode ter corrigido a linha exata apontada anteriormente, mas cometido o mesmo erro nos novos arquivos/linhas deste commit. Use tools para caçar ativamente as mesmas vulnerabilidades e agrupe-as via \`relatedOccurrences\`.
+        contextForLlm += `\n**Mandatory Action (Phases 1 and 2):** When analyzing the current diff, prioritize searching for variations of these same errors. The developer may have fixed the exact line pointed out previously but made the same mistake in new files/lines of this commit. Use tools to actively hunt for the same vulnerabilities and group them via \`relatedOccurrences\`.
 `;
 
         contextForLlm += `
@@ -314,7 +313,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
         continue;
       }
 
-      const reason = match.note?.trim() || 'Issue verificado como corrigido na iteração atual.';
+      const reason = match.note?.trim() || 'Issue verified as fixed in the current iteration.';
       const replyContent = [
         botTag,
         RESOLUTION_MARKER,
@@ -487,7 +486,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
 
       if (isAgenticReviewerComment(comment.content) && comment.content.includes(ROUND_STATE_MARKER)) {
 
-        const match = comment.content.match(/Rodada:\s*(\d+)/i);
+        const match = comment.content.match(/(?:Round|Rodada):\s*(\d+)/i);
         const round = match ? Number.parseInt(match[1], 10) : 0;
         return {
           round: Number.isFinite(round) && round > 0 ? round : 0,

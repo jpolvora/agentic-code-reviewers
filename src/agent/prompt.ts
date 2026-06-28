@@ -27,7 +27,7 @@ function loadFileContent(path: string, label: string): string {
   try {
     return readFileSync(path, 'utf8');
   } catch (error) {
-    throw new Error(`Falha ao carregar ${label}: ${path} — ${String(error)}`);
+    throw new Error(`Failed to load ${label}: ${path} — ${String(error)}`);
   }
 }
 
@@ -35,7 +35,7 @@ function buildSkillSection(skillContent: string): string[] {
   return [
     '---',
     '',
-    '# Harness do projeto',
+    '# Project Harness',
     '',
     skillContent,
   ];
@@ -48,17 +48,17 @@ function buildDiffSection(diffSection: DiffPromptSection): string[] {
 
   const modeLabel =
     diffSection.mode === 'full'
-      ? 'unified diff completo'
+      ? 'complete unified diff'
       : diffSection.mode === 'per-file'
-        ? `por arquivo (${diffSection.includedFiles} incluídos)`
-        : 'resumo';
+        ? `per file (${diffSection.includedFiles} included)`
+        : 'summary';
 
   return [
     '---',
     '',
-    '## Diff da PR (pré-carregado)',
+    '## PR Diff (pre-loaded)',
     '',
-    `> Modo: **${modeLabel}**. Use esta seção na **Fase 1**; complemente com \`read\`/\`grep\` na Fase 2.`,
+    `> Mode: **${modeLabel}**. Use this section in **Phase 1**; complement with \`read\`/\`grep\` in Phase 2.`,
     '',
     diffSection.content,
     '',
@@ -75,7 +75,7 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
 
   const largePrNote =
     context.diffStats.fileCount > 20
-      ? `\n> **PR grande (${context.diffStats.fileCount} arquivos):** execute as duas fases em **todos** os arquivos elegíveis — sem atalhos.\n`
+      ? `\n> **Large PR (${context.diffStats.fileCount} files):** execute both phases on **all** eligible files — no shortcuts.\n`
       : '';
 
   const lines = [
@@ -90,17 +90,17 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
 
   lines.push(
     '',
-    '## Contexto da execução',
+    '## Execution Context',
     '',
-    `\`cwd\` = \`${config.repoRoot}\`. Diff e rules já estão embutidos abaixo; use tools para expandir contexto na Fase 2.`,
+    `\`cwd\` = \`${config.repoRoot}\`. Diff and rules are already embedded below; use tools to expand context in Phase 2.`,
     '',
   );
 
   if (config.pullRequestId > 0) {
     lines.push(
       `- **Pull Request ID (Azure DevOps):** #${config.pullRequestId}`,
-      `- **Fonte do ID da PR:** \`${config.pullRequestIdSource || 'desconhecida'}\``,
-      `- **Atenção:** não confunda o ID da PR com IDs de Work Items (User Story/Task) linkados à PR.`,
+      `- **PR ID Source:** \`${config.pullRequestIdSource || 'unknown'}\``,
+      `- **Warning:** do not confuse the PR ID with linked Work Item IDs (User Story/Task).`,
       '',
     );
   }
@@ -109,10 +109,10 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
     `- **Branch:** \`${sourceRef}\` → \`${targetRef}\``,
     `- **Diff range:** \`${diffScopeLabel}\``,
     `- **Stack:** \`${config.stack}\``,
-    `- **Score mínimo para threads (\`AGENTIC_CODE_REVIEWERS_SCORE_MIN\`):** **${config.scoreMin}** — inclua em \`reviews\` **somente** achados com \`score ≥ ${config.scoreMin}\`; o runner descarta o restante antes de criar threads (default da pipeline: 6; CLI \`--score-min\` e env têm precedência).`,
-    `- **Arquivos elegíveis:** ${context.diffStats.fileCount}`,
+    `- **Minimum score for threads (\`AGENTIC_CODE_REVIEWERS_SCORE_MIN\`):** **${config.scoreMin}** — include in \`reviews\` **only** findings with \`score ≥ ${config.scoreMin}\`; the runner discards the rest before creating threads (pipeline default: 6; CLI \`--score-min\` and env take precedence).`,
+    `- **Eligible files:** ${context.diffStats.fileCount}`,
     context.diffStats.files.length > 0
-      ? `- **Lista:** ${context.diffStats.files.slice(0, 30).join(', ')}${context.diffStats.files.length > 30 ? '...' : ''}`
+      ? `- **List:** ${context.diffStats.files.slice(0, 30).join(', ')}${context.diffStats.files.length > 30 ? '...' : ''}`
       : '',
     `- **Include:** ${config.includePatterns.join(', ')}`,
     `- **Exclude:** ${config.excludePatterns.join(', ')}`,
@@ -128,12 +128,12 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
 
 function buildSeedTestSection(): string[] {
   return [
-    '## Modo seed test (obrigatório nesta execução)',
+    '## Seed Test Mode (mandatory in this run)',
     '',
-    '1. Leia `scripts/cursor-reviewer/SEED-ISSUES.md` e `fixtures/seed/expected-scenarios.json`.',
-    '2. Reporte cada defeito intencional nos arquivos `CursorReviewerSeed*` / `cursor-reviewer-seed*`.',
-    '3. Não descarte achados só por `Compile Remove` ou rota Angular ausente.',
-    '4. Cada review: `suggestedFix`, score ≥ 5, keywords do cenário.',
+    '1. Read `scripts/cursor-reviewer/SEED-ISSUES.md` and `fixtures/seed/expected-scenarios.json`.',
+    '2. Report each intentional defect in files `CursorReviewerSeed*` / `cursor-reviewer-seed*`.',
+    '3. Do not discard findings just because of `Compile Remove` or missing Angular route.',
+    '4. Each review: `suggestedFix`, score ≥ 5, scenario keywords.',
     '',
   ];
 }
@@ -142,93 +142,93 @@ function buildTwoPhaseWorkflow(context: PromptContext, scoreMin: number): string
   const diffRange = context.gitContext.diffRange;
   const hasEmbeddedDiff = context.diffSection.mode !== 'empty';
   const diffStep = hasEmbeddedDiff
-    ? 'Use o **diff pré-carregado** acima como base da triagem.'
+    ? 'Use the **pre-loaded diff** above as the triage base.'
     : context.gitContext.includeUncommitted
-      ? `Execute \`git diff ${diffRange}\` **e** \`git diff HEAD\` / untracked nos paths elegíveis.`
-      : `Execute \`git diff ${diffRange}\` nos arquivos elegíveis.`;
+      ? `Execute \`git diff ${diffRange}\` **and** \`git diff HEAD\` / untracked on eligible paths.`
+      : `Execute \`git diff ${diffRange}\` on eligible files.`;
 
   const omittedNote =
     context.diffSection.omittedFiles > 0
-      ? `\n   - **${context.diffSection.omittedFiles} arquivo(s)** ficaram fora do diff embutido — leia via tools antes de concluir.`
+      ? `\n   - **${context.diffSection.omittedFiles} file(s)** were left out of the embedded diff — read via tools before concluding.`
       : '';
 
   return [
-    '## Análise em duas fases (obrigatória — não pule etapas)',
+    '## Two-Phase Analysis (mandatory — do not skip steps)',
     '',
-    'Complete **Fase 1 inteira** antes de iniciar a Fase 2. Não publique achado sem passar pelas duas.',
+    'Complete **Phase 1 entirely** before starting Phase 2. Do not publish any findings without going through both.',
     '',
-    '### Fase 1 — Triagem (mapa de candidatos)',
+    '### Phase 1 — Triage (candidate map)',
     '',
-    'Objetivo: lista enxuta de **hipóteses** ancoradas em linhas alteradas — ainda **sem** veredito final.',
+    'Objective: lean list of **hypotheses** anchored on modified lines — still **without** final verdict.',
     '',
     `1. ${diffStep}`,
-    '2. Incorpore descrição da PR, work items e threads ADO (contexto abaixo, se houver).',
-    `3. Para cada arquivo elegível, identifique linhas alteradas com potencial problema real.${omittedNote}`,
-    '4. **Descarte imediatamente:** nits, estilo, preferências, alertas teóricos sem caminho executável, código pré-existente intocado.',
-    '5. Em `*.html`: ignore CSS/Tailwind/layout; candidate só segurança, permissões, bindings e validações.',
-    '6. Mantenha candidato somente com hipótese concreta de falha, regressão ou violação de regra.',
+    '2. Incorporate PR description, work items, and ADO threads (context below, if any).',
+    `3. For each eligible file, identify modified lines with potential real issues.${omittedNote}`,
+    '4. **Discard immediately:** nits, style, preferences, theoretical warnings without executable path, untouched pre-existing code.',
+    '5. In `*.html`: ignore CSS/Tailwind/layout; candidate only security, permissions, bindings, and validations.',
+    '6. Keep candidate only with concrete hypothesis of failure, regression, or rule violation.',
     '',
-    '**Saída mental da Fase 1:** lista de candidatos `(arquivo, linha, hipótese breve)` — pode estar vazia.',
+    '**Mental output of Phase 1:** list of candidates `(file, line, brief hypothesis)` — may be empty.',
     '',
-    '### Fase 2 — Investigação profunda + classificação (obrigatória por candidato)',
+    '### Phase 2 — Deep Investigation + Classification (mandatory per candidate)',
     '',
-    'Objetivo: **provar ou refutar** cada candidato com tools; só os comprovados entram em `reviews`.',
+    'Objective: **prove or refute** each candidate with tools; only proven ones enter \`reviews\`.',
     '',
-    '#### 2.1 — Carregar critérios do projeto',
+    '#### 2.1 — Load project criteria',
     '',
-    'Leia as **rules pré-mapeadas** (seção acima) e a skill: `.agents/skills/code-review/SKILL.md`.',
+    'Read the **pre-mapped rules** (section above) and the skill: `.agents/skills/code-review/SKILL.md`.',
     '',
-    '#### 2.2 — Expandir contexto com tools (por candidato)',
+    '#### 2.2 — Expand context with tools (per candidate)',
     '',
-    '| Camada | O que ler (`read`, `grep`, `glob`, busca semântica) |',
+    '| Layer | What to read (`read`, `grep`, `glob`, semantic search) |',
     '|--------|-----------------------------------------------------|',
-    '| Arquivo alterado | Arquivo inteiro ou símbolos + trechos adjacentes |',
-    '| Backend | Entidade/DTO, AppService, `[Authorize]`, EF, constantes `Domain.Shared` |',
-    '| Frontend | Componente, template, guards, `*abpPermission`, formulários |',
-    '| Testes | `test/**/*`, specs — cobertura existente ou ausência material |',
-    '| Consumidores | Chamadores, fluxo ponta a ponta (API → service → UI) |',
-    '| Projeto | Rules listadas acima, `docs/` quando regra de negócio |',
+    '| Modified file | Full file or symbols + adjacent segments |',
+    '| Backend | Entity/DTO, AppService, `[Authorize]`, EF, `Domain.Shared` constants |',
+    '| Frontend | Component, template, guards, `*abpPermission`, forms |',
+    '| Tests | `test/**/*`, specs — existing coverage or material absence |',
+    '| Consumers | Callers, end-to-end flow (API → service → UI) |',
+    '| Project | Rules listed above, `docs/` when business rule |',
     '',
-    '#### 2.3 — Prova obrigatória (documentar em `analysis`)',
+    '#### 2.3 — Mandatory Proof (document in `analysis`)',
     '',
-    'Para incluir em `reviews`, complete os 4 itens com evidência de tools:',
+    'To include in `reviews`, complete the 4 items with evidence from tools:',
     '',
-    '1. **Evidência lida** — arquivos/símbolos inspecionados (liste em `impactPaths`).',
-    '2. **Cenário de falha executável** — entrada/estado que dispara o problema.',
-    '3. **Proteção ausente** — por que testes/validações/invariantes **não** cobrem (cite o que verificou).',
-    '4. **Descartes** — hipóteses alternativas consideradas e rejeitadas.',
+    '1. **Evidence** — inspected files/symbols (list in `impactPaths`).',
+    '2. **Scenario** — executable failure scenario: input/state that triggers the problem.',
+    '3. **Protection** — why tests/validations/invariants **do not** cover (cite what you verified).',
+    '4. **Discards** — alternative hypotheses considered and rejected.',
     '',
-    'Não completou os 4 → **não inclua** em `reviews`.',
+    'Did not complete all 4 → **do not include** in `reviews`.',
     '',
-    '#### 2.4 — Classificar e filtrar',
+    '#### 2.4 — Classify and Filter',
     '',
-    `> **Parâmetro obrigatório desta execução — scoreMin = ${scoreMin}** (env \`AGENTIC_CODE_REVIEWERS_SCORE_MIN\` ou \`--score-min\`; default 6). Achados com \`score < ${scoreMin}\` **nunca** entram em \`reviews\` — o gate TypeScript descarta antes de abrir threads na PR.`,
+    `> **Mandatory parameter of this execution — scoreMin = ${scoreMin}** (env \`AGENTIC_CODE_REVIEWERS_SCORE_MIN\` or \`--score-min\`; default 6). Findings with \`score < ${scoreMin}\` **never** enter \`reviews\` — the TypeScript gate discards before creating threads in the PR.`,
     '',
-    '1. Atribua `severity` e `score` conforme tabelas do **System Prompt**.',
-    `2. Aplique o filtro de publicação: **score < ${scoreMin} → omita** (não envie no JSON); só \`fix-code\` ou \`escalate\`.`,
-    '3. Combine múltiplos achados na **mesma linha** em um único review.',
-    '4. Preencha `comment` (amigável, sem código); `suggestedFix` só se houver patch cirúrgico claro (senão `""`).',
+    '1. Assign `severity` and score according to the tables in the **System Prompt**.',
+    `2. Apply publication filter: **score < ${scoreMin} → omit** (do not send in JSON); only \`fix-code\` or \`escalate\`.`,
+    '3. Combine multiple findings on the same line into a single review.',
+    '4. Fill in `comment` (friendly, no code); `suggestedFix` only if there is a clear surgical patch (otherwise `""`).',
     '',
-    '### Fase 3 — Prevenção de Whack-a-Mole (Agrupamento e Generalização)',
+    '### Phase 3 — Whack-a-Mole Prevention (Grouping and Generalization)',
     '',
-    'Para **cada achado comprovado na Fase 2**, antes de emitir o JSON final: você DEVE usar `grep`/`glob` para procurar **ocorrências irmãs do mesmo padrão** em todos os arquivos elegíveis do diff.',
+    'For **each proven finding in Phase 2**, before emitting the final JSON: you MUST use `grep`/`glob` to look for sister occurrences of the same pattern in all eligible files of the diff.',
     '',
-    '- Exemplos: `[Authorize]` ausente num endpoint → verifique os demais endpoints; `.Result`/`.Wait()` num método → verifique os demais.',
-    '- Agrupe **todas** as ocorrências da mesma classe no array `relatedOccurrences` do review principal. **Não** reporte só a primeira e deixe as irmãs para a próxima rodada — isso quebra a convergência.',
+    '- Examples: missing `[Authorize]` on an endpoint → check other endpoints; `.Result`/`.Wait()` in a method → check others.',
+    '- Group **all** occurrences of the same class in the `relatedOccurrences` array of the main review. **Do not** report only the first and leave the sisters for the next round — this breaks convergence.',
   ];
 }
 
 function buildVerdictAndAdoPolicy(scoreMin: number): string[] {
   return [
     '',
-    '### Veredito final',
+    '### Final Verdict',
     '',
-    `1. Releia cada review contra o filtro de publicação (score ≥ ${scoreMin}, campos obrigatórios, \`fix-code\`/\`escalate\`). Remova do JSON qualquer item abaixo do limiar.`,
-    '2. **Completude:** confirme que percorreu **todos** os arquivos elegíveis e que cada achado real e comprovado foi incluído — não reserve achados para rodadas futuras (convergência em uma rodada).',
-    '3. **Não duplique** threads ADO existentes (contexto abaixo), incluindo a tabela de threads **já resolvidas** — não re-levante um problema resolvido sem **nova evidência** de que voltou.',
-    '4. `resolvedThreads`: somente se **verificou** via tools que o problema foi corrigido.',
-    '5. PR limpa: `"reviews": []`; `reviewSummary` pode ser `""` (o runner publica mensagem de sucesso padronizada — não liste issues em `reviewSummary`).',
-    '6. Emita **somente** o bloco JSON — sem narrativa fora do JSON.',
+    `1. Re-read each review against the publication filter (score ≥ ${scoreMin}, required fields, \`fix-code\`/\`escalate\`). Remove from the JSON any item below the threshold.`,
+    '2. **Completeness:** confirm that you went through **all** eligible files and that each real and proven finding was included — do not reserve findings for future rounds (single-round convergence).',
+    '3. **Do not duplicate** existing ADO/GitHub threads (context below), including the table of already resolved threads — do not re-raise a resolved issue without **new evidence** that it has returned.',
+    '4. `resolvedThreads`: only if you **verified** via tools that the issue has been fixed.',
+    '5. Clean PR: `"reviews": []`; `reviewSummary` can be `""` (the runner publishes a standardized success message — do not list issues in `reviewSummary`).',
+    '6. Emit **only** the JSON block — no narrative outside of the JSON.',
   ];
 }
 
@@ -254,7 +254,7 @@ export function buildAgentPrompt(config: ReviewerConfig, context: PromptContext)
     sections.push(
       '---',
       '',
-      `# Recomendações Específicas da Stack (${config.stack})`,
+      `# Specific Stack Recommendations (${config.stack})`,
       '',
       stackPromptContent,
       '',
@@ -267,7 +267,7 @@ export function buildAgentPrompt(config: ReviewerConfig, context: PromptContext)
     sections.push(
       '---',
       '',
-      '# Diretivas por tipo de alteração',
+      '# Change-Type Directives',
       '',
       moduleContents.join('\n\n---\n\n'),
       '',
