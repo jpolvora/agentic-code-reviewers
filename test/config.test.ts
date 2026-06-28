@@ -270,7 +270,7 @@ describe('loadConfig', () => {
     );
   });
 
-  it('usa maxRounds default 5 e respeita override por env', () => {
+  it('usa maxRounds default 10 e respeita override por env', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
@@ -278,7 +278,7 @@ describe('loadConfig', () => {
       },
       () => {
         const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.maxRounds, 5);
+        assert.equal(config.maxRounds, 10);
       },
     );
 
@@ -311,7 +311,7 @@ describe('loadConfig', () => {
       },
       () => {
         const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
-        assert.equal(config.maxRounds, 5);
+        assert.equal(config.maxRounds, 10);
       },
     );
   });

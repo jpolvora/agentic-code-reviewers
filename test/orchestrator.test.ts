@@ -28,7 +28,7 @@ describe('mergeReviews', () => {
       comment: 'issue A',
       score: 7,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/A.cs'],
     };
     const b = { ...a, score: 8, comment: 'issue A duplicate' };
@@ -69,7 +69,7 @@ describe('mergeReviews', () => {
       comment: 'critical issue',
       score: 9,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/A.cs'],
     };
     const warning: CodeReviewItem = {
@@ -79,7 +79,7 @@ describe('mergeReviews', () => {
       comment: 'warning issue',
       score: 7,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/B.cs'],
     };
     const filtered = [critical];
@@ -100,7 +100,7 @@ describe('mergeReviews', () => {
       comment: 'critical issue',
       score: 9,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/A.cs'],
     };
     // Simulates the new parallel-runner logic: originalCritical + metaCritical + metaNonCritical
@@ -121,7 +121,7 @@ describe('mergeReviews', () => {
       comment: 'legit warning',
       score: 7,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/B.cs'],
     };
     const warning2: CodeReviewItem = {
@@ -131,7 +131,7 @@ describe('mergeReviews', () => {
       comment: 'false positive',
       score: 6,
       developerAction: 'fix-code',
-      analysis: '1. Evidência: x. 2. Cenário: y. 3. Proteção: z. 4. Descarte: w.',
+      analysis: '1. Evidence: x. 2. Scenario: y. 3. Protection: z. 4. Discards: w.',
       impactPaths: ['/src/C.cs'],
     };
     // Meta-reviewer only keeps warning1 and drops warning2 (FP)

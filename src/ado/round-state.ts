@@ -53,7 +53,7 @@ export function parseRoundStateFromThreads(
       continue;
     }
 
-    const match = botComment.content.match(/Rodada:\s*(\d+)/i);
+    const match = botComment.content.match(/(?:Round|Rodada):\s*(\d+)/i);
     const round = match ? Number.parseInt(match[1], 10) : 0;
     return {
       round: Number.isFinite(round) && round > 0 ? round : 0,
@@ -110,27 +110,27 @@ export function buildRoundStateComment(botTag: string, input: RoundStateCommentI
     botTag,
     ROUND_STATE_MARKER,
     '',
-    `**Estado da revisão automática** — Rodada: ${input.currentRound}${input.maxRounds > 0 ? ` / ${input.maxRounds}` : ''}`,
+    `**Automatic review state** — Round: ${input.currentRound}${input.maxRounds > 0 ? ` / ${input.maxRounds}` : ''}`,
   ];
 
   if (input.escalate) {
     lines.push(
       '',
-      '🚦 **Orçamento de rodadas atingido — revisão automática pausada.**',
+      '🚦 **Review round budget reached — automatic reviews paused.**',
       '',
-      `O ciclo automático de correção atingiu ${input.currentRound} rodadas (limite ${input.maxRounds}). ` +
-        'Para evitar loop infinito de fix→review, novos apontamentos **não-críticos** deixam de ser publicados automaticamente.',
+      `The automatic fix cycle reached ${input.currentRound} rounds (limit ${input.maxRounds}). ` +
+        'To prevent an infinite loop of fix→review, new non-critical findings will no longer be posted automatically.',
       '',
     );
     if (input.suppressedCount > 0) {
       lines.push(
-        `Nesta rodada foram suprimidos **${input.suppressedCount} apontamento(s) não-crítico(s)** (warning/suggestion). ` +
-          'Apenas achados **critical** seguem sendo publicados.',
+        `In this round, **${input.suppressedCount} non-critical finding(s)** (warning/suggestion) were suppressed. ` +
+          'Only critical findings will continue to be posted.',
         '',
       );
     }
     lines.push(
-      '👤 **Ação recomendada:** revisão humana das threads abertas restantes; decida manualmente o que corrigir e conclua a PR.',
+      '👤 **Recommended Action:** perform a human review of the remaining open threads; decide manually what to fix and complete the PR.',
     );
   }
 

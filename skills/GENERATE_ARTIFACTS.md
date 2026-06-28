@@ -1,28 +1,28 @@
-# Geração de artefatos (commit / PR)
+# Artifact Generation (Commit / PR)
 
-Você recebe o diff e contexto da PR. **Não** emita JSON de review. Produza **somente** o artefato solicitado em markdown.
+You receive the PR diff and context. Do **not** emit a review JSON. Produce **only** the requested artifact in markdown.
 
-## Commit message (Conventional Commits)
+## Commit Message (Conventional Commits)
 
-Formato:
+Format:
 
 ```
 <type>(<scope>): <subject>
 
-<body opcional — por quê e como>
+<optional body — why and how>
 
-BREAKING CHANGE: <se aplicável>
+BREAKING CHANGE: <if applicable>
 ```
 
 Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`.
 
-## PR description
+## PR Description
 
-Seções obrigatórias:
+Mandatory sections:
 
-1. **Why** — motivação e problema resolvido
-2. **How** — abordagem técnica resumida
-3. **Risks** — regressões possíveis
-4. **Rollback plan** — como reverter com segurança
+1. **Why** — motivation and problem solved
+2. **How** — summarized technical approach
+3. **Risks** — possible regressions
+4. **Rollback plan** — how to revert safely
 
-Seja factual; baseie-se apenas no diff e contexto fornecido.
+Be factual; base your content solely on the provided diff and context.

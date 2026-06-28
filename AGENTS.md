@@ -8,6 +8,7 @@ Operational guide for AI agents in this repository (**Multi Agent Code Reviewer*
 
 ## Invariant Behavior
 
+- **English-Only Policy:** Use English only when writing prompts, code, documentation, and LLM communication in this project. Translate prompts from any language to English before generating the response. All agent outputs and comments must be strictly in English.
 - **Only implement what is explicitly requested.** On any ambiguity or design fork, stop and ask.
 - **Be critical, not compliant.** Challenge assumptions; reject architecturally unsound suggestions with a technical rationale.
 - **Simplicity first.** Minimal changes, no workarounds, no over-engineering.
@@ -53,7 +54,7 @@ Before reviewing, check in `repoRoot` (in this order, if they exist):
 4. `docs/` — domain and architecture rules.
 
 ### JSON Output Contract
-Respond **exclusively** with a JSON block containing:
+Respond **exclusively** in english language with a JSON block containing:
 
 ```json
 {
@@ -108,7 +109,7 @@ After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_
 | Secrets / markdown | Blocks credential patterns and dangerous HTML/script |
 
 ### Rounds and Escalation
-The runner tracks iterations via the `<!-- reviewer-round-state -->` marker. When `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default: 5) is exceeded:
+The runner tracks iterations via the `<!-- reviewer-round-state -->` marker. When `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default: 10) is exceeded:
 - Suppress `warning` and `suggestion` findings.
 - Publish only `critical` (security or business invariant breaks).
 - The runner will add a handoff warning for human review on the PR.
@@ -188,7 +189,10 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 
 ### Skills — Routing and Management
 
-The repository has **two layers** of "skills". Do not confuse them:
+The repository has **two layers** of "skills": **Runtime prompts** (`skills/` loaded during execution) and **IDE skills** (`.agents/skills/` invoked manually in the IDE).
+
+<details>
+<summary><b>🔍 View Detailed Skill Routing and Management Instructions</b></summary>
 
 | Layer | Location | Loaded by | When |
 |---|---|---|---|
@@ -231,6 +235,23 @@ Fix review threads locally      → solve-pr (GitHub) or manual dev
 | Bot published threads; want auto-fix in CI | `auto-fix.yml` + `--auto-fix` (see `skills/COOPERATIVE_FIX.md`) |
 | Open review threads; want local fix cycle | `/solve-pr` (same cooperative gate as Auto-Fix CI) |
 | Production / pipeline | No IDE skill — runner + `skills/` only |
+
+#### Adding or Modifying an IDE Skill
+
+1. Create `.agents/skills/<name>/SKILL.md` with `name` + `description` frontmatter (Cursor trigger).
+2. Document mode (read-only vs. write), env prerequisites, and step-by-step flow.
+3. Auxiliary scripts in `.agents/skills/<name>/scripts/` (e.g., `solve-pr`).
+4. Update **this** `AGENTS.md`, [`README.md`](README.md), and the table in [`docs/index.md`](docs/index.md).
+5. Generic skills reusable across projects → [workflow-skills](https://github.com/jpolvora/workflow-skills).
+
+#### Adding a Runtime Stack
+
+1. Register in `STACKS` + `getStackConfig` (`src/config.ts`).
+2. Create `skills/stacks/<name>.md`.
+3. Cover auto-detection in `test/config.test.ts`.
+4. **Sync** `README.md`, `AGENTS.md`, `docs/`, and `.env.example` when changing env vars, workflows, stacks, or engines.
+
+</details>
 
 #### Adding or Modifying an IDE Skill
 

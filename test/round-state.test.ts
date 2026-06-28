@@ -57,7 +57,7 @@ describe('parseRoundStateFromThreads', () => {
             {
               id: 7,
               parentCommentId: 0,
-              content: `${BOT}\n${ROUND_STATE_MARKER}\n\n**Estado da revisão automática** — Rodada: 2 / 3`,
+              content: `${BOT}\n${ROUND_STATE_MARKER}\n\n**Automatic review state** — Round: 2 / 3`,
               commentType: 1,
             },
           ],
@@ -117,8 +117,8 @@ describe('buildRoundStateComment', () => {
       suppressedCount: 0,
     });
     assert.ok(content.includes(ROUND_STATE_MARKER));
-    assert.ok(content.includes('Rodada: 2 / 3'));
-    assert.ok(!content.includes('revisão humana'));
+    assert.ok(content.includes('Round: 2 / 3'));
+    assert.ok(!content.includes('human review'));
   });
 
   it('inclui aviso de escalonamento e contagem suprimida', () => {
@@ -128,8 +128,8 @@ describe('buildRoundStateComment', () => {
       escalate: true,
       suppressedCount: 2,
     });
-    assert.ok(content.includes('revisão automática pausada'));
-    assert.ok(content.includes('2 apontamento(s) não-crítico(s)'));
-    assert.ok(content.includes('revisão humana'));
+    assert.ok(content.includes('automatic reviews paused'));
+    assert.ok(content.includes('2 non-critical finding(s)'));
+    assert.ok(content.includes('human review'));
   });
 });

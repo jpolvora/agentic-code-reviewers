@@ -27,7 +27,7 @@ O ciclo de Auto-Fix envolve a coordenação de duas pipelines separadas: a **rev
 Um ciclo contínuo de máquina (avaliação e correção) levanta a preocupação com **loops infinitos** e **concorrência**. O sistema já foi desenhado com proteções contra esses cenários:
 
 ### 1. Loop Infinito e Convergência (Round Escalamiento)
-O revisor controla quantas rodadas de revisão/correção já ocorreram utilizando um comentário invisível na PR (`<!-- reviewer-round-state -->`). Se a correção falhar repetidas vezes em resolver os problemas após um número máximo de tentativas (configurável via `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`, default: 5):
+O revisor controla quantas rodadas de revisão/correção já ocorreram utilizando um comentário invisível na PR (`<!-- reviewer-round-state -->`). Se a correção falhar repetidas vezes em resolver os problemas após um número máximo de tentativas (configurável via `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`, default: 10):
 - O revisor para de gerar sugestões e avisos (threads de prioridade menor).
 - Deixa apenas as *issues* críticas abertas (se houver).
 - Gera um alerta pedindo **revisão humana** (escalonamento).

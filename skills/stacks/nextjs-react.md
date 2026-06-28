@@ -1,20 +1,20 @@
-# Recomendações Específicas: Next.js/React
+# Specific Recommendations: Next.js/React
 
-Você deve focar nos seguintes padrões e problemas comuns ao revisar código desta stack:
+You should focus on the following common patterns and issues when reviewing code in this stack:
 
-## 1. Ciclo de Vida do React e Hooks
-*   **Arrays de Dependências do useEffect:**
-    *   Verifique se as dependências declaradas em `useEffect`, `useMemo` ou `useCallback` estão corretas e completas. A ausência de dependências necessárias causa "stale closures" (dados obsoletos), enquanto a inclusão incorreta ou desnecessária de objetos/funções não-memorizados pode causar renderizações infinitas.
-*   **Vazamentos de Memória e Recursos nos Efeitos:**
-    *   Certifique-se de que qualquer efeito que crie timers (`setInterval`, `setTimeout`), assine eventos (`addEventListener`), estabeleça conexões (WebSockets, EventSource) ou utilize recursos globais retorne uma função de cleanup para destruí-los/limpá-los no final.
+## 1. React Lifecycle and Hooks
+*   **useEffect Dependency Arrays:**
+    *   Verify that dependencies declared in `useEffect`, `useMemo`, or `useCallback` are correct and complete. The absence of necessary dependencies causes "stale closures" (obsolete data), while the incorrect or unnecessary inclusion of non-memoized objects/functions can cause infinite rendering loops.
+*   **Memory and Resource Leaks in Effects:**
+    *   Ensure that any effect creating timers (`setInterval`, `setTimeout`), subscribing to events (`addEventListener`), establishing connections (WebSockets, EventSource), or utilizing global resources returns a cleanup function to destroy/clear them at the end.
 
-## 2. Next.js App Router & Arquitetura
+## 2. Next.js App Router & Architecture
 *   **Server Components vs. Client Components:**
-    *   Preste atenção no uso adequado da diretiva `'use client'`. Não use Client Components se os componentes puderem ser renderizados no servidor (Server Components).
-    *   Evite passar dados não-serializáveis (ex.: funções, classes) como props de Server Components para Client Components.
-*   **Segurança em API Routes / Server Actions:**
-    *   Certifique-se de que todas as rotas de API (`app/api/*/route.ts`) ou Server Actions (funções marcadas com `'use server'`) realizem validação de sessão, autenticação e autorização adequadas do usuário antes de realizar qualquer alteração ou fornecer dados sensíveis. Nunca confie puramente em verificações feitas apenas no lado do cliente.
-*   **Exposição de Chaves Secretas e Env Vars:**
-    *   Certifique-se de que nenhuma chave de API ou segredo (ex: chaves privadas, senhas de banco) seja carregado em variáveis expostas ao cliente (variáveis que iniciam com o prefixo `NEXT_PUBLIC_`). Variáveis de ambiente sensíveis devem ser lidas exclusivamente em Server Components, Server Actions ou API Routes.
-*   **Validação de Entrada em Chamadas de API:**
-    *   Sempre valide os parâmetros e payloads de entrada nas rotas e Server Actions utilizando bibliotecas como `zod`, `yup` ou similar para mitigar injeção e dados corrompidos.
+    *   Pay attention to the proper use of the `'use client'` directive. Do not use Client Components if components can be rendered on the server (Server Components).
+    *   Avoid passing non-serializable data (e.g., functions, classes) as props from Server Components to Client Components.
+*   **Security in API Routes / Server Actions:**
+    *   Ensure all API routes (`app/api/*/route.ts`) or Server Actions (functions marked with `'use server'`) perform proper session validation, authentication, and authorization of the user before making any changes or providing sensitive data. Never rely purely on checks made only on the client side.
+*   **Exposure of Secret Keys and Env Vars:**
+    *   Ensure that no API keys or secrets (e.g., private keys, database passwords) are loaded into variables exposed to the client (variables starting with the `NEXT_PUBLIC_` prefix). Sensitive environment variables must be read exclusively in Server Components, Server Actions, or API Routes.
+*   **Input Validation in API Calls:**
+    *   Always validate input parameters and payloads in routes and Server Actions using libraries like `zod`, `yup`, or similar to mitigate injection and corrupted data.

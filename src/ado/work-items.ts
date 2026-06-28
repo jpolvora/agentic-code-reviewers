@@ -62,14 +62,14 @@ export function formatWorkItemsLoadedLogMessage(summaries: WorkItemSummary[]): s
   const usBracket = storyLabels.length > 0 ? storyLabels.join(', ') : '—';
   const tasksBracket = taskLabels.length > 0 ? taskLabels.join(', ') : '—';
 
-  return `Work Items carregados com sucesso: [${usBracket}], [${tasksBracket}]`;
+  return `Work Items loaded successfully: [${usBracket}], [${tasksBracket}]`;
 }
 
 function toWorkItemSummary(workItem: { id: number; fields: Record<string, unknown> }): WorkItemSummary {
   return {
     id: workItem.id,
     type: getWorkItemType(workItem.fields),
-    title: getWorkItemTitle(workItem.fields) || `(sem título #${workItem.id})`,
+    title: getWorkItemTitle(workItem.fields) || `(no title #${workItem.id})`,
   };
 }
 
@@ -103,7 +103,7 @@ export async function getPullRequestWorkItemContext(
 
     if (workItemIds.length > limitedIds.length) {
       log?.(
-        `Work items truncados para o prompt: ${limitedIds.length}/${workItemIds.length} (limite ${maxWorkItems}).`,
+        `Work items truncated for the prompt: ${limitedIds.length}/${workItemIds.length} (limit ${maxWorkItems}).`,
       );
     }
 

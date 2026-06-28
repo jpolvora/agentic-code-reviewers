@@ -15,10 +15,10 @@ function review(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
     fileName: '/src/Foo.cs',
     lineNumber: 42,
     severity: 'warning',
-    comment: 'Possível NRE quando input é nulo.',
+    comment: 'Potential NRE when input is null.',
     score: 7,
     developerAction: 'fix-code',
-    analysis: 'Evidência lida.',
+    analysis: 'Evidence read.',
     impactPaths: ['/src/Foo.cs'],
     ...overrides,
   };

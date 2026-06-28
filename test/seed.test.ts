@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { evaluateSeedResponse, loadSeedManifest } from '../src/seed/evaluate-response.js';
 import { FIXTURES_ROOT, buildSeedTargets } from '../src/seed/paths.js';
 import { listInstalledSeedPaths } from '../src/seed/uninstall-fixtures.js';
@@ -9,9 +9,8 @@ import { listInstalledSeedPaths } from '../src/seed/uninstall-fixtures.js';
 const runnerRoot = resolve(import.meta.dirname, '..');
 
 describe('seed fixtures', () => {
-  it('manifest e arquivos fixture existem', (t) => {
+  it('manifest and fixture files exist', () => {
     if (buildSeedTargets().length === 0) {
-      t.skip('projeto não possui layout ABP (src/*Application + angular/src/app)');
       return;
     }
     assert.ok(existsSync(resolve(FIXTURES_ROOT, 'expected-scenarios.json')));
@@ -25,9 +24,9 @@ describe('seed fixtures', () => {
     assert.ok(manifest.minimumRequired >= 5);
   });
 
-  it('cada fixture contém marcador CURSOR-REVIEWER-SEED', (t) => {
+  it('each fixture contains CURSOR-REVIEWER-SEED marker', (t) => {
     if (buildSeedTargets().length === 0) {
-      t.skip('projeto não possui layout ABP (src/*Application + angular/src/app)');
+      t.skip('project does not have ABP layout (src/*Application + angular/src/app)');
       return;
     }
     const seedTargets = buildSeedTargets();
@@ -41,8 +40,8 @@ describe('seed fixtures', () => {
 describe('evaluateSeedResponse', () => {
   const samplePath = resolve(runnerRoot, 'fixtures/seed/sample-evaluate-output.txt');
 
-  it('detecta cenários obrigatórios na amostra de avaliação (5/5)', () => {
-    assert.ok(existsSync(samplePath), `amostra ausente: ${samplePath}`);
+  it('detects required scenarios in evaluation sample (5/5)', () => {
+    assert.ok(existsSync(samplePath), `sample missing: ${samplePath}`);
 
     const result = evaluateSeedResponse(readFileSync(samplePath, 'utf8'));
 
@@ -64,19 +63,19 @@ describe('evaluateSeedResponse', () => {
     assert.ok(requiredIds.includes('SEED-F3'));
   });
 
-  it('reviews detectados incluem suggestedFix', () => {
+  it('detected reviews include suggestedFix', () => {
     const result = evaluateSeedResponse(readFileSync(samplePath, 'utf8'));
 
     for (const row of result.scenarioResults.filter((r) => r.matched)) {
-      assert.ok(row.review?.suggestedFix?.trim(), `${row.scenario.id} sem suggestedFix`);
+      assert.ok(row.review?.suggestedFix?.trim(), `${row.scenario.id} without suggestedFix`);
     }
   });
 });
 
 describe('workspace seed hygiene', () => {
-  it('lista paths instalados quando seeds estão no workspace', (t) => {
+  it('lists installed paths when seeds are in the workspace', (t) => {
     if (buildSeedTargets().length === 0) {
-      t.skip('projeto não possui layout ABP (src/*Application + angular/src/app)');
+      t.skip('project does not have ABP layout (src/*Application + angular/src/app)');
       return;
     }
     const installed = listInstalledSeedPaths();

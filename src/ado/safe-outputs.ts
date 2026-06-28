@@ -69,10 +69,10 @@ const DANGEROUS_MARKDOWN_PATTERNS: RegExp[] = [
 function hasAnalysisStructure(analysis: string): boolean {
   const text = analysis.trim();
   if (!text) return false;
-  const hasEvidence = /1\.\s*\*{0,2}\s*(?:Evidência|Evidencia|Evidence)/i.test(text);
-  const hasScenario = /2\.\s*\*{0,2}\s*(?:Cenário|Cenario|Scenario|Causal|Investigação|Investigacao)/i.test(text);
-  const hasProtection = /3\.\s*\*{0,2}\s*(?:Proteção|Protecao|Proteções|Protecoes|Protection|Cenário|Cenario|Scenario)/i.test(text);
-  const hasDiscard = /4\.\s*\*{0,2}\s*(?:Descarte|Descartes|Discard|Discards|Proteção|Protecao|Proteções|Protecoes|Protection)/i.test(text);
+  const hasEvidence = /1\.\s*\*{0,2}\s*Evidence/i.test(text);
+  const hasScenario = /2\.\s*\*{0,2}\s*Scenario/i.test(text);
+  const hasProtection = /3\.\s*\*{0,2}\s*Protection/i.test(text);
+  const hasDiscard = /4\.\s*\*{0,2}\s*Discards?/i.test(text);
   return hasEvidence && hasScenario && hasProtection && hasDiscard;
 }
 
@@ -163,7 +163,7 @@ export function checkSafeReview(
     return {
       safe: false,
       reason: 'analysis-structure',
-      detail: 'analysis must contain 4 numbered sections (Evidence/Evidência, Scenario/Cenário, Protection/Proteção, Discards/Descarte)',
+      detail: 'analysis must contain 4 numbered sections (1. Evidence, 2. Scenario, 3. Protection, 4. Discards)',
     };
   }
 

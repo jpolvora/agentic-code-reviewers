@@ -182,14 +182,14 @@ export function buildRulesMap(repoRoot: string, changedFiles: string[]): RulesMa
   }
 
   const lines: string[] = [
-    '## Rules do projeto (pré-mapeadas para esta PR)',
+    '## Project Rules (pre-mapped for this PR)',
     '',
-    'Consulte via `read` as rules abaixo — já filtradas pelos arquivos alterados. Índice completo: `.cursor/rules/main.mdc`.',
+    'Consult via `read` the rules below — already filtered by modified files. Full index: `.cursor/rules/main.mdc`.',
     '',
   ];
 
   if (alwaysApplyRules.length > 0) {
-    lines.push('### Sempre ativas (`alwaysApply`)');
+    lines.push('### Always Active (`alwaysApply`)');
     for (const rule of alwaysApplyRules) {
       const desc = descriptors.find((d) => d.relativePath === rule)?.description;
       lines.push(`- \`${rule}\`${desc ? ` — ${desc}` : ''}`);
@@ -198,7 +198,7 @@ export function buildRulesMap(repoRoot: string, changedFiles: string[]): RulesMa
   }
 
   if (fileRules.length > 0) {
-    lines.push('### Por arquivo alterado');
+    lines.push('### Per Modified File');
     for (const { file, rules } of fileRules) {
       lines.push(`- \`${file}\` → ${rules.map((r) => `\`${r}\``).join(', ')}`);
     }
@@ -207,7 +207,7 @@ export function buildRulesMap(repoRoot: string, changedFiles: string[]): RulesMa
 
   const extraRules = uniqueRules.filter((r) => !alwaysApplyRules.includes(r));
   if (extraRules.length > 0) {
-    lines.push('### Rules a ler na Fase 2 (deduplicadas)');
+    lines.push('### Rules to Read in Phase 2 (deduplicated)');
     for (const rule of extraRules) {
       const desc = descriptors.find((d) => d.relativePath === rule)?.description;
       lines.push(`- \`${rule}\`${desc ? ` — ${desc}` : ''}`);
