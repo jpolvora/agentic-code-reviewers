@@ -38,7 +38,7 @@ Não fechar thread sem correção correspondente listada explicitamente (`resolv
 2. Analisar profundamente cada descrição
 3. Aplicar correções cirúrgicas
 4. git add + commit local
-5. Executar build de validação (`npm run build` ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`)
+5. Executar build de validação (`npm test` / `npm run build` ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`; falha = exit ≠ 0)
 6. Fechar cada thread corrigida com comentário detalhado (causa raiz + o que mudou)
 7. git push — somente se build e resoluções tentadas tiverem sucesso
 ```

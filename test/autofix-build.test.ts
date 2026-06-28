@@ -22,7 +22,17 @@ describe('resolveAutoFixBuildCommand', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('detecta npm run build quando package.json tem scripts.build', () => {
+  it('prefere npm test quando package.json tem scripts.test', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-build-'));
+    fs.writeFileSync(
+      path.join(tmpDir, 'package.json'),
+      JSON.stringify({ scripts: { test: 'vitest', build: 'tsc' } }),
+    );
+    assert.equal(resolveAutoFixBuildCommand(tmpDir), 'npm test');
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('usa npm run build quando só scripts.build existe', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-build-'));
     fs.writeFileSync(
       path.join(tmpDir, 'package.json'),
@@ -32,10 +42,10 @@ describe('resolveAutoFixBuildCommand', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('retorna null sem package.json ou sem script build', () => {
+  it('retorna null sem package.json ou sem scripts test/build', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autofix-build-'));
     assert.equal(resolveAutoFixBuildCommand(tmpDir), null);
-    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ scripts: { test: 'vitest' } }));
+    fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ scripts: { lint: 'eslint .' } }));
     assert.equal(resolveAutoFixBuildCommand(tmpDir), null);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

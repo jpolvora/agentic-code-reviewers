@@ -4,7 +4,7 @@ import { execSync } from 'node:child_process';
 import type { ReviewerConfig } from '../config.js';
 import type { Logger } from '../logger.js';
 
-/** Resolve build command: env override → `npm run build` when package.json has scripts.build → skip. */
+/** Resolve build command: env override → `npm test` → `npm run build` → skip. */
 export function resolveAutoFixBuildCommand(repoRoot: string, envCommand?: string): string | null {
   if (envCommand === '') return null;
   if (envCommand) return envCommand;
@@ -14,6 +14,7 @@ export function resolveAutoFixBuildCommand(repoRoot: string, envCommand?: string
 
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')) as { scripts?: Record<string, string> };
+    if (pkg.scripts?.test) return 'npm test';
     if (pkg.scripts?.build) return 'npm run build';
   } catch {
     return null;
@@ -30,7 +31,7 @@ export async function runAutoFixBuild(config: ReviewerConfig, logger: Logger): P
 
   const command = config.autoFixBuildCommand;
   if (!command) {
-    logger.info('Build de auto-fix ignorado (sem comando configurado ou script build ausente).');
+    logger.info('Build de auto-fix ignorado (sem comando configurado ou scripts test/build ausentes).');
     return true;
   }
 

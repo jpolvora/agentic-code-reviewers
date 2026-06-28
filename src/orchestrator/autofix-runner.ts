@@ -390,11 +390,9 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
   logger.section('Validando build após commit local');
   const buildOk = await runAutoFixBuild(config, logger);
   if (!buildOk) {
-    logger.warn(
-      'Gate cooperativo: build falhou — resolução e push abortados. Commit local preservado; ' +
-        'corrija o build manualmente (skill solve-pr).',
+    throw new Error(
+      'Gate cooperativo: build falhou após commit local — resolução e push abortados.',
     );
-    return;
   }
 
   logger.section('Fechando threads corrigidas na PR');

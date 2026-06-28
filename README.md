@@ -178,7 +178,7 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread (prompt + gate + Safe Outputs). |
 | `AGENTIC_CODE_REVIEWERS_AUTO_FIX` | `false` | Ativa modo auto-fix (`--auto-fix`). |
-| `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND` | auto (`npm run build` se `package.json` tem `scripts.build`) | Build pós-commit antes de resolver threads/push; string vazia desabilita. |
+| `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND` | auto (`npm test` se `scripts.test`, senão `npm run build`) | Validação pós-commit antes de resolver threads/push; string vazia desabilita. |
 | `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-LLM (diff-line, protected paths, secrets). |
 | `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process por chunk de arquivos. |
 | `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Segunda passagem LLM para filtrar candidatos paralelos. |

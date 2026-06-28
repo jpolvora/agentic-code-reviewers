@@ -40,7 +40,7 @@ Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudan�
 Ordem alinhada à skill IDE [`solve-pr`](../.agents/skills/solve-pr/SKILL.md) e ao contrato [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md):
 
 1. Commit **local**
-2. **Build** de validação (`npm run build` quando `package.json` tem `scripts.build`, ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`)
+2. **Build** de validação (`npm test` quando `package.json` tem `scripts.test`, senão `npm run build`, ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`). Falha aborta o job (exit ≠ 0).
 3. Responder e resolver threads na PR
 4. Push **somente** se build e resoluções tentadas tiverem sucesso
 

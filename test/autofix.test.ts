@@ -468,7 +468,10 @@ describe('runAutoFixFlow', () => {
       }),
     } as any;
 
-    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+    await assert.rejects(
+      () => runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger),
+      /build falhou após commit local/,
+    );
 
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
     const localLog = execSync('git log -1 --oneline', { cwd: tmpDir, encoding: 'utf8' });

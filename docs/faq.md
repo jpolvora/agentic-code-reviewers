@@ -577,7 +577,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Por que o loop review → fix → review parou após a primeira correção?
 
-**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) auto-fix falhou silenciosamente — verifique logs do step “Fail if all configured auto-fix engines failed”.
+**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) build pós-commit ou push falhou — o job auto-fix termina com exit ≠ 0 (verifique logs do engine e do step “Fail if all configured auto-fix engines failed”).
 
 *Evidência:* [`auto-fix.md`](auto-fix.md); `.github/workflows/auto-fix.yml`.
 
