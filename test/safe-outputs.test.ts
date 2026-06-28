@@ -92,6 +92,20 @@ describe('checkSafeReview', () => {
     assert.equal(result.safe, true);
   });
 
+  it('accepts analysis in English (standard format)', () => {
+    const englishAnalysis =
+      '1. Evidence: read Foo.cs. 2. Scenario: error on save. 3. Protection: missing validations. 4. Discards: not a nit.';
+    const result = checkSafeReview(validReview({ analysis: englishAnalysis }), baseOptions());
+    assert.equal(result.safe, true);
+  });
+
+  it('accepts analysis with Portuguese variations (e.g. Causal, Proteções, Descartes)', () => {
+    const ptVarAnalysis =
+      '1. Evidência: linha 90 usa DateTime.Now. 2. Causal: servidor grava local. 3. Proteções ausentes: sem conversão na API. 4. Descartes: não é offset explícito.';
+    const result = checkSafeReview(validReview({ analysis: ptVarAnalysis }), baseOptions());
+    assert.equal(result.safe, true);
+  });
+
   it('rejects protected path in fileName', () => {
     const result = checkSafeReview(
       validReview({ fileName: '.github/workflows/ci.yml', lineNumber: 1 }),

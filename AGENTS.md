@@ -103,7 +103,7 @@ After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_
 | Diff-line anchoring | `lineNumber` must be on a changed line in the diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
 | Protected paths | Blocks reviews referencing CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
 | Severity ↔ score | Consistency required (`critical` 9–10; `warning`/`suggestion` floors respect **`config.scoreMin`** in `safe-outputs.ts`) |
-| Analysis structure | Four numbered sections (Evidence, Scenario, Protection, Discards) |
+| Analysis structure | Four numbered sections in English (Evidence, Scenario, Protection, Discards) or Portuguese (Evidência, Cenário/Causal, Proteção/Proteções, Descarte/Descartes) |
 | Size limits | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` (default 8000) |
 | Secrets / markdown | Blocks credential patterns and dangerous HTML/script |
 
