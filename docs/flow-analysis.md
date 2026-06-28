@@ -371,7 +371,7 @@ Resumo positivo (PR limpa):
 [Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
 
-Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
+All pending issues have been successfully resolved! The PR is ready to be merged. 🚀
 ```
 
 ---

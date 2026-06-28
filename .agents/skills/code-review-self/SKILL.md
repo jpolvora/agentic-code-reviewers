@@ -311,7 +311,7 @@ Quando `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS=true` (default), aplique **antes** d
 | **Diff-line** | `lineNumber` em linha **alterada** no diff (`REQUIRE_DIFF_LINE`, default true) |
 | **Protected paths** | Não referenciar CI, locks, manifests, `.env*` (globs em `DEFAULT_PROTECTED_PATTERNS` + `PROTECTED_PATTERNS`) |
 | **Severity ↔ score** | `critical`: max(9, scoreMin)–10; `warning`: scoreMin–8; `suggestion`: scoreMin–7 |
-| **Analysis structure** | Seções numeradas 1–4: Evidência, Cenário, Proteção, Descarte |
+| **Analysis structure** | Four numbered sections in English (Evidence, Scenario, Protection, Discards) |
 | **Size limits** | `comment`/`analysis` ≤ 8000 chars; `suggestedFix` ≤ 16000 |
 | **Secrets** | Bloqueia padrões de credencial (PAT, AWS keys, private keys, etc.) |
 | **Markdown perigoso** | Bloqueia `<script>`, `javascript:`, `onerror=`, `<iframe>` |

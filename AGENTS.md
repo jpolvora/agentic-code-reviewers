@@ -23,6 +23,7 @@ Operational guide for AI agents in this repository (**Multi Agent Code Reviewer*
   - **`.env.example`** — when env vars are added, renamed, or defaults change
   - **Workflow examples** — `examples/`, `.github/workflows/` when CI inputs or behavior change
   - Run **`npm test`** (and `npm run test:seed` when review/detection behavior changes) before considering the task done.
+- **No Legacy Compatibility by Default:** You do not need to maintain backward compatibility with legacy versions or formats. In case of important implementation corrections or refactorings, inform the developer and feel free to introduce breaking changes by default (as the product is in active development). Only implement backward compatibility treatments if the programmer explicitly specifies that they want to maintain it.
 - **Decompose before executing.** Break large tasks into independent subtasks. When possible, parallelize with subagents sharing only the minimum necessary context — keep context windows small.
 
 ---
@@ -104,7 +105,7 @@ After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_
 | Diff-line anchoring | `lineNumber` must be on a changed line in the diff (`AGENTIC_CODE_REVIEWERS_REQUIRE_DIFF_LINE`, default `true`) |
 | Protected paths | Blocks reviews referencing CI, manifests, locks (globs + `AGENTIC_CODE_REVIEWERS_PROTECTED_PATTERNS`) |
 | Severity ↔ score | Consistency required (`critical` 9–10; `warning`/`suggestion` floors respect **`config.scoreMin`** in `safe-outputs.ts`) |
-| Analysis structure | Four numbered sections in English (Evidence, Scenario, Protection, Discards) or Portuguese (Evidência, Cenário/Causal, Proteção/Proteções, Descarte/Descartes) |
+| Analysis structure | Four numbered sections in English (Evidence, Scenario, Protection, Discards) |
 | Size limits | `AGENTIC_CODE_REVIEWERS_MAX_COMMENT_CHARS` (default 8000) |
 | Secrets / markdown | Blocks credential patterns and dangerous HTML/script |
 

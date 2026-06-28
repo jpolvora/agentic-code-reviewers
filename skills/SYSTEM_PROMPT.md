@@ -72,7 +72,7 @@ Return **exclusively** a single valid JSON block (fence with the `json` tag). No
 
 - Use as a **clean PR signal** in JSON (`""` or brief text) — the runner **ignores** the text.
 - **Threads** are the channel for auto-fix: findings with `score ≥ scoreMin` become threads; below the threshold they do not.
-- The summary comment on the PR is posted **at the end** of the review, when **no active/pending threads** from the bot remain, with a fixed message: `Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀`.
+- The summary comment on the PR is posted **at the end** of the review, when **no active/pending threads** from the bot remain, with a fixed message: `All pending issues have been successfully resolved! The PR is ready to be merged. 🚀`.
 
 ### Required Fields per Review
 

@@ -71,6 +71,26 @@ describe('parseRoundStateFromThreads', () => {
       commentId: 7,
     });
   });
+
+  it('parses legacy Rodada-format round-state threads', () => {
+    const threads: AdoThreadsResponse = {
+      value: [
+        {
+          id: 99,
+          status: 'closed',
+          comments: [
+            {
+              id: 1,
+              parentCommentId: 0,
+              content: `${BOT}\n${ROUND_STATE_MARKER}\n\n**Estado da revisão automática** — Rodada: 5 / 10`,
+              commentType: 1,
+            },
+          ],
+        },
+      ],
+    };
+    assert.equal(parseRoundStateFromThreads(threads, BOT).round, 5);
+  });
 });
 
 describe('decideRoundEscalation', () => {
