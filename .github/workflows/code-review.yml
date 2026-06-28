@@ -54,10 +54,8 @@ jobs:
         include:
           - engine: cursor-sdk
             model: composer-2.5
-            bot_tag: '[Cursor Reviewer]'
           - engine: opencode
             model: opencode-go/deepseek-v4-flash
-            bot_tag: '[Cursor Reviewer · OpenCode]'
 
     concurrency:
       group: review-${{ matrix.engine }}-${{ github.event.pull_request.number || github.run_id }}
@@ -96,7 +94,6 @@ jobs:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ matrix.engine }}
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
-          AGENTIC_CODE_REVIEWERS_BOT_TAG: ${{ matrix.bot_tag }}
           AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
           AGENTIC_CODE_REVIEWERS_SCORE_MIN: '1'
           CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}

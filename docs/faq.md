@@ -459,7 +459,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Qual o formato da thread publicada?
 
-**Resposta:** `[Cursor Reviewer]` + emoji/severity + comentário + correção sugerida (opcional) + `<details>` com score, análise e caminhos. **Não** usa ` ```suggestion ` — ADO não aplica sugestões inline como GitHub.
+**Resposta:** `Agentic Code Reviewer {engine}` + emoji/severity + comentário + correção sugerida (opcional) + `<details>` com score, análise e caminhos. A tag é derivada de `AGENTIC_CODE_REVIEWERS_ENGINE` (ex.: `Agentic Code Reviewer cursor-sdk`). **Não** usa ` ```suggestion ` — ADO não aplica sugestões inline como GitHub.
 
 *Evidência:* `formatCommentForPosting` em `src/ado/format-thread.ts`.
 
@@ -565,7 +565,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### O reviewer corrige código automaticamente?
 
-**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit/push e resolvem threads cuja linha foi de fato alterada.
+**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit local, **build de validação**, resolução de threads e push.
 
 *Evidência:* `src/index.ts` (`config.autoFix`); `src/orchestrator/autofix-runner.ts`; [`auto-fix.md`](auto-fix.md).
 
@@ -577,7 +577,7 @@ Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a sta
 
 ### Por que o loop review → fix → review parou após a primeira correção?
 
-**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) auto-fix falhou silenciosamente — verifique logs do step “Fail if all configured auto-fix engines failed”.
+**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) build pós-commit ou push falhou — o job auto-fix termina com exit ≠ 0 (verifique logs do engine e do step “Fail if all configured auto-fix engines failed”).
 
 *Evidência:* [`auto-fix.md`](auto-fix.md); `.github/workflows/auto-fix.yml`.
 

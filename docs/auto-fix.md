@@ -13,14 +13,14 @@ O ciclo de Auto-Fix envolve a coordenação de duas pipelines separadas: a **rev
    - Lê as *threads* ativas (comentários não resolvidos) na PR.
    - Analisa o código e propõe correções para cada problema.
    - Aplica as mudanças no código local.
-   - Gera commit local, resolve threads e faz push (gate cooperativo — ver [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md)).
+   - Gera commit local, valida build, resolve threads e faz push (gate cooperativo — ver [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md)).
 5. **Re-avaliação (O Loop):** O *push* gerado pelo Auto-Fix re-aciona a pipeline de Code Review (passo 2). O revisor avalia o novo código. Se a thread foi consertada, ele a marca como resolvida. Caso contrário, deixa novos apontamentos.
 
 ## Threads, score_min e resumo final
 
-- **Auto-fix só enxerga threads** na PR — achados precisam ser publicados como thread para entrar no loop.
-- **`AGENTIC_CODE_REVIEWERS_SCORE_MIN`** define o que vira thread: somente reviews com `score ≥ scoreMin` são publicados.
-- O **comentário de resumo** (“PR pronta para merge”) só é postado **no fim** de uma rodada de review, quando **não restam** threads ativas/pendentes do bot — sinalizando que o ciclo convergiu.
+- **Auto-fix processa todas as review threads abertas** na PR (com arquivo e linha), sem filtro de tag. Threads que não forem issue de código corrigível são ignoradas pelo subagente (`replacements: []`).
+- **`AGENTIC_CODE_REVIEWERS_SCORE_MIN`** define o que o **reviewer** publica como nova thread.
+- O **comentário de resumo** (“PR pronta para merge”) só é postado **no fim** de uma rodada de review, quando **não restam** threads ativas/pendentes do bot.
 
 ## Proteções do Sistema
 
@@ -36,14 +36,15 @@ O revisor controla quantas rodadas de revisão/correção já ocorreram utilizan
 ### 2. Detecção de Mudanças (No-op)
 Se o agente de Auto-Fix processar as threads, mas não conseguir formular mudanças concretas no código, o script detecta working tree limpa e termina sem commit. **Sem commit, sem resolução, sem push.**
 
-### 3. Gate cooperativo (resolve → push)
+### 3. Gate cooperativo (build → resolve → push)
 Ordem alinhada à skill IDE [`solve-pr`](../.agents/skills/solve-pr/SKILL.md) e ao contrato [`COOPERATIVE_FIX.md`](../skills/COOPERATIVE_FIX.md):
 
 1. Commit **local**
-2. Responder e resolver threads na PR
-3. Push **somente** se todas as resoluções tentadas tiverem sucesso
+2. **Build** de validação (`npm test` quando `package.json` tem `scripts.test`, senão `npm run build`, ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`). Falha aborta o job (exit ≠ 0).
+3. Responder e resolver threads na PR
+4. Push **somente** se build e resoluções tentadas tiverem sucesso
 
-Se a resolução falhar (token, permissão), o commit local é preservado e o push é abortado.
+Se o build ou a resolução falhar (token, permissão, compilação), o commit local é preservado e o push é abortado.
 
 ### 4. Concorrência e Execução Sequencial (Sem sobreposição)
 

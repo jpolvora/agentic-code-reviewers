@@ -24,96 +24,66 @@ Os runtimes são **independentes** (sem import ou acoplamento de código). Este 
 
 | Runtime | Escopo |
 |---------|--------|
-| **Auto-Fix CI** | Somente threads do bot (`AGENTIC_CODE_REVIEWERS_BOT_TAG`) |
-| **solve-pr IDE** | **Todas** as review threads abertas na PR (bot, humano, outros reviewers) |
+| **Auto-Fix CI** | **Todas** as review threads abertas com arquivo+linha. Analisa a descrição integral de cada uma. |
+| **solve-pr IDE** | **Todas** as review threads abertas na PR |
 
-Em ambos: **não resolver** thread sem alteração comprovada na linha ancorada (`lineNumber`).
+Não fechar thread sem correção correspondente listada explicitamente (`resolvedThreads` no Auto-Fix).
 
 ---
 
-## Ordem de operações (gate cooperativo)
-
-Ordem **obrigatória** em ambos os runtimes:
+## Ordem de operações (Auto-Fix CI)
 
 ```
-1. Ler threads ativas (Auto-Fix: bot; solve-pr: todas abertas)
-2. Investigar contexto (arquivo, testes, callers)
+1. Buscar threads abertas (arquivo+linha)
+2. Analisar profundamente cada descrição
 3. Aplicar correções cirúrgicas
-4. Validar (testes locais quando aplicável)
-5. git add + commit local
-6. Responder e resolver threads corrigidas na PR
-7. git push — SOMENTE se todas as resoluções tentadas tiverem sucesso
+4. git add + commit local
+5. Executar build de validação (`npm test` / `npm run build` ou `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`; falha = exit ≠ 0)
+6. Fechar cada thread corrigida com comentário detalhado (causa raiz + o que mudou)
+7. git push — somente se build e resoluções tentadas tiverem sucesso
 ```
 
-Se o passo 6 falhar (token, permissão, thread não encontrada): **não fazer push**. Deixe o commit local para inspeção ou push manual.
+Se o passo 5 ou 6 falhar: **não fazer push**. Commit local preservado para inspeção manual.
 
-**Dual-engine sequencial (CI):** se o engine anterior resolveu threads mas o push falhou, o engine seguinte (sem threads ativas) deve tentar **recovery push** do commit local pendente antes de encerrar.
+**Dual-engine sequencial (CI):** se o engine anterior resolveu threads mas o push falhou, o engine seguinte tenta **recovery push** do commit local pendente.
 
 ---
 
-## Resposta na thread (paridade com code review)
+## Resposta na thread
 
-Toda resolução deve incluir o marcador canônico (mesmo do runner de review):
+Toda resolução inclui o marcador canônico:
 
 ```
 <!-- resolution-reply -->
 ```
 
-Corpo sugerido (Auto-Fix CI inclui `botTag`; solve-pr IDE usa só o marcador + explicação do desenvolvedor):
-
-```markdown
-<!-- resolution-reply -->
-
-<explicação curta: causa raiz + o que mudou>
-```
-
-Auto-Fix CI (`provider.resolvePullRequestReviewThreads`) prefixa com `botTag`. solve-pr (`resolve_thread.cjs`) posta reply do desenvolvedor com o marcador canônico.
-
----
-
-## Mensagem de commit
-
-Preferir Conventional Commits com referência à PR:
-
-```
-fix(review): resolve issues from review threads of PR #<N>
-```
-
-Auto-Fix CI gera automaticamente quando `pullRequestId` está disponível.
+Corpo: **explicação detalhada** do agente (problema, causa raiz, alteração, por que resolve). Auto-Fix prefixa com `botTag` na API.
 
 ---
 
 ## Formato estruturado (Auto-Fix subagente)
 
-O subagente Auto-Fix retorna JSON (`AUTO_FIX.md`):
+JSON (`AUTO_FIX.md`):
 
-- `explanation` — texto base da reply (por arquivo).
-- `replacements[]` — intervalos `startLine`/`endLine`/`replacementContent`.
-- Resolução de thread: só quando a **linha da thread** teve conteúdo alterado (gate TypeScript).
-
-solve-pr pode usar edição direta **ou** o mesmo raciocínio; não é obrigado ao JSON de replacements.
+- `replacements[]` — intervalos alterados no arquivo.
+- `resolvedThreads[]` — `{ threadId, explanation }` por thread fechada.
 
 ---
 
 ## Contexto intra-review
 
-Ao listar threads para correção, incluir sempre:
-
 | Campo | Uso |
 |-------|-----|
-| `threadId` | Resolução na API (GitHub GraphQL ID ou ADO numérico) |
-| `filePath` / `path` | Arquivo ancorado |
-| `lineNumber` / `line` | Linha da review |
-| `summary` | Primeiro comentário da thread |
-
-Isso permite casar tentativa de fix ↔ thread ↔ próxima rodada de code review.
+| `threadId` | Resolução na API |
+| `filePath` | Arquivo ancorado |
+| `lineNumber` | Linha da review |
+| `description` | Texto integral do comentário (análise profunda) |
+| `summary` | Resumo curto para tabelas do reviewer |
 
 ---
 
 ## Token GitHub
 
-Precedência (ambos os runtimes):
-
 `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` → `GITHUB_TOKEN` → `GH_TOKEN`
 
-PAT recomendado para `resolveReviewThread` (integration token do Actions frequentemente nega).
+PAT recomendado para `resolveReviewThread`.

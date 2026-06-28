@@ -92,7 +92,7 @@ Findings that violate any rule below are automatically discarded:
 
 ### PR Summary Comment (`shouldPostReviewSummary` in `src/ado/post-comments.ts`)
 
-The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending bot threads** remain on the PR. `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`.
+The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending runner threads** remain on the PR (`Agentic Code Reviewer` prefix). `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`. Comment tag is `buildBotTag(engine)` from `src/bot-tag.ts`.
 
 ### Safe Outputs (`src/ado/safe-outputs.ts`)
 
@@ -135,7 +135,7 @@ All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except creden
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Diff comparison branch |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Include runner in diff (CI of this repo) |
 
-**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, `BOT_TAG`, etc.
+**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, etc.
 
 **`run.sh` only:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
@@ -170,8 +170,9 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `.github/workflows/review-remote.yml` | Reusable workflow for consumer repositories. |
 | `.github/workflows/auto-fix.yml` | CI self-healing loop — triggers after successful code review (`workflow_run`) |
 | `examples/consumer-github-workflow.yml` | Copy-paste template for GitHub consumers. |
-| `src/orchestrator/autofix-runner.ts` | Auto-fix flow: subagents per file, replacements, partial thread resolution |
+| `src/orchestrator/autofix-runner.ts` | Auto-fix flow: threads abertas com arquivo+linha (`fileReviewThreads`), subagents per file, cooperative resolve |
 | `src/git/autofix-commit.ts` | Consolidated commit and push after auto-fix |
+| `src/git/autofix-build.ts` | Post-commit build gate before thread resolution/push |
 | `skills/AUTO_FIX.md` | Auto-fix subagent prompt (surgical fixes, JSON replacements) |
 | `skills/COOPERATIVE_FIX.md` | Shared fix contract (Auto-Fix CI ↔ solve-pr IDE, no code coupling) |
 | `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |

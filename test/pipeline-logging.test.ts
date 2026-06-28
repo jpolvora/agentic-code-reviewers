@@ -5,7 +5,10 @@ import {
   formatLogIssueCommand,
 } from '../src/ado/pipeline-logging.js';
 import { formatCommentForPosting } from '../src/ado/format-thread.js';
+import { BOT_TAG_PREFIX } from '../src/bot-tag.js';
 import type { CodeReviewItem, GateEvaluation } from '../src/ado/types.js';
+
+const BOT = `${BOT_TAG_PREFIX} cursor-sdk`;
 
 function review(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
   return {
@@ -55,7 +58,7 @@ describe('formatLogIssueCommand', () => {
 describe('buildReviewSummaryMarkdown', () => {
   it('inclui status, severidades e linha de tabela por review', () => {
     const md = buildReviewSummaryMarkdown(gate, [review()], false);
-    assert.match(md, /# Cursor Reviewer/);
+    assert.match(md, /# Agentic Code Reviewer/);
     assert.match(md, /Com issues/);
     assert.match(md, /\| warning \| 7 \| `src\/Foo\.cs:42`/);
   });
@@ -65,7 +68,7 @@ describe('formatCommentForPosting — fences', () => {
   it('normaliza ```suggestion para bloco neutro e usa label de correção', () => {
     const body = formatCommentForPosting(
       review({ suggestedFix: '```suggestion\nvar x = 1;\n```' }),
-      '[Cursor Reviewer]',
+      BOT,
     );
     assert.equal(body.includes('```suggestion'), false);
     assert.match(body, /\*\*Correção sugerida:\*\*/);
@@ -75,7 +78,7 @@ describe('formatCommentForPosting — fences', () => {
   it('envolve sugestão sem fence em bloco de código neutro', () => {
     const body = formatCommentForPosting(
       review({ suggestedFix: 'troque == por ===' }),
-      '[Cursor Reviewer]',
+      BOT,
     );
     assert.match(body, /\*\*Correção sugerida:\*\*\n\n```\ntroque == por ===\n```/);
   });

@@ -168,12 +168,12 @@ Detalhes: [`score_calc.md`](score_calc.md) · [`faq.md`](faq.md) § 11.
 
 ### Auto-Fix e self-healing
 
-Modo **`--auto-fix`** / `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true` — correção automática de threads ativas (commit + push + resolução parcial). **Review padrão permanece read-only**; auto-fix é ramo separado em `src/index.ts`.
+Modo **`--auto-fix`** / `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true` — correção automática de threads ativas (commit → build → resolução → push). **Review padrão permanece read-only**; auto-fix é ramo separado em `src/index.ts`.
 
 | Componente | Arquivo |
 |------------|---------|
 | Orquestrador | `src/orchestrator/autofix-runner.ts` |
-| Commit/push | `src/git/autofix-commit.ts` |
+| Commit/push | `src/git/autofix-commit.ts`, `src/git/autofix-build.ts` |
 | Prompt subagente | `skills/AUTO_FIX.md` |
 | CI GitHub | `.github/workflows/auto-fix.yml` |
 | Skill IDE (manual) | `.agents/skills/solve-pr/` |
@@ -399,7 +399,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 **Issue (thread active):**
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 
 🛑 **CRITICAL:** Descrição objetiva...
 
@@ -422,7 +422,7 @@ Refs curtas (`master`) normalizadas para `refs/heads/...`.
 **Resumo positivo (thread closed):**
 
 ```
-[Cursor Reviewer]
+[Agentic Code Reviewer cursor-sdk]
 <!-- review-summary -->
 Todas as pendências foram resolvidas com sucesso! A PR está pronta para ser mesclada. 🚀
 ```
@@ -507,7 +507,6 @@ Pipeline: SUCESSO (exit 0)
 | `--source-branch REF` | Branch source |
 | `--target-branch REF` | Branch target (default: `refs/heads/master`) |
 | `--org`, `--project`, `--repo`, `--pr-id` | Contexto ADO |
-| `--bot-tag TAG` | Tag do bot |
 | `--model ID` | Modelo Cursor |
 | `--engine NAME` | Engine: `cursor-sdk`, `cursor` ou `opencode` |
 | `--repo-root PATH` | Raiz do repositório alvo |

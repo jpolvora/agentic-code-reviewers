@@ -7,6 +7,7 @@ import type { ExecutionEngine } from '../engine/types.js';
 import type { Logger } from '../logger.js';
 import { extractJsonFromAgentOutput } from '../parser/review-response.js';
 import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
+import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 
 export interface Replacement {
@@ -118,6 +119,38 @@ export function isThreadLineModified(
   return origLine !== updatedLine;
 }
 
+interface AutoFixAgentResponse {
+  replacements: Replacement[];
+  resolvedThreads?: Array<{ threadId: string | number; explanation: string }>;
+}
+
+function buildResolvedItemsFromAgent(
+  threads: ActiveThreadInfo[],
+  parsed: AutoFixAgentResponse,
+  dryRun: boolean,
+): ResolvedThreadItem[] {
+  const items: ResolvedThreadItem[] = [];
+
+  if (!parsed.resolvedThreads || parsed.resolvedThreads.length === 0) {
+    return items;
+  }
+
+  for (const entry of parsed.resolvedThreads) {
+    const thread = threads.find((t) => String(t.threadId) === String(entry.threadId));
+    if (!thread) continue;
+    const note = entry.explanation?.trim();
+    if (!note) continue;
+    items.push({
+      threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
+      fileName: thread.filePath,
+      lineNumber: thread.lineNumber,
+      note: dryRun ? `${note} (simulado)` : note,
+    });
+  }
+  return items;
+}
+
+
 interface FileFixResult {
   relativePath: string;
   resolvedItems: ResolvedThreadItem[];
@@ -150,6 +183,14 @@ async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Pr
     return;
   }
 
+  logger.section('Recovery: validando build antes de publicar commit pendente');
+  const buildOk = await runAutoFixBuild(config, logger);
+  if (!buildOk) {
+    throw new Error(
+      'Recovery dual-engine: build falhou — push do commit local pendente abortado.',
+    );
+  }
+
   logger.section('Recovery: publicando commit pendente do engine anterior');
   const pushed = await pushAutoFixChanges(config, logger);
   if (!pushed) {
@@ -159,6 +200,10 @@ async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Pr
   }
 }
 
+export function getAutoFixThreads(reviewContext: ReviewContextResult): ActiveThreadInfo[] {
+  return reviewContext.fileReviewThreads;
+}
+
 export async function runAutoFixFlow(
   config: ReviewerConfig,
   reviewContext: ReviewContextResult,
@@ -166,9 +211,9 @@ export async function runAutoFixFlow(
   engine: ExecutionEngine,
   logger: Logger,
 ): Promise<void> {
-  const activeThreads = reviewContext.activeThreads || [];
+  const activeThreads = getAutoFixThreads(reviewContext);
   if (activeThreads.length === 0) {
-    logger.info('Nenhuma thread ativa/aberta para correção automática.');
+    logger.info('Nenhuma thread de review aberta (com arquivo/linha) para correção automática.');
     await tryRecoverPendingPush(config, logger);
     return;
   }
@@ -218,9 +263,9 @@ export async function runAutoFixFlow(
       const threadListText = threads
         .map(
           (t) =>
-            `- Thread ${t.threadId} | Linha ${t.lineNumber}: ${t.summary}`,
+            `### Thread ${t.threadId} (linha ${t.lineNumber})\n${t.description || t.summary}`,
         )
-        .join('\n');
+        .join('\n\n');
 
       const prompt = `${autoFixSystemPrompt}
 
@@ -234,10 +279,10 @@ ${fileContent}
 \`\`\`
 
 ---
-## Threads de revisão ativas:
+## Threads abertas neste arquivo (analise cada descrição em profundidade):
 ${threadListText}
 
-Por favor, analise as threads acima e retorne o JSON com a explicação e as substituições (replacements) necessárias para corrigir todos os problemas apontados para este arquivo.
+Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhada por thread corrigida).
 `;
 
       logger.info(`Disparando subagente de correção para o arquivo: ${filePath}`);
@@ -257,10 +302,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           return undefined;
         }
 
-        const parsed = JSON.parse(jsonText) as {
-          explanation: string;
-          replacements: Array<{ startLine: number; endLine: number; replacementContent: string }>;
-        };
+        const parsed = JSON.parse(jsonText) as AutoFixAgentResponse;
 
         if (!parsed.replacements || !Array.isArray(parsed.replacements)) {
           logger.error(`Formato de replacements inválido retornado para o arquivo: ${filePath}`);
@@ -268,7 +310,7 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         }
 
         if (parsed.replacements.length === 0) {
-          logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}. Threads não serão resolvidas.`);
+          logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}.`);
           return undefined;
         }
 
@@ -281,40 +323,33 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
         }
 
         if (updatedContent === fileContent) {
-          logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}. Threads não serão resolvidas.`);
+          logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}.`);
           return undefined;
         }
 
-        const explanation = parsed.explanation || 'Issue corrigida automaticamente pelo subagente.';
+        const localResolvedItems = buildResolvedItemsFromAgent(threads, parsed, config.dryRun);
 
-        const localResolvedItems: ResolvedThreadItem[] = [];
-
-        // Resolve apenas threads cuja linha teve conteúdo alterado pelos replacements
-        for (const thread of threads) {
-          const isModified = isThreadLineModified(
-            fileContent,
-            updatedContent,
-            thread.lineNumber,
-            parsed.replacements,
+        const verifiedResolvedItems = localResolvedItems.filter((item) => {
+          const thread = threads.find(
+            (t) =>
+              (Number.isNaN(Number(item.threadId)) ? item.threadId : Number(item.threadId)) ===
+              (Number.isNaN(Number(t.threadId)) ? t.threadId : Number(t.threadId)),
           );
-
-          if (isModified) {
-            localResolvedItems.push({
-              threadId: Number.isNaN(Number(thread.threadId)) ? thread.threadId : Number(thread.threadId),
-              fileName: thread.filePath,
-              lineNumber: thread.lineNumber,
-              note: config.dryRun ? `${explanation} (simulado)` : explanation,
-            });
-          } else {
+          if (!thread) return false;
+          if (
+            !isThreadLineModified(fileContent, updatedContent, thread.lineNumber, parsed.replacements)
+          ) {
             logger.warn(
-              `Thread ${thread.threadId} na linha ${thread.lineNumber} de ${filePath} não foi afetada pelas substituições e continuará aberta.`,
+              `Thread ${thread.threadId} declarada resolvida mas linha ${thread.lineNumber} não foi alterada — ignorada.`,
             );
+            return false;
           }
-        }
+          return true;
+        });
 
-        if (localResolvedItems.length === 0) {
+        if (verifiedResolvedItems.length === 0) {
           logger.warn(
-            `Arquivo ${filePath} teria alterações sem threads resolvíveis — correção descartada.`,
+            `Arquivo ${filePath} alterado mas nenhuma thread confirmada após verificação determinística — correção descartada.`,
           );
           return undefined;
         }
@@ -326,7 +361,8 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
           fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
         }
 
-        return { relativePath, resolvedItems: localResolvedItems };
+        return { relativePath, resolvedItems: verifiedResolvedItems };
+
       } catch (err: any) {
         logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
         return undefined;
@@ -343,15 +379,23 @@ Por favor, analise as threads acima e retorne o JSON com a explicação e as sub
     return;
   }
 
-  // Gate cooperativo (COOPERATIVE_FIX.md): commit local → resolver threads → push
+  // commit local → build → fechar threads com explicação detalhada → push
   logger.section('Consolidando alterações com Git (commit local)');
   const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles);
   if (!commitSuccess) {
-    logger.info('Commit local não realizado; abortando resolução e push.');
+    logger.info('Commit local não realizado; abortando build, resolução e push.');
     return;
   }
 
-  logger.section('Respondendo e resolvendo threads na PR');
+  logger.section('Validando build após commit local');
+  const buildOk = await runAutoFixBuild(config, logger);
+  if (!buildOk) {
+    throw new Error(
+      'Gate cooperativo: build falhou após commit local — resolução e push abortados.',
+    );
+  }
+
+  logger.section('Fechando threads corrigidas na PR');
   if (config.dryRun) {
     logger.info(`[dry-run] Simulando resolução de ${resolvedItems.length} thread(s).`);
     simulateThreadResolution(activeThreads, reviewContext.pendingThreads ?? [], resolvedItems);

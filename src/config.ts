@@ -6,7 +6,9 @@ import {
 } from './engine/cursor-sdk/model.js';
 import { assertOpencodeModel, DEFAULT_OPENCODE_MODEL } from './engine/opencode/model.js';
 import type { ReviewerEngineName } from './engine/types.js';
+import { buildBotTag } from './bot-tag.js';
 import { detectSourceBranchRef } from './git/diff.js';
+import { resolveAutoFixBuildCommand } from './git/autofix-build.js';
 import { ENV, ENV_PREFIX, env } from './env.js';
 import {
   buildDefaultProtectedPatterns,
@@ -170,6 +172,7 @@ export interface ReviewerConfig {
   /** Engine de execução LLM (default: cursor-sdk). */
   engine: ReviewerEngineName;
   model: string;
+  /** Tag nos comentários — derivada da engine (`buildBotTag`). */
   botTag: string;
   verbose: boolean;
   dryRun: boolean;
@@ -231,6 +234,8 @@ export interface ReviewerConfig {
   generatePrDescription: boolean;
   artifactsOnly: boolean;
   autoFix: boolean;
+  /** Comando de build pós-commit no auto-fix; null = ignorar (sem script ou env vazio). */
+  autoFixBuildCommand: string | null;
 }
 
 export interface CliArgs {
@@ -242,7 +247,6 @@ export interface CliArgs {
   project?: string;
   repository?: string;
   pullRequestId?: number;
-  botTag?: string;
   model?: string;
   repoRoot?: string;
   includeUncommitted?: boolean;
@@ -457,10 +461,6 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case '--pr-id':
         args.pullRequestId = Number(next);
-        i++;
-        break;
-      case '--bot-tag':
-        args.botTag = next;
         i++;
         break;
       case '--model':
@@ -835,7 +835,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     cursorApiKey,
     engine,
     model: resolveReviewerModel(engine, cli.model),
-    botTag: cli.botTag ?? env.botTag() ?? '[Cursor Reviewer]',
+    botTag: buildBotTag(engine),
     verbose: cli.verbose ?? parseBool(env.verbose(), true),
     dryRun,
     includeUncommitted,
@@ -880,6 +880,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     generatePrDescription: cli.generatePrDescription ?? false,
     artifactsOnly: cli.artifactsOnly ?? false,
     autoFix,
+    autoFixBuildCommand: resolveAutoFixBuildCommand(
+      repoRoot,
+      env.autoFixBuildCommand(),
+    ),
   };
 }
 
@@ -900,7 +904,6 @@ Opções:
   --source-branch REF    Override local da branch da PR (pipeline usa SYSTEM_PULLREQUEST_SOURCEBRANCH)
   --target-branch REF    Branch de comparação do diff (default: refs/heads/master)
   --org, --project, --repo, --pr-id   Contexto Azure DevOps/GitHub
-  --bot-tag TAG          Tag do bot
   --model ID             Modelo LLM (default por engine)
   --engine NAME          Engine: cursor-sdk, cursor ou opencode (default: cursor-sdk)
   --repo-root PATH       Raiz do repositório alvo

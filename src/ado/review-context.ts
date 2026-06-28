@@ -1,13 +1,16 @@
 import { AdoClient } from './client.js';
+import { normalizeFilePath, stripHtml } from './utils.js';
 import {
-  commentHasBotTag,
-  normalizeFilePath,
-  stripHtml,
-} from './utils.js';
-import {
-  REVIEW_SUMMARY_MARKER,
   commentBodyHasResolutionReply,
+  RESOLUTION_MARKER,
+  REVIEW_SUMMARY_MARKER,
 } from '../git/markers.js';
+import {
+  extractAgenticBotTagLine,
+  isAgenticReviewerComment,
+  stripAgenticBotTags,
+} from '../bot-tag.js';
+
 import type {
   ActiveThreadInfo,
   AdoThread,
@@ -17,6 +20,7 @@ import type {
 } from './types.js';
 
 export function getReviewSummaryFromComment(content: string, botTag: string): string {
+
   let summary = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
   summary = summary.replace(/```[\s\S]*?```/g, '');
   summary = summary.replaceAll(botTag, '');
@@ -28,14 +32,11 @@ export function getReviewSummaryFromComment(content: string, botTag: string): st
   return summary;
 }
 
-function threadHasResolutionReply(thread: { comments: Array<{ content: string; isDeleted?: boolean; parentCommentId: number }> }, botTag: string): boolean {
-  return thread.comments.some(
-    (comment) =>
-      !comment.isDeleted &&
-      comment.parentCommentId !== 0 &&
-      commentHasBotTag(comment.content, botTag, 'contains') &&
-      commentBodyHasResolutionReply(comment.content, botTag),
-  );
+/** Texto integral do comentário da thread (sem truncar) para análise do auto-fix. */
+export function getThreadDescription(content: string, botTag: string): string {
+  let description = content.replace(/<details>[\s\S]*?<\/details>/gi, '');
+  description = stripAgenticBotTags(description);
+  return description;
 }
 
 function getFirstVisibleComment(thread: AdoThread) {
@@ -61,8 +62,8 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
     }
 
     const rawContent = firstComment.content;
-    const isBot = commentHasBotTag(rawContent, botTag, 'contains');
-    const detectedBotTag = isBot ? botTag : null;
+    const isBot = isAgenticReviewerComment(rawContent);
+    const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
     const summary = getReviewSummaryFromComment(rawContent, botTag);
 
     pending.push({
@@ -75,14 +76,17 @@ function extractPendingThreads(threads: AdoThreadsResponse, botTag: string): Pen
       botTag: detectedBotTag,
       summary: summary || stripHtml(rawContent).replace(/\s+/g, ' ').slice(0, 160),
     });
+
   }
 
   return pending;
 }
 
-export function filterGatePendingThreads(threads: PendingPrThread[], botTag: string): PendingPrThread[] {
-  return threads.filter((t) => t.isBot && t.botTag === botTag);
+/** Threads pendentes do runner para gate e resumo final (exclui revisores humanos). */
+export function filterGatePendingThreads(threads: PendingPrThread[]): PendingPrThread[] {
+  return threads.filter((t) => t.isBot && t.botTag != null);
 }
+
 
 export async function getPullRequestReviewContext(
   client: AdoClient,
@@ -108,7 +112,7 @@ export async function getPullRequestReviewContext(
       status: string;
       summary: string;
     }> = [];
-    const activeThreads: ActiveThreadInfo[] = [];
+    const fileReviewThreads: ActiveThreadInfo[] = [];
     const pendingThreads = extractPendingThreads(existingThreads, botTag);
 
     for (const thread of existingThreads.value) {
@@ -121,59 +125,63 @@ export async function getPullRequestReviewContext(
         continue;
       }
 
-      const botComment = thread.comments.find(
-        (comment) => !comment.isDeleted && commentHasBotTag(comment.content, botTag),
-      );
-      if (!botComment) {
+      const rootComment = getFirstVisibleComment(thread);
+      if (!rootComment) {
         continue;
       }
 
       const normalizedPath = normalizeFilePath(thread.threadContext.filePath);
       const lineNumber = thread.threadContext.rightFileStart?.line ?? 0;
-      const isActiveBotThread = threadStatus === 'active' || threadStatus === 'pending';
-
-      if (isActiveBotThread) {
-        existingKeys.set(`${normalizedPath}|line:${lineNumber}`, true);
+      if (lineNumber <= 0) {
+        continue;
       }
 
-      if (isActiveBotThread) {
+      const isOpen = threadStatus === 'active' || threadStatus === 'pending';
+      const summary = getReviewSummaryFromComment(rootComment.content, botTag);
+      const hasResolutionReply = thread.comments.some(
+        (comment) =>
+          !comment.isDeleted &&
+          comment.id !== rootComment.id &&
+          (commentBodyHasResolutionReply(comment.content, botTag) ||
+            comment.content.includes(RESOLUTION_MARKER)),
+      );
+
+      if (isOpen) {
+        existingKeys.set(`${normalizedPath}|line:${lineNumber}`, true);
         activeContextRows.push({
           filePath: normalizedPath,
           lineNumber,
           status: threadStatus,
-          summary: getReviewSummaryFromComment(botComment.content, botTag),
+          summary,
         });
-
-        activeThreads.push({
+        fileReviewThreads.push({
           threadId: String(thread.id),
           filePath: normalizedPath,
           lineNumber,
           status: threadStatus,
-          summary: getReviewSummaryFromComment(botComment.content, botTag),
-          botCommentId: botComment.id,
-          hasResolutionReply: threadHasResolutionReply(thread, botTag),
+          summary,
+          description: getThreadDescription(rootComment.content, botTag),
+          botCommentId: rootComment.id,
+          hasResolutionReply,
         });
       } else {
-        // Threads do bot já resolvidas (fixed/wontFix/closed/byDesign): NÃO entram no
-        // dedup determinístico (existingKeys), mas viram memória para o LLM não
-        // re-levantar problemas já tratados sem nova evidência (evita loop de re-litígio).
         resolvedContextRows.push({
           filePath: normalizedPath,
           lineNumber,
           status: threadStatus,
-          summary: getReviewSummaryFromComment(botComment.content, botTag),
+          summary,
         });
       }
     }
 
     log(`Found ${pendingThreads.length} pending thread(s) on PR (all authors).`);
-    log(`Found ${activeThreads.length} active bot thread(s) eligible for resolution.`);
+    log(`Found ${fileReviewThreads.length} open file review thread(s).`);
 
     if (activeContextRows.length === 0 && resolvedContextRows.length === 0) {
       return {
         existingKeys,
         contextForLlm: '',
-        activeThreads,
+        fileReviewThreads,
         allThreads: existingThreads,
         pendingThreads,
       };
@@ -220,7 +228,7 @@ Nas rodadas anteriores, foram identificados os seguintes problemas na base de c�
         contextForLlm += `| ${row.filePath} | ${row.lineNumber} | ${row.status} | ${escapedSummary} |\n`;
       }
     } else {
-      contextForLlm += '_No active bot review threads at the moment._\n';
+      contextForLlm += '_No active file review threads at the moment._\n';
     }
 
     if (resolvedContextRows.length > 0) {
@@ -241,7 +249,7 @@ These issues were reported in a previous round and already resolved/closed. Do *
     return {
       existingKeys,
       contextForLlm,
-      activeThreads,
+      fileReviewThreads,
       allThreads: existingThreads,
       pendingThreads,
     };
@@ -266,14 +274,14 @@ export function testReviewSummaryAlreadyPosted(
     }
 
     for (const comment of thread.comments) {
-      if (comment.isDeleted || !commentHasBotTag(comment.content, botTag)) {
+      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) {
         continue;
       }
       if (!comment.content.includes(REVIEW_SUMMARY_MARKER)) {
         continue;
       }
 
-      let existing = comment.content.replaceAll(botTag, '');
+      let existing = stripAgenticBotTags(comment.content);
       existing = existing.replace(REVIEW_SUMMARY_MARKER, '');
       existing = existing.replace(/\s+/g, ' ').trim();
 

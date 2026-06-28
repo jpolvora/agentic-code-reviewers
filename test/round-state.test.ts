@@ -7,9 +7,10 @@ import {
   parseRoundStateFromThreads,
   splitReviewsForEscalation,
 } from '../src/ado/round-state.js';
+import { buildBotTag } from '../src/bot-tag.js';
 import type { AdoThreadsResponse, CodeReviewItem } from '../src/ado/types.js';
 
-const BOT = '[Cursor Reviewer]';
+const BOT = buildBotTag('cursor-sdk');
 
 function review(overrides: Partial<CodeReviewItem> = {}): CodeReviewItem {
   return {

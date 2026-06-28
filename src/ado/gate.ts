@@ -15,7 +15,7 @@ export function countSeverities(reviews: CodeReviewItem[]): Record<ReviewSeverit
   return counts;
 }
 
-/** pendingThreads: apenas threads bot [Cursor Reviewer] active/pending (filtradas upstream). */
+/** pendingThreads: threads do runner (`Agentic Code Reviewer`) active/pending (filtradas upstream). */
 export function evaluateGate(params: {
   newReviews: CodeReviewItem[];
   resolvedCount: number;
@@ -124,7 +124,7 @@ export function formatGateSummary(
           ? `${thread.filePath}:${thread.lineNumber ?? '?'}`
           : '(thread geral)';
       lines.push(
-        `  - #${thread.threadId} [${thread.status}] ${location} | autor: ${thread.author}${thread.botTag ? ` (${thread.botTag})` : ''}`,
+        `  - #${thread.threadId} [${thread.status}] ${location} | autor: ${thread.author}`,
       );
       lines.push(`    ${thread.summary}`);
     }

@@ -20,7 +20,7 @@ Runtime **IDE** complementar ao **Auto-Fix CI** (`--auto-fix` / `auto-fix.yml`).
 code review → developer fix → commit → resolve threads → push → code review → …
 ```
 
-`solve-pr` lista **todas** as review threads não resolvidas da PR — bot, humano ou outro reviewer. Não filtra por `AGENTIC_CODE_REVIEWERS_BOT_TAG`.
+`solve-pr` lista **todas** as review threads não resolvidas da PR — bot, humano ou outro reviewer.
 
 ---
 

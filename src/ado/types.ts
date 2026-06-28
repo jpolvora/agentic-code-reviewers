@@ -43,6 +43,8 @@ export interface ActiveThreadInfo {
   lineNumber: number;
   status: string;
   summary: string;
+  /** Texto completo do comentário raiz da thread (para auto-fix). */
+  description: string;
   botCommentId: string | number;
   hasResolutionReply: boolean;
 }
@@ -61,7 +63,8 @@ export interface PendingPrThread {
 export interface ReviewContextResult {
   existingKeys: Map<string, boolean>;
   contextForLlm: string;
-  activeThreads: ActiveThreadInfo[];
+  /** Review threads abertas com arquivo+linha (auto-fix, resolução, gate). */
+  fileReviewThreads: ActiveThreadInfo[];
   allThreads: AdoThreadsResponse | null;
   pendingThreads: PendingPrThread[];
 }

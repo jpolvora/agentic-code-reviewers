@@ -35,7 +35,6 @@ export const ENV = {
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
   GITHUB_TOKEN: primaryKey('GITHUB_TOKEN'),
   TARGET_BRANCH: primaryKey('TARGET_BRANCH'),
-  BOT_TAG: primaryKey('BOT_TAG'),
   SCORE_MIN: primaryKey('SCORE_MIN'),
   TIMEOUT_MS: primaryKey('TIMEOUT_MS'),
   SANDBOX: primaryKey('SANDBOX'),
@@ -67,6 +66,7 @@ export const ENV = {
   ADO_REPO: primaryKey('ADO_REPO'),
   PROMPT_COLOR: primaryKey('PROMPT_COLOR'),
   AUTO_FIX: primaryKey('AUTO_FIX'),
+  AUTO_FIX_BUILD_COMMAND: primaryKey('AUTO_FIX_BUILD_COMMAND'),
 } as const;
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
@@ -89,7 +89,6 @@ export const env = {
     readCredential('GITHUB_TOKEN') ??
     readCredential('GH_TOKEN'),
   targetBranch: () => readEnv('TARGET_BRANCH'),
-  botTag: () => readEnv('BOT_TAG'),
   scoreMin: () => readEnv('SCORE_MIN'),
   timeoutMs: () => readEnv('TIMEOUT_MS'),
   sandbox: () => readEnv('SANDBOX'),
@@ -121,4 +120,5 @@ export const env = {
   adoRepo: () => readEnv('ADO_REPO'),
   promptColor: () => readEnv('PROMPT_COLOR'),
   autoFix: () => readEnv('AUTO_FIX'),
+  autoFixBuildCommand: () => readEnv('AUTO_FIX_BUILD_COMMAND'),
 } as const;

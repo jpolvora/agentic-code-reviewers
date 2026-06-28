@@ -53,7 +53,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
     *   **Azure DevOps:** Emite logging commands (`##vso[task.logissue]`) e anexa um resumo markdown rico na tela de build (`##vso[task.uploadsummary]`).
     *   **GitHub:** Anexa um resumo markdown completo da revisão diretamente na página do workflow via `GITHUB_STEP_SUMMARY`.
 *   **📦 Execução Remota via cURL:** Permite rodar o reviewer remotamente baixando apenas o script `run.sh` da branch `release`, dispensando o clone completo do repositório ou a presença de dependências de desenvolvimento.
-*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit/push na branch da PR e re-dispara code review. Proteções: resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
+*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit, **build de validação**, resolução de threads, push na branch da PR e re-dispara code review. Proteções: build pós-commit, resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
 *   **📏 Limiar de publicação (`score_min`) end-to-end:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min` (precedência CLI > env > default **6**) controla quais achados viram threads — injetado no prompt, gate TypeScript (`isPublishableReview`) e Safe Outputs (`severity-score`). Mesmo valor para `cursor-sdk` e `opencode`.
 *   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
@@ -174,10 +174,11 @@ Defaults sensatos — omita salvo necessidade explícita.
 | `AGENTIC_CODE_REVIEWERS_VERBOSE` | `true` | Logs; `[assistant]` no SSE (`--quiet` desativa). |
 | `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` | `600000` | Timeout da sessão (10 min). |
 | `AGENTIC_CODE_REVIEWERS_SANDBOX` | `true` | Sandbox read-only do `cursor-sdk`. |
-| `AGENTIC_CODE_REVIEWERS_BOT_TAG` | `[Cursor Reviewer]` | Tag do bot nos comentários. |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM; define a tag nos comentários (`Agentic Code Reviewer {engine}`) |
 | `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` | `5` | Rodadas antes do handoff humano. |
 | `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | `6` | Score mínimo para publicar thread (prompt + gate + Safe Outputs). |
 | `AGENTIC_CODE_REVIEWERS_AUTO_FIX` | `false` | Ativa modo auto-fix (`--auto-fix`). |
+| `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND` | auto (`npm test` se `scripts.test`, senão `npm run build`) | Validação pós-commit antes de resolver threads/push; string vazia desabilita. |
 | `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS` | `true` | Gate determinístico pós-LLM (diff-line, protected paths, secrets). |
 | `AGENTIC_CODE_REVIEWERS_PARALLEL_CHUNKS` | `1` | Agentes paralelos in-process por chunk de arquivos. |
 | `AGENTIC_CODE_REVIEWERS_META_REVIEWER` | `false` | Segunda passagem LLM para filtrar candidatos paralelos. |
@@ -229,9 +230,8 @@ npm run review -- [argumentos]
 *   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
 *   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6. Injetado no prompt e aplicado pelo gate TypeScript + Safe Outputs (mesmo valor em `cursor-sdk` e `opencode`).
 *   `--auto-fix` : Modo correção automática — lê threads ativas do bot, aplica fixes via subagentes, commit/push e resolve threads (requer contexto de PR e token com escrita). Equivalente a `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`. **Mutuamente exclusivo** com o fluxo de review padrão na mesma invocação.
-*   `--bot-tag <VAL>` : Tag inserida no comentário do bot (default: `[Cursor Reviewer]`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_BOT_TAG`.
 
-> Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência.
+> Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência. A tag nos comentários da PR é derivada automaticamente: `Agentic Code Reviewer {engine}`.
 
 > **Nota:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` e `--score-min` são opt-in. Sem configurá-los, o gate permanece **6–10**.
 
@@ -409,10 +409,10 @@ Os checks de code review (`continue-on-error: true`) **não** bloqueiam o merge 
 
 Dispara **somente** em PRs com destino **`main`**. Um check por engine via matrix — por padrão **em paralelo**:
 
-| Check na PR | Engine | Modelo | Bot tag |
+| Check na PR | Engine | Modelo | Tag nos comentários |
 | :--- | :--- | :--- | :--- |
-| **Review (cursor-sdk)** | `@cursor/sdk` | `composer-2.5` | `[Cursor Reviewer]` |
-| **Review (opencode)** | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `[Cursor Reviewer · OpenCode]` |
+| **Review (cursor-sdk)** | `@cursor/sdk` | `composer-2.5` | `Agentic Code Reviewer cursor-sdk` |
+| **Review (opencode)** | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `Agentic Code Reviewer opencode` |
 
 **Modo de execução**
 
