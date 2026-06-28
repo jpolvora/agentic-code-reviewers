@@ -9,8 +9,9 @@ import { listInstalledSeedPaths } from '../src/seed/uninstall-fixtures.js';
 const runnerRoot = resolve(import.meta.dirname, '..');
 
 describe('seed fixtures', () => {
-  it('manifest and fixture files exist', () => {
+  it('manifest and fixture files exist', (t) => {
     if (buildSeedTargets().length === 0) {
+      t.skip('project does not have ABP layout (src/*Application + angular/src/app)');
       return;
     }
     assert.ok(existsSync(resolve(FIXTURES_ROOT, 'expected-scenarios.json')));

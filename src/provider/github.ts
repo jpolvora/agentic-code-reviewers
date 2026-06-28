@@ -209,7 +209,7 @@ In previous rounds, the following issues were identified in the codebase:
         for (const summary of allSummaries) {
           contextForLlm += `${summary}\n`;
         }
-        contextForLlm += `**Mandatory Action (Phases 1 and 2):** When analyzing the current diff, prioritize searching for variations of these same errors. The developer may have fixed the exact line pointed out previously but made the same mistake in new files/lines of this commit. Use tools to actively hunt for the same vulnerabilities and group them via \`relatedOccurrences\`.
+        contextForLlm += `\n**Mandatory Action (Phases 1 and 2):** When analyzing the current diff, prioritize searching for variations of these same errors. The developer may have fixed the exact line pointed out previously but made the same mistake in new files/lines of this commit. Use tools to actively hunt for the same vulnerabilities and group them via \`relatedOccurrences\`.
 `;
 
         contextForLlm += `
