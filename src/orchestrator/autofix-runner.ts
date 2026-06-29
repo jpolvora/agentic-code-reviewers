@@ -240,6 +240,19 @@ function getHeadCommitChangedFiles(repoRoot: string): string[] {
   return out.split(/\r?\n/).filter((line) => line.length > 0);
 }
 
+function formatCommonAutoFixSections(modifiedFiles: string[]): string[] {
+  const lines: string[] = [];
+  if (modifiedFiles.length > 0) {
+    lines.push('### Files Changed');
+    for (const file of modifiedFiles) {
+      lines.push(`- \`${file}\``);
+    }
+    lines.push('');
+  }
+  lines.push('> A new code review round will be triggered automatically to validate the changes.');
+  return lines;
+}
+
 export function buildRecoverySummary(modifiedFiles: string[], threadIds: string[]): string {
   const fixCount = threadIds.length > 0 ? threadIds.length : modifiedFiles.length > 0 ? 1 : 0;
   const lines: string[] = [];
@@ -256,14 +269,6 @@ export function buildRecoverySummary(modifiedFiles: string[], threadIds: string[
   );
   lines.push('');
 
-  if (modifiedFiles.length > 0) {
-    lines.push('### Files Changed');
-    for (const file of modifiedFiles) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push('');
-  }
-
   if (threadIds.length > 0) {
     lines.push('### Resolved Threads');
     for (const id of threadIds) {
@@ -272,7 +277,7 @@ export function buildRecoverySummary(modifiedFiles: string[], threadIds: string[
     lines.push('');
   }
 
-  lines.push('> A new code review round will be triggered automatically to validate the changes.');
+  lines.push(...formatCommonAutoFixSections(modifiedFiles));
   return lines.join('\n');
 }
 
@@ -344,14 +349,6 @@ function buildAutoFixSummary(
   );
   lines.push('');
 
-  if (modifiedFiles.length > 0) {
-    lines.push('### Files Changed');
-    for (const file of modifiedFiles) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push('');
-  }
-
   if (resolvedWithThreads.length > 0) {
     lines.push('### Resolved Issues');
     lines.push('');
@@ -370,7 +367,7 @@ function buildAutoFixSummary(
     lines.push('');
   }
 
-  lines.push('> A new code review round will be triggered automatically to validate the changes.');
+  lines.push(...formatCommonAutoFixSections(modifiedFiles));
   return lines.join('\n');
 }
 
