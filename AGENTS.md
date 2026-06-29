@@ -18,7 +18,7 @@ Operational guide for AI agents in this repository (**Multi Agent Code Reviewer*
 - **Documentation stays in sync with code.** After every implementation (feature, fix, or behavior change), update **all affected documentation** in the same change set — do not merge code that drifts from docs. Minimum checklist when touching runner behavior:
   - **`AGENTS.md`** — architecture, env vars, gate rules, skills routing
   - **`README.md`** — user-facing features, CLI, workflows, env tables
-  - **`docs/`** — `index.md`, `faq.md`, and topic docs (`flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `two-phase-execution-model.md`) as applicable
+  - **`docs/`** — `index.md` (lean overview + links), `workflows.md` (all execution paths), `faq.md`, and topic docs (`flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `two-phase-execution-model.md`) as applicable. Docs are English-only; `index.md` links to each deep dive.
   - **`skills/`** — when prompts, JSON contract, or gate policy change (`SYSTEM_PROMPT.md`, `AUTO_FIX.md`, stacks)
   - **`.env.example`** — when env vars are added, renamed, or defaults change
   - **Workflow examples** — `examples/`, `.github/workflows/` when CI inputs or behavior change
