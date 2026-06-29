@@ -82,6 +82,25 @@ export class AdoProvider implements PlatformProvider {
     );
   }
 
+  async postPrComment(
+    botTag: string,
+    commentBody: string,
+    log: (msg: string) => void,
+  ): Promise<boolean> {
+    const commentContent = [botTag, '', commentBody].join('\n');
+    try {
+      await this.ado.post(`/pullRequests/${this.config.pullRequestId}/threads?api-version=7.1`, {
+        comments: [{ parentCommentId: 0, content: commentContent, commentType: 1 }],
+        status: 'closed',
+      });
+      log('Comment posted to PR.');
+      return true;
+    } catch (error) {
+      log(`Error: failed to post PR comment: ${String(error)}`);
+      return false;
+    }
+  }
+
   async setPullRequestReviewSummary(
     botTag: string,
     summaryText: string,

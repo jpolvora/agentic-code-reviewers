@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { execSync } from 'node:child_process';
 import type { ReviewerConfig } from '../config.js';
 import type { ActiveThreadInfo, ReviewContextResult, ResolvedThreadItem } from '../ado/types.js';
 import type { PlatformProvider } from '../provider/types.js';
@@ -9,6 +10,8 @@ import { extractJsonFromAgentOutput } from '../parser/review-response.js';
 import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
 import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
+import { AUTO_FIX_SUMMARY_MARKER } from '../git/markers.js';
+import { isAgenticReviewerComment, stripAgenticBotTags } from '../bot-tag.js';
 
 export interface Replacement {
   startLine: number;
@@ -178,7 +181,12 @@ async function mapPool<T, R>(
 }
 
 /** Dual-engine sequencial: publica commit deixado pelo engine anterior quando threads já foram resolvidas. */
-async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Promise<void> {
+async function tryRecoverPendingPush(
+  config: ReviewerConfig,
+  reviewContext: ReviewContextResult,
+  provider: PlatformProvider,
+  logger: Logger,
+): Promise<void> {
   if (config.dryRun || !isLocalAheadOfRemote(config.repoRoot)) {
     return;
   }
@@ -198,10 +206,200 @@ async function tryRecoverPendingPush(config: ReviewerConfig, logger: Logger): Pr
       'Recovery dual-engine: falha ao publicar commit local pendente (threads já resolvidas por engine anterior).',
     );
   }
+
+  const subject = getHeadCommitSubject(config.repoRoot);
+  const threadIds = parseAutoFixCommitThreadIds(subject);
+  if (threadIds !== null) {
+    const summary = buildRecoverySummary(
+      getHeadCommitChangedFiles(config.repoRoot),
+      threadIds,
+    );
+    await postAutoFixSummary(config, reviewContext, provider, summary, logger);
+  }
+}
+
+export function parseAutoFixCommitThreadIds(subject: string): string[] | null {
+  if (!subject.includes('auto-fix issues from review threads')) {
+    return null;
+  }
+  const match = subject.match(/\[(.+)\]\s*$/);
+  if (!match) return [];
+  return match[1].split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function getHeadCommitSubject(repoRoot: string): string {
+  return execSync('git log -1 --format=%s', { cwd: repoRoot, encoding: 'utf8' }).trim();
+}
+
+function getHeadCommitChangedFiles(repoRoot: string): string[] {
+  const out = execSync('git show --name-only --pretty=format: HEAD', {
+    cwd: repoRoot,
+    encoding: 'utf8',
+  }).trim();
+  if (!out) return [];
+  return out.split(/\r?\n/).filter((line) => line.length > 0);
+}
+
+function formatCommonAutoFixSections(modifiedFiles: string[]): string[] {
+  const lines: string[] = [];
+  if (modifiedFiles.length > 0) {
+    lines.push('### Files Changed');
+    for (const file of modifiedFiles) {
+      lines.push(`- \`${file}\``);
+    }
+    lines.push('');
+  }
+  lines.push('> A new code review round will be triggered automatically to validate the changes.');
+  return lines;
+}
+
+export function buildRecoverySummary(modifiedFiles: string[], threadIds: string[]): string {
+  const fixCount = threadIds.length > 0 ? threadIds.length : modifiedFiles.length > 0 ? 1 : 0;
+  const lines: string[] = [];
+  lines.push(AUTO_FIX_SUMMARY_MARKER);
+  lines.push('');
+  lines.push('## Auto-Fix Summary');
+  lines.push('');
+  lines.push(
+    '> Published by the dual-engine recovery path after a prior engine committed and resolved threads but failed to push.',
+  );
+  lines.push('');
+  lines.push(
+    `The auto-fix workflow successfully applied **${fixCount} fix(es)** across **${modifiedFiles.length} file(s)**.`,
+  );
+  lines.push('');
+
+  if (threadIds.length > 0) {
+    lines.push('### Resolved Threads');
+    for (const id of threadIds) {
+      lines.push(`- \`${id}\``);
+    }
+    lines.push('');
+  }
+
+  lines.push(...formatCommonAutoFixSections(modifiedFiles));
+  return lines.join('\n');
+}
+
+async function postAutoFixSummary(
+  config: ReviewerConfig,
+  reviewContext: ReviewContextResult,
+  provider: PlatformProvider,
+  summary: string,
+  logger: Logger,
+): Promise<void> {
+  logger.section('Publicando sumário do auto-fix na PR');
+  if (config.dryRun) {
+    logger.info(`[dry-run] Sumário do auto-fix seria publicado:\n${summary}`);
+    return;
+  }
+  if (testAutoFixSummaryAlreadyPosted(reviewContext, config.botTag, summary)) {
+    logger.info('Auto-fix summary já publicado anteriormente — pulando duplicata.');
+    return;
+  }
+  const posted = await provider.postPrComment(config.botTag, summary, (msg) => logger.info(msg));
+  if (!posted) {
+    logger.warn(
+      'Auto-fix push/resolução concluídos, mas falha ao publicar sumário na PR — push já foi bem-sucedido.',
+    );
+  } else {
+    logger.info('Sumário do auto-fix publicado na PR.');
+  }
 }
 
 export function getAutoFixThreads(reviewContext: ReviewContextResult): ActiveThreadInfo[] {
   return reviewContext.fileReviewThreads;
+}
+
+function buildThreadUrl(
+  config: ReviewerConfig,
+  thread: ActiveThreadInfo,
+): string {
+  if (config.provider === 'github') {
+    return `https://github.com/${config.organization}/${config.repositoryName}/pull/${config.pullRequestId}#discussion_r${thread.botCommentId}`;
+  }
+  const org = encodeURIComponent(config.organization);
+  const project = encodeURIComponent(config.project);
+  const repo = encodeURIComponent(config.repositoryName);
+  return `https://dev.azure.com/${org}/${project}/_git/${repo}/pullrequest/${config.pullRequestId}?threadId=${thread.threadId}`;
+}
+
+function buildAutoFixSummary(
+  config: ReviewerConfig,
+  resolvedItems: ResolvedThreadItem[],
+  activeThreads: ActiveThreadInfo[],
+  modifiedFiles: string[],
+): string {
+  const resolvedWithThreads = resolvedItems
+    .map((item) => {
+      const thread = activeThreads.find(
+        (t) => String(t.threadId) === String(item.threadId),
+      );
+      return { item, thread };
+    })
+    .filter((x) => x.thread != null);
+
+  const lines: string[] = [];
+  lines.push(AUTO_FIX_SUMMARY_MARKER);
+  lines.push('');
+  lines.push('## Auto-Fix Summary');
+  lines.push('');
+  lines.push(
+    `The auto-fix workflow successfully applied **${resolvedWithThreads.length} fix(es)** across **${modifiedFiles.length} file(s)**.`,
+  );
+  lines.push('');
+
+  if (resolvedWithThreads.length > 0) {
+    lines.push('### Resolved Issues');
+    lines.push('');
+    lines.push('| # | File | Line | Thread | Resolution |');
+    lines.push('|---|------|------|--------|------------|');
+    let idx = 0;
+    for (const { item, thread } of resolvedWithThreads) {
+      idx++;
+      const url = buildThreadUrl(config, thread!);
+      const file = (thread!.filePath || '').replace(/^\/+/, '');
+      const resolution = (item.note || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+      lines.push(
+        `| ${idx} | \`${file}\` | ${thread!.lineNumber} | [discussion](${url}) | ${resolution} |`,
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push(...formatCommonAutoFixSections(modifiedFiles));
+  return lines.join('\n');
+}
+
+function normalizeAutoFixSummaryBody(text: string): string {
+  let body = stripAgenticBotTags(text);
+  body = body.replace(AUTO_FIX_SUMMARY_MARKER, '');
+  return body.replace(/\s+/g, ' ').trim();
+}
+
+export function testAutoFixSummaryAlreadyPosted(
+  reviewContext: ReviewContextResult,
+  _botTag: string,
+  summaryText: string,
+): boolean {
+  const threads = reviewContext.allThreads;
+  if (!threads) return false;
+
+  const normalizedSummary = normalizeAutoFixSummaryBody(summaryText);
+
+  for (const thread of threads.value) {
+    if (thread.threadContext?.filePath) continue;
+
+    for (const comment of thread.comments) {
+      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) continue;
+      if (!comment.content.includes(AUTO_FIX_SUMMARY_MARKER)) continue;
+
+      if (normalizeAutoFixSummaryBody(comment.content) === normalizedSummary) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export async function runAutoFixFlow(
@@ -214,7 +412,7 @@ export async function runAutoFixFlow(
   const activeThreads = getAutoFixThreads(reviewContext);
   if (activeThreads.length === 0) {
     logger.info('Nenhuma thread de review aberta (com arquivo/linha) para correção automática.');
-    await tryRecoverPendingPush(config, logger);
+    await tryRecoverPendingPush(config, reviewContext, provider, logger);
     return;
   }
 
@@ -381,7 +579,8 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
 
   // commit local → build → fechar threads com explicação detalhada → push
   logger.section('Consolidando alterações com Git (commit local)');
-  const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles);
+  const resolvedThreadIds = resolvedItems.map((item) => String(item.threadId));
+  const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles, resolvedThreadIds);
   if (!commitSuccess) {
     logger.info('Commit local não realizado; abortando build, resolução e push.');
     return;
@@ -424,6 +623,9 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
       'Gate cooperativo: push falhou após resolução de threads — PR e remoto podem estar inconsistentes.',
     );
   }
+
+  const summary = buildAutoFixSummary(config, resolvedItems, activeThreads, modifiedFiles);
+  await postAutoFixSummary(config, reviewContext, provider, summary, logger);
 }
 
 

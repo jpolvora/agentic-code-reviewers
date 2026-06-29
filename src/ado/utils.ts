@@ -4,6 +4,12 @@ export function normalizeFilePath(filePath: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`;
 }
 
+/** Canonicaliza caminhos preservando case (só forward-slash + prefixo /). Necessário para lookups em filesystems case-sensitive. */
+export function canonicalFilePath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+
 /** Chave de dedup `path|line:N` alinhada entre ADO e GitHub. */
 export function reviewDedupKey(filePath: string, lineNumber: number): string {
   return `${normalizeFilePath(filePath)}|line:${lineNumber}`;

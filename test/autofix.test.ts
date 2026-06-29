@@ -4,7 +4,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync } from 'node:child_process';
-import { applyReplacements, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
+import { applyReplacements, buildRecoverySummary, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, parseAutoFixCommitThreadIds, runAutoFixFlow, testAutoFixSummaryAlreadyPosted } from '../src/orchestrator/autofix-runner.js';
+import { AUTO_FIX_SUMMARY_MARKER } from '../src/git/markers.js';
 
 describe('applyReplacements', () => {
   it('aplica substituição simples em arquivo', () => {
@@ -122,6 +123,89 @@ describe('getAutoFixThreads', () => {
   });
 });
 
+describe('parseAutoFixCommitThreadIds', () => {
+  it('returns null for non auto-fix commits', () => {
+    assert.equal(parseAutoFixCommitThreadIds('pending from prior engine'), null);
+  });
+
+  it('parses thread ids from auto-fix commit subject', () => {
+    assert.deepEqual(
+      parseAutoFixCommitThreadIds('fix(#18): auto-fix issues from review threads [PRRT_a, PRRT_b]'),
+      ['PRRT_a', 'PRRT_b'],
+    );
+  });
+
+  it('returns empty array when auto-fix commit has no thread list', () => {
+    assert.deepEqual(parseAutoFixCommitThreadIds('fix(#18): auto-fix issues from review threads'), []);
+  });
+});
+
+describe('buildRecoverySummary', () => {
+  it('includes marker, files, and thread ids', () => {
+    const summary = buildRecoverySummary(['src/foo.ts'], ['PRRT_1']);
+    assert.match(summary, /auto-fix-summary/);
+    assert.match(summary, /dual-engine recovery path/);
+    assert.match(summary, /src\/foo\.ts/);
+    assert.match(summary, /PRRT_1/);
+  });
+});
+
+describe('testAutoFixSummaryAlreadyPosted', () => {
+  const botTag = 'Agentic Code Reviewer cursor-sdk';
+  const summaryBody = `${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+
+  it('returns true when stored comment matches after bot-tag and marker normalization', () => {
+    const stored = `${botTag}\n\n${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            comments: [{ id: 1, parentCommentId: 0, content: stored, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), true);
+  });
+
+  it('returns false when no prior auto-fix summary exists', () => {
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            comments: [{ id: 1, parentCommentId: 0, content: `${botTag}\n\nOther comment`, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), false);
+  });
+
+  it('ignores file-anchored threads', () => {
+    const stored = `${botTag}\n\n${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            threadContext: { filePath: '/src/foo.ts' },
+            comments: [{ id: 1, parentCommentId: 0, content: stored, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), false);
+  });
+});
+
 describe('runAutoFixFlow', () => {
   const dummyLogger = {
     info: () => {},
@@ -182,6 +266,41 @@ describe('runAutoFixFlow', () => {
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
   });
 
+  it('encontra arquivo PascalCase usando filePath preservando case (regressão Linux)', async () => {
+    const tmpDir = setupTempWorkspace();
+    fs.mkdirSync(path.join(tmpDir, 'Controllers'), { recursive: true });
+    const pascalFile = path.join(tmpDir, 'Controllers', 'AuditController.cs');
+    fs.writeFileSync(pascalFile, 'linha 1\nlinha 2\nlinha 3');
+    execSync('git add . && git commit -m "add pascal"', { cwd: tmpDir, stdio: 'ignore' });
+
+    const config = {
+      repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true,
+      provider: 'github', organization: 'o', repositoryName: 'r', pullRequestId: 1,
+      project: '', botTag: 'Agentic Code Reviewer test',
+    } as any;
+    const reviewContext = {
+      fileReviewThreads: [{ filePath: '/Controllers/AuditController.cs', lineNumber: 1, summary: 'authz missing', threadId: '1', botCommentId: 9 }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+      postPrComment: mock.fn(async () => true),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText: agentJson({
+          replacements: [{ startLine: 1, endLine: 1, replacementContent: 'linha 1 fix' }],
+          resolvedThreads: [{ threadId: '1', explanation: 'Added authz check.' }],
+        }),
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    const content = fs.readFileSync(pascalFile, 'utf8');
+    assert.equal(content, 'linha 1 fix\nlinha 2\nlinha 3', 'arquivo PascalCase deve ser encontrado e alterado');
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+  });
+
   it('dry-run não grava arquivo nem resolve threads na API', async () => {
     const tmpDir = setupTempWorkspace();
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: true, autoFix: true } as any;
@@ -231,15 +350,17 @@ describe('runAutoFixFlow', () => {
     fs.writeFileSync(path.join(tmpDir, 'file2.txt'), 'linha 1\nlinha 2\nlinha 3');
     execSync('git add file2.txt && git commit -m "add file2"', { cwd: tmpDir, stdio: 'ignore' });
 
-    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true, provider: 'github', organization: 'test-org', repositoryName: 'test-repo', pullRequestId: 1, project: '', botTag: 'Agentic Code Reviewer test' } as any;
     const reviewContext = {
       fileReviewThreads: [
-        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
-        { filePath: '/file2.txt', lineNumber: 1, summary: 'test issue 2', threadId: '2' },
+        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1', botCommentId: 100 },
+        { filePath: '/file2.txt', lineNumber: 1, summary: 'test issue 2', threadId: '2', botCommentId: 200 },
       ],
     } as any;
+    const postPrComment = mock.fn(async () => true);
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 1),
+      postPrComment,
     } as any;
     const engine = {
       run: async (cfg: any, task: any) => {
@@ -266,19 +387,27 @@ describe('runAutoFixFlow', () => {
     assert.equal(resolvedItemsArg.length, 1);
     assert.equal(resolvedItemsArg[0].threadId, 1);
     assert.equal(resolvedItemsArg[0].fileName, '/file.txt');
+    // Verifica que o sumário foi publicado
+    assert.equal(postPrComment.mock.callCount(), 1);
+    const summaryBody = postPrComment.mock.calls[0].arguments[1] as string;
+    assert.match(summaryBody, /auto-fix-summary/);
+    assert.match(summaryBody, /file\.txt/);
+    assert.match(summaryBody, /Fixed issue on line 1/);
   });
 
   it('resolve apenas threads listadas em resolvedThreads pelo agente', async () => {
     const tmpDir = setupTempWorkspace();
-    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true, provider: 'github', organization: 'test-org', repositoryName: 'test-repo', pullRequestId: 1, project: '', botTag: 'Agentic Code Reviewer test' } as any;
     const reviewContext = {
       fileReviewThreads: [
-        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1' },
-        { filePath: '/file.txt', lineNumber: 3, summary: 'test issue 2', threadId: '2' },
+        { filePath: '/file.txt', lineNumber: 1, summary: 'test issue 1', threadId: '1', botCommentId: 100 },
+        { filePath: '/file.txt', lineNumber: 3, summary: 'test issue 2', threadId: '2', botCommentId: 200 },
       ],
     } as any;
+    const postPrComment = mock.fn(async () => true);
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 1),
+      postPrComment,
     } as any;
     const engine = {
       run: async () => ({
@@ -298,6 +427,7 @@ describe('runAutoFixFlow', () => {
     assert.equal(resolvedItemsArg.length, 1);
     assert.equal(resolvedItemsArg[0].threadId, 1);
     assert.equal(resolvedItemsArg[0].lineNumber, 1);
+    assert.equal(postPrComment.mock.callCount(), 1);
   });
 
   it('não fecha threads omitidas em resolvedThreads mesmo com replacement amplo', async () => {
@@ -306,15 +436,17 @@ describe('runAutoFixFlow', () => {
     fs.writeFileSync(path.join(tmpDir, 'file.txt'), lines.join('\n'));
     execSync('git add file.txt && git commit -m "reset file" --amend --no-edit', { cwd: tmpDir, stdio: 'ignore' });
 
-    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
+    const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true, provider: 'github', organization: 'test-org', repositoryName: 'test-repo', pullRequestId: 1, project: '', botTag: 'Agentic Code Reviewer test' } as any;
     const reviewContext = {
       fileReviewThreads: [
-        { filePath: '/file.txt', lineNumber: 1, summary: 'issue linha 1', threadId: '1' },
-        { filePath: '/file.txt', lineNumber: 5, summary: 'issue linha 5', threadId: '2' },
+        { filePath: '/file.txt', lineNumber: 1, summary: 'issue linha 1', threadId: '1', botCommentId: 100 },
+        { filePath: '/file.txt', lineNumber: 5, summary: 'issue linha 5', threadId: '2', botCommentId: 200 },
       ],
     } as any;
+    const postPrComment = mock.fn(async () => true);
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 1),
+      postPrComment,
     } as any;
     const engine = {
       run: async () => ({
@@ -338,6 +470,7 @@ describe('runAutoFixFlow', () => {
     assert.equal(resolvedItemsArg.length, 1);
     assert.equal(resolvedItemsArg[0].threadId, 1);
     assert.equal(resolvedItemsArg[0].lineNumber, 1);
+    assert.equal(postPrComment.mock.callCount(), 1);
   });
 
   it('não comita quando resolvedThreads está vazio', async () => {
@@ -383,8 +516,10 @@ describe('runAutoFixFlow', () => {
 
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
     const reviewContext = { fileReviewThreads: [] } as any;
+    const postPrComment = mock.fn(async () => true);
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 0),
+      postPrComment,
     } as any;
     const engine = {
       run: mock.fn(async () => {
@@ -395,6 +530,7 @@ describe('runAutoFixFlow', () => {
     await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
 
     assert.equal(engine.run.mock.callCount(), 0);
+    assert.equal(postPrComment.mock.callCount(), 0);
     const remoteAfter = execSync('git ls-remote origin refs/heads/master', {
       cwd: tmpDir,
       encoding: 'utf8',
@@ -404,6 +540,45 @@ describe('runAutoFixFlow', () => {
     assert.notEqual(remoteBefore, remoteAfter);
     const localHead = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf8' }).trim();
     assert.equal(localHead, remoteAfter);
+  });
+
+  it('recovery: publica sumário após push de commit auto-fix pendente', async () => {
+    const tmpDir = setupTempWorkspace();
+    execSync('git push -u origin master', { cwd: tmpDir, stdio: 'ignore' });
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2 alterada\nlinha 3');
+    execSync(
+      'git add file.txt && git commit -m "fix(#18): auto-fix issues from review threads [PRRT_a]"',
+      { cwd: tmpDir, stdio: 'ignore' },
+    );
+
+    const config = {
+      repoRoot: tmpDir,
+      runnerRoot: tmpDir,
+      dryRun: false,
+      autoFix: true,
+      pullRequestId: 18,
+      botTag: 'Agentic Code Reviewer test',
+    } as any;
+    const reviewContext = { fileReviewThreads: [], allThreads: { value: [] } } as any;
+    const postPrComment = mock.fn(async () => true);
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+      postPrComment,
+    } as any;
+    const engine = {
+      run: mock.fn(async () => {
+        throw new Error('engine não deve rodar sem threads');
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(postPrComment.mock.callCount(), 1);
+    const summaryBody = postPrComment.mock.calls[0].arguments[1] as string;
+    assert.match(summaryBody, /auto-fix-summary/);
+    assert.match(summaryBody, /dual-engine recovery path/);
+    assert.match(summaryBody, /file\.txt/);
+    assert.match(summaryBody, /PRRT_a/);
   });
 
   it('falha quando push falha após resolução bem-sucedida', async () => {
@@ -475,7 +650,7 @@ describe('runAutoFixFlow', () => {
 
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
     const localLog = execSync('git log -1 --oneline', { cwd: tmpDir, encoding: 'utf8' });
-    assert.match(localLog, /fix\(review\): resolve issues from review threads of PR #77/);
+    assert.match(localLog, /fix\(#77\): auto-fix issues from review threads/);
     const remoteHeadAfter = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
     assert.equal(remoteHeadBefore, remoteHeadAfter, 'push não deve ocorrer quando build falha');
   });
@@ -511,7 +686,7 @@ describe('runAutoFixFlow', () => {
 
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
     const localLog = execSync('git log -1 --oneline', { cwd: tmpDir, encoding: 'utf8' });
-    assert.match(localLog, /fix\(review\): resolve issues from review threads of PR #99/);
+    assert.match(localLog, /fix\(#99\): auto-fix issues from review threads/);
     const remoteHeadAfter = execSync('git rev-parse HEAD', { cwd: remoteUrl, encoding: 'utf8' }).trim();
     assert.equal(remoteHeadBefore, remoteHeadAfter, 'push não deve ocorrer quando resolução falha');
   });

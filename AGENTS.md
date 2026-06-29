@@ -18,7 +18,7 @@ Operational guide for AI agents in this repository (**Multi Agent Code Reviewer*
 - **Documentation stays in sync with code.** After every implementation (feature, fix, or behavior change), update **all affected documentation** in the same change set — do not merge code that drifts from docs. Minimum checklist when touching runner behavior:
   - **`AGENTS.md`** — architecture, env vars, gate rules, skills routing
   - **`README.md`** — user-facing features, CLI, workflows, env tables
-  - **`docs/`** — `index.md`, `faq.md`, and topic docs (`flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `two-phase-execution-model.md`) as applicable
+  - **`docs/`** — `index.md` (lean overview + links), `workflows.md` (all execution paths), `faq.md`, and topic docs (`flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `two-phase-execution-model.md`) as applicable. Docs are English-only; `index.md` links to each deep dive.
   - **`skills/`** — when prompts, JSON contract, or gate policy change (`SYSTEM_PROMPT.md`, `AUTO_FIX.md`, stacks)
   - **`.env.example`** — when env vars are added, renamed, or defaults change
   - **Workflow examples** — `examples/`, `.github/workflows/` when CI inputs or behavior change
@@ -95,6 +95,8 @@ Findings that violate any rule below are automatically discarded:
 ### PR Summary Comment (`shouldPostReviewSummary` in `src/ado/post-comments.ts`)
 
 The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending runner threads** remain on the PR (`Agentic Code Reviewer` prefix). `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`. Comment tag is `buildBotTag(engine)` from `src/bot-tag.ts`.
+
+Additionally, the **auto-fix flow** posts its own **detailed summary comment** after a successful commit/build/resolve/push cycle, listing changed files, resolved threads with links, and using the `AUTO_FIX_SUMMARY_MARKER` (`<!-- auto-fix-summary -->`). This gives developers visibility into what was fixed and triggers the next code review round.
 
 ### Safe Outputs (`src/ado/safe-outputs.ts`)
 
@@ -180,7 +182,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |
 | `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
 | `src/provider/` | `PlatformProvider` interface + `AdoProvider` and `GithubProvider` implementations. |
-| `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`). |
+| `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`), comment posting (`post-comments.ts`). |
 | `src/orchestrator/` | In-process parallelism (`parallel-runner.ts`), merge (`merge-reviews.ts`), optional meta-reviewer. |
 | `src/mcp/` | Read-only context tools (`review-tools.ts`) and prompt injection. |
 | `skills/stacks/` | Per-stack Markdown recommendations (loaded by the runner). |

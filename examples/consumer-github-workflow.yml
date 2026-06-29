@@ -1,64 +1,138 @@
-# Exemplo — code review em repositório consumidor (GitHub Actions)
+# Agentic Code Review + Auto-Fix — consumer project (GitHub Actions)
 #
-# Copie para .github/workflows/code-review.yml no seu projeto.
-# Configure o secret CURSOR_API_KEY em Settings → Secrets.
+# Two files in .github/workflows/ that chain review → auto-fix → re-review
+# until all threads are resolved. See docs/workflows.md §4 for details.
 #
-# ── Opção A (recomendada): reusable workflow ─────────────────────────────
+# Required secrets:
+#   CURSOR_API_KEY            — review engine (cursor-sdk)
+#   OPENCODE_API_KEY          — auto-fix engine (opencode)
+#   AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN — PAT with repo / pull-requests:write
+#
+# ═════════════════════════════════════════════════════════════════════════
+# File 1: code-review.yml
+# Triggers on every PR push. Posts review threads, exits 1 if threads exist.
+# ═════════════════════════════════════════════════════════════════════════
 
 name: Agentic Code Review
 
 on:
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened]
 
 permissions:
-  pull-requests: write
   contents: read
+  pull-requests: write
 
 jobs:
   review:
-    uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
-    with:
-      score_min: '6'   # opcional; omitir = default 6 (precedência: input > env no runner)
-    secrets:
-      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-      # recomendado — publicar reviews e resolver threads (resolvedThreads / auto-fix):
-      # AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
 
-# ── Opção B: curl direto (sem reusable workflow) ─────────────────────────
-#
-# jobs:
-#   review:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - uses: actions/checkout@v5
-#         with:
-#           fetch-depth: 0
-#
-#       - uses: actions/setup-node@v6
-#         with:
-#           node-version: 22
-#
-#       - name: Run remote reviewer
-#         env:
-#           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-#           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ github.token }}
-#         run: |
-#           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
-#             --gh \
-#             --pr-id "${{ github.event.pull_request.number }}" \
-#             --source-branch "${{ github.head_ref }}" \
-#             --target-branch "${{ github.event.pull_request.base.ref }}"
-#         continue-on-error: true
-#
-# ── OpenCode (Opção A com engine opencode) ────────────────────────────────
-#
-# jobs:
-#   review-opencode:
-#     uses: jpolvora/agentic-code-reviewers/.github/workflows/review-remote.yml@release
-#     with:
-#       engine: opencode
-#       model: opencode-go/deepseek-v4-flash
-#     secrets:
-#       CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
-#       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      - name: Run code reviewer
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
+          AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
+        run: |
+          git checkout -B "${{ github.head_ref }}"
+          curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
+            --gh \
+            --source-branch "refs/heads/${{ github.head_ref }}" \
+            --target-branch "refs/heads/${{ github.event.pull_request.base.ref }}"
+        continue-on-error: true
+
+      - name: Check for active threads
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+        run: |
+          ACTIVE=$(node .agents/skills/solve-pr/scripts/fetch_threads.cjs ${{ github.event.pull_request.number }} --json 2>/dev/null | jq '.activeThreads | length' || echo 0)
+          echo "Active threads: $ACTIVE"
+          [ "$ACTIVE" -eq 0 ] || exit 1
+
+# ═════════════════════════════════════════════════════════════════════════
+# File 2: auto-fix.yml
+# Triggers via workflow_run after any code review completes.
+# Reads open threads, applies fixes, commits, builds, resolves threads, pushes.
+# ═════════════════════════════════════════════════════════════════════════
+
+name: Agentic Auto Fix
+
+on:
+  workflow_run:
+    workflows: ["Agentic Code Review"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    concurrency:
+      group: auto-fix-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Extract PR info
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+        run: |
+          PN="${{ github.event.workflow_run.pull_requests[0].number }}"
+          HB="${{ github.event.workflow_run.pull_requests[0].head.ref }}"
+          BB="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
+          if [ -z "$PN" ] || [ "$PN" = "null" ]; then
+            SHA="${{ github.event.workflow_run.head_sha }}"
+            JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" --jq '.[0]')
+            PN=$(echo "$JSON" | jq -r '.number')
+            HB=$(echo "$JSON" | jq -r '.head.ref')
+            BB=$(echo "$JSON" | jq -r '.base.ref')
+          fi
+          echo "pr_number=$PN" >> "$GITHUB_OUTPUT"
+          echo "source_branch=$HB" >> "$GITHUB_OUTPUT"
+          echo "target_branch=$BB" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-info.outputs.source_branch }}
+
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
+
+      - name: Check for active threads
+        id: check-threads
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+        run: |
+          ACTIVE=$(node .agents/skills/solve-pr/scripts/fetch_threads.cjs ${{ steps.pr-info.outputs.pr_number }} --json 2>/dev/null | jq '.activeThreads | length' || echo 0)
+          echo "Active threads: $ACTIVE"
+          echo "active_threads_count=$ACTIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Run auto-fix
+        if: ${{ steps.check-threads.outputs.active_threads_count != '0' }}
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: opencode
+          AGENTIC_CODE_REVIEWERS_MODEL: opencode-go/deepseek-v4-flash
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
+            --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "refs/heads/${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "refs/heads/${{ steps.pr-info.outputs.target_branch }}" \
+            --auto-fix

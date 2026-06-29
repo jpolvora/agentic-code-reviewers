@@ -30,6 +30,8 @@ O revisor publica threads acionáveis nas linhas afetadas da PR. **Não altera a
 
 Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](docs/):
 
+*   **[Índice da documentação](docs/index.md):** Visão geral enxuta de cada feature com links para os deep-dives (em inglês).
+*   **[Caminhos de Execução](docs/workflows.md):** Todos os modos (local, CI ADO, CI GitHub deste repo e de consumidores, auto-fix, skills IDE, engines) — em inglês.
 *   **[Fluxo de Análise e Decisão](docs/flow-analysis.md):** Guia completo de ciclo de vida, do carregamento de contexto ao gate final.
 *   **[Fluxo de Auto-Fix e Self-Healing](docs/auto-fix.md):** Como configurar pipelines para corrigir código automaticamente e revalidar o review em um loop seguro.
 *   **[Perguntas Frequentes (FAQ)](docs/faq.md):** Dúvidas comuns de configuração, comportamento do bot e regras.
@@ -53,7 +55,7 @@ Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](do
     *   **Azure DevOps:** Emite logging commands (`##vso[task.logissue]`) e anexa um resumo markdown rico na tela de build (`##vso[task.uploadsummary]`).
     *   **GitHub:** Anexa um resumo markdown completo da revisão diretamente na página do workflow via `GITHUB_STEP_SUMMARY`.
 *   **📦 Execução Remota via cURL:** Permite rodar o reviewer remotamente baixando apenas o script `run.sh` da branch `release`, dispensando o clone completo do repositório ou a presença de dependências de desenvolvimento.
-*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit, **build de validação**, resolução de threads, push na branch da PR e re-dispara code review. Proteções: build pós-commit, resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
+*   **🔄 Auto-Fix e ciclo self-healing (GitHub):** Modo `--auto-fix` (ou workflow [`auto-fix.yml`](.github/workflows/auto-fix.yml)) lê threads ativas do bot, aplica correções cirúrgicas via subagentes (`skills/AUTO_FIX.md`), commit (`fix(#N): auto-fix issues from review threads [threadId, ...]`), **build de validação**, resolução de threads, push na branch da PR, e **publica sumário detalhado** (arquivos alterados, threads resolvidas com links) no PR — re-disparando code review. Proteções: build pós-commit, resolução parcial por linha alterada, `MAX_ROUNDS`, concurrency por PR, falha explícita se todos os engines falharem. Requer PAT com push (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`). Detalhes: [`docs/auto-fix.md`](docs/auto-fix.md).
 *   **📏 Limiar de publicação (`score_min`) end-to-end:** `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min` (precedência CLI > env > default **6**) controla quais achados viram threads — injetado no prompt, gate TypeScript (`isPublishableReview`) e Safe Outputs (`severity-score`). Mesmo valor para `cursor-sdk` e `opencode`.
 *   **🤖 Skills agênticas do runner (`.agents/skills/`):** Skills versionadas neste repositório para uso no Cursor/IDE ao desenvolver ou operar o **agentic-code-reviewers**:
     *   **`code-review-self`** — Executa o pipeline de review (duas fases, gate, rodadas) pelo próprio agente do IDE, sem `@cursor/sdk`; útil para dry-run local e validação do comportamento do runner.
@@ -673,8 +675,8 @@ npm run review -- --dry-run --engine opencode --model opencode-go/deepseek-v4-fl
 *   `src/engine/` : `ExecutionEngine`, `getEngine()` e adapters `cursor-sdk` (`@cursor/sdk`) e `opencode` (`@opencode-ai/sdk`).
 *   `src/agent/` : Montagem do prompt (`prompt.ts`) e orquestração da chamada ao engine (`runner.ts`).
 *   `src/ado/` : Gate (`review-validation.ts`, `safe-outputs.ts`), rodadas, formatação de threads e helpers ADO.
-*   `src/orchestrator/` : Paralelismo in-process (`parallel-runner.ts`), merge (`merge-reviews.ts`), meta-reviewer e **auto-fix** (`autofix-runner.ts`).
-*   `src/git/autofix-commit.ts` : Commit consolidado e push após auto-fix.
+*   `src/orchestrator/` : Paralelismo in-process (`parallel-runner.ts`), merge (`merge-reviews.ts`), meta-reviewer e **auto-fix** (`autofix-runner.ts` — inclui sumário detalhado pós-push).
+*   `src/git/autofix-commit.ts` : Commit consolidado (`fix(#N): auto-fix issues from review threads [...]`) e push após auto-fix.
 *   `skills/` : Contratos de prompts estáticos (`SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, `AUTO_FIX.md`) e subpasta `skills/stacks/` com recomendações por stack.
 *   `.agents/skills/` : Skills agênticas do ecossistema do runner (`code-review-self`, `megabrain`, `solve-pr` e scripts auxiliares).
 *   `.github/workflows/auto-fix.yml` : Pipeline de auto-fix (self-healing) acionada após code review.

@@ -20,11 +20,12 @@ function ensureGitUser(config: ReviewerConfig, logger: Logger): void {
   }
 }
 
-export function buildAutoFixCommitMessage(config: ReviewerConfig): string {
+export function buildAutoFixCommitMessage(config: ReviewerConfig, threadIds?: string[]): string {
+  const threadList = threadIds && threadIds.length > 0 ? ` [${threadIds.join(', ')}]` : '';
   if (config.pullRequestId > 0) {
-    return `fix(review): resolve issues from review threads of PR #${config.pullRequestId}`;
+    return `fix(#${config.pullRequestId}): auto-fix issues from review threads${threadList}`;
   }
-  return 'fix(review): apply auto-fixes for active review threads';
+  return `fix: auto-fix issues from review threads${threadList}`;
 }
 
 /** HEAD local à frente de origin/<branch> (commit pendente de push). */
@@ -48,6 +49,7 @@ export async function commitAutoFixChanges(
   config: ReviewerConfig,
   logger: Logger,
   changedPaths: string[],
+  threadIds?: string[],
 ): Promise<boolean> {
   if (config.dryRun) {
     logger.info('[dry-run] Simulando commit local das alterações.');
@@ -72,7 +74,7 @@ export async function commitAutoFixChanges(
 
     ensureGitUser(config, logger);
 
-    const commitMsg = buildAutoFixCommitMessage(config);
+    const commitMsg = buildAutoFixCommitMessage(config, threadIds);
     logger.info(`Criando commit local: ${commitMsg}`);
     execFileSync('git', ['commit', '-m', commitMsg], { cwd: config.repoRoot, stdio: 'inherit' });
     return true;

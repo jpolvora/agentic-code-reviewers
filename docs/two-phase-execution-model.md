@@ -1,28 +1,29 @@
-# Modelo de execução — análise em duas fases (chamada única)
+# Execution model — two-phase analysis (single call)
 
-> **Artefato de referência** — explica como o **agentic-code-reviewers** implementa as duas fases de review (triagem → investigação) e por que optamos por **uma única chamada ao agente** em vez de múltiplos agentes ou steps separados.  
-> **Complementa:** [`flow-analysis.md`](flow-analysis.md) (fluxo operacional completo).  
-> **Última revisão:** jun/2026.
-
----
-
-## Resumo executivo
-
-| Pergunta | Resposta |
-|----------|----------|
-| São dois prompts enviados? | **Não** — um prompt montado por `buildAgentPrompt()`. |
-| São duas chamadas ao agente? | **Não** — um `agent.send()` por review. |
-| As fases são “mentais”? | **Parcialmente** — Fase 1 é saída mental; Fase 2 usa tools reais na mesma sessão. |
-| Quando sai o JSON? | **Uma vez**, no final, após as duas fases. |
-| Vale dividir em 2 agentes? | **Não por padrão** — a chamada única é a escolha certa para este caso de uso. |
+> **Reference artifact** — explains how the **agentic-code-reviewers** implements the two review phases (triage → investigation) and why we use a **single agent call** instead of multiple agents or separate steps.
+>
+> See [`index.md`](index.md) for an overview. Complements [`flow-analysis.md`](flow-analysis.md) (full operational flow).
+> **Last revision:** Jun/2026.
 
 ---
 
-## Como funciona na prática
+## Executive summary
 
-### 1. Uma montagem, um envio
+| Question | Answer |
+|----------|--------|
+| Are two prompts sent? | **No** — one prompt built by `buildAgentPrompt()`. |
+| Are two agent calls made? | **No** — one `agent.send()` per review. |
+| Are the phases "mental"? | **Partially** — Phase 1 is mental output; Phase 2 uses real tools in the same session. |
+| When does the JSON come out? | **Once**, at the end, after both phases. |
+| Is it worth splitting into 2 agents? | **Not by default** — the single call is the right choice for this use case. |
 
-O `runner.ts` monta o prompt completo e delega ao **engine** injetado (`getEngine(config)`):
+---
+
+## How it works in practice
+
+### 1. One assembly, one send
+
+`runner.ts` builds the complete prompt and delegates to the injected engine (`getEngine(config)`):
 
 ```typescript
 // src/agent/runner.ts
@@ -32,133 +33,134 @@ export async function runCodeReviewAgent(config, context, engine, logger) {
 }
 ```
 
-No engine `cursor-sdk`, isso vira `Agent.create()` + `agent.send()` — **um run só** (`src/engine/cursor-sdk/stream.ts`).
+In the `cursor-sdk` engine this becomes `Agent.create()` + `agent.send()` — **a single run** (`src/engine/cursor-sdk/stream.ts`).
 
-O `index.ts` chama `runCodeReviewAgent` **uma vez** por review (ou omite o agente se o diff estiver vazio).
+`index.ts` calls `runCodeReviewAgent` **once** per review (or omits the agent if the diff is empty).
 
-### 2. O prompt já traz as duas fases
+### 2. The prompt already carries both phases
 
-`buildAgentPrompt()` concatena tudo num único string:
+`buildAgentPrompt()` concatenates everything into a single string:
 
-| Bloco | Origem |
+| Block | Origin |
 |-------|--------|
 | System prompt | `skills/SYSTEM_PROMPT.md` |
 | Harness | `skills/CODE_REVIEW.md` |
-| Contexto git, diff, rules, ADO | `src/agent/prompt.ts` |
-| **Workflow em 2 fases** | `buildTwoPhaseWorkflow()` |
-| Veredito final | `buildVerdictAndAdoPolicy()` |
+| Git, diff, rules, ADO context | `src/agent/prompt.ts` |
+| **2-phase workflow** | `buildTwoPhaseWorkflow()` |
+| Final verdict | `buildVerdictAndAdoPolicy()` |
 
-As fases estão descritas em `buildTwoPhaseWorkflow()` (`src/agent/prompt.ts`):
+The phases are described in `buildTwoPhaseWorkflow()` (`src/agent/prompt.ts`):
 
-- **Fase 1 — Triagem:** mapa de candidatos ancorados em linhas alteradas; descarte imediato de nits, estilo, teoria sem caminho executável.
-- **Saída mental da Fase 1:** lista `(arquivo, linha, hipótese breve)` — **sem JSON intermediário**.
-- **Fase 2 — Investigação:** provar ou refutar cada candidato com tools; só os comprovados entram em `reviews`.
+- **Phase 1 — Triage:** candidate map anchored to changed lines; immediate discard of nits, style, theory without executable path.
+- **Phase 1 mental output:** list `(file, line, brief hypothesis)` — **no intermediate JSON**.
+- **Phase 2 — Investigation:** prove or refute each candidate with tools; only the proven ones enter `reviews`.
 
-Instrução explícita: *"Complete **Fase 1 inteira** antes de iniciar a Fase 2. Não publique achado sem passar pelas duas."*
+Explicit instruction: *"Complete **the entire Phase 1** before starting Phase 2. Do not publish a finding without going through both."*
 
-### 3. O que o agente faz durante o run (mesma sessão)
+### 3. What the agent does during the run (same session)
 
 ```mermaid
 flowchart TD
-    A[Prompt único enviado] --> B[Fase 1: triagem no diff embutido]
-    B --> C[Lista mental de candidatos]
-    C --> D[Fase 2: tools por candidato]
+    A[Single prompt sent] --> B[Phase 1: triage on embedded diff]
+    B --> C[Mental list of candidates]
+    C --> D[Phase 2: tools per candidate]
     D --> E[read / grep / skills / rules]
-    E --> F[Provar ou refutar cada hipótese]
-    F --> G[Um bloco JSON final]
-    G --> H[TypeScript: parse + gate score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6)]
+    E --> F[Prove or refute each hypothesis]
+    F --> G[One final JSON block]
+    G --> H[TypeScript: parse + gate score >= AGENTIC_CODE_REVIEWERS_SCORE_MIN default 6]
 ```
 
-- **Fase 1:** usa o diff pré-carregado (ou `git diff` via tool) para mapear candidatos nas linhas alteradas.
-- **Fase 2:** para cada candidato, usa tools (`read`, `grep`, skill `code-review`, rules do projeto) para provar ou descartar.
-- **Saída:** **só no fim** — um bloco ` ```json ` com `reviews`, `resolvedThreads`, `reviewSummary`.
+- **Phase 1:** uses the pre-loaded diff (or `git diff` via tools) to map candidates on changed lines.
+- **Phase 2:** for each candidate, uses tools (`read`, `grep`, code-review skill, project rules) to prove or discard.
+- **Output:** **only at the end** — a ```` ```json ```` block with `reviews`, `resolvedThreads`, `reviewSummary`.
 
-Durante o run aparecem eventos `thinking`, `tool_call` e `assistant` — tudo na mesma conversa.
+During the run, `thinking`, `tool_call` and `assistant` events appear — all in the same conversation.
 
-### 4. Segunda “camada” de fases (não é outro agente)
+### 4. Second "layer" of phases (not another agent)
 
-A doc operacional fala em **decisão em duas camadas**:
+The operational doc speaks of a **two-layer decision**:
 
-1. **Agente (LLM)** — triagem + prova + filtro score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` no prompt (valor em **Contexto da execução** e Fase 2.4; default 6).
-2. **TypeScript** — `isPublishableReview(review, scoreMin)` + Safe Outputs (`severity-score` com mesmo `scoreMin`) descartam o que não passa antes de postar.
+1. **Agent (LLM)** — triage + proof + filter score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` in the prompt (value in **execution context** and Phase 2.4; default 6).
+2. **TypeScript** — `isPublishableReview(review, scoreMin)` + Safe Outputs (`severity-score` with the same `scoreMin`) discard what doesn't pass before posting.
 
-Isso é pós-processamento determinístico do JSON, **não** uma segunda rodada do LLM. Ver [`flow-analysis.md`](flow-analysis.md) e `src/ado/review-validation.ts`.
-
----
-
-## Análise: chamada única vs. multi-agente
-
-### Por que a chamada única funciona bem aqui
-
-**1. As fases compartilham o mesmo contexto cognitivo.**
-
-A Fase 2 depende das hipóteses da Fase 1. Num único run, o agente mantém diff, candidatos, rules lidas via tool e raciocínio na **mesma janela de contexto**. Com agentes separados, seria necessário re-serializar a saída da Fase 1 e reconstruir contexto — mais tokens e perda de nuance (“por que achei isso suspeito?”).
-
-**2. As tools já dão o que um “step 2” daria.**
-
-O ganho clássico de multi-step é forçar evidência antes do veredito. A Fase 2 **já é isso**: `read`, `grep`, skill, rules — provar ou refutar cada candidato com os 4 itens obrigatórios documentados em `analysis` e `impactPaths`.
-
-**3. A precisão já tem gate determinístico.**
-
-O filtro final **não é LLM** — é TypeScript (`isPublishableReview`, score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 com default 6, campos obrigatórios). Isso é mais barato, reprodutível e testável (`npm test`) do que um segundo agente “juiz”.
-
-**4. Custo e latência.**
-
-Um run = um `Agent.create` + `agent.send`. Dois agentes = duas inicializações, dois contextos, mais tempo de parede — relevante numa pipeline de PR a cada push.
-
-### Onde o desenho atual é frágil
-
-| Risco | Sintoma | Mitigação atual |
-|-------|---------|-----------------|
-| Modelo “pula” a Fase 1 | Achados rasos, `impactPaths` inconsistentes | Instrução explícita + gate exige `impactPaths` não vazio |
-| Diluição de instrução (prompt longo) | Ignora regras do meio do prompt | System prompt + skill + fases + ADO num string — **ponto mais frágil** |
-| PR grande → atalho | Revisa só alguns arquivos | Nota `PR grande` mandando rodar em todos os arquivos elegíveis |
-| Sem checkpoint entre fases | Não dá para inspecionar candidatos da Fase 1 | Fase 1 é “saída mental”, não observável |
-
-O ponto crítico é o **prompt monolítico**: confiabilidade de seguir instruções cai conforme o prompt cresce.
-
-### Quando 2 agentes / múltiplos steps valeriam a pena
-
-Mudar o desenho **somente se** algum destes virar problema **medido**:
-
-1. **Falso positivo persistente apesar do gate** → agente “crítico” separado (generator/critic) que recebe reviews candidatos + diff e só confirma/derruba. Tentar antes endurecer prompt e gate determinístico.
-
-2. **Janela de contexto estourando em PRs grandes** → split natural **por arquivo/chunk**, não por fase: N runs paralelos (um por grupo de arquivos) + agregação. Escala melhor e ainda paraleliza.
-
-3. **Observabilidade dos candidatos da Fase 1** → expor triagem como JSON intermediário (mesmo agente, via `resume`) para debug de por que algo não virou thread.
+This is deterministic post-processing of the JSON, **not** a second LLM round. See [`flow-analysis.md`](flow-analysis.md) and `src/ado/review-validation.ts`.
 
 ---
 
-## Recomendações (ordem de custo-benefício)
+## Analysis: single call vs. multi-agent
 
-1. **Barato (manter):** investir no gate determinístico (TypeScript) — precisão garantida sem custo extra de LLM.
-2. **Médio:** se PRs grandes forem comuns, **paralelizar por arquivo** (vários runs), não por fase.
-3. **Caro / só se necessário:** agente *critic* dedicado apenas para reviews `critical`, como segunda opinião antes de postar.
+### Why the single call works well here
 
-**Conclusão:** o gargalo de qualidade num reviewer não é “fases demais no mesmo agente”, e sim **evidência + gate**. O desenho atual acerta nisso. Separar em 2 agentes adiciona custo e complexidade de orquestração sem atacar o risco principal (prompt monolítico), que se resolve melhor encurtando/estruturando o prompt e reforçando o gate determinístico.
+**1. The phases share the same cognitive context.**
+
+Phase 2 depends on Phase 1 hypotheses. In a single run the agent keeps diff, candidates, rules read via tools and reasoning in the **same context window**. With separate agents the Phase 1 output would need to be re-serialized and the context rebuilt — more tokens and loss of nuance ("why did I find this suspicious?").
+
+**2. Tools already provide what a "step 2" would.**
+
+The classic multi-step gain is forcing evidence before the verdict. Phase 2 **is exactly that**: `read`, `grep`, skill, rules — prove or refute each candidate with the 4 mandatory items documented in `analysis` and `impactPaths`.
+
+**3. Precision already has a deterministic gate.**
+
+The final filter is **not LLM** — it's TypeScript (`isPublishableReview`, score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 default 6, required fields). This is cheaper, reproducible and testable (`npm test`) than a second "judge" agent.
+
+**4. Cost and latency.**
+
+One run = one `Agent.create` + `agent.send`. Two agents = two initializations, two contexts, more wall-clock time — relevant in a per-push PR pipeline.
+
+### Where the current design is fragile
+
+| Risk | Symptom | Current mitigation |
+|------|---------|--------------------|
+| Model "skips" Phase 1 | Shallow findings, inconsistent `impactPaths` | Explicit instruction + gate requires non-empty `impactPaths` |
+| Instruction dilution (long prompt) | Ignores rules in the middle of the prompt | System prompt + skill + phases + ADO in one string — **most fragile point** |
+| Large PR → shortcut | Reviews only a few files | Note `large PR` instructing to run over all eligible files |
+| No checkpoint between phases | Can't inspect Phase 1 candidates | Phase 1 is "mental output", not observable |
+
+The critical point is the **monolithic prompt**: reliability of following instructions drops as the prompt grows.
+
+### When 2 agents / multiple steps would be worth it
+
+Change the design **only if** one of these becomes a **measured** problem:
+
+1. **Persistent false positives despite the gate** → separate "critic" agent (generator/critic) receiving candidate reviews + diff and only confirming/dropping. Try hardening the prompt and deterministic gate first.
+
+2. **Context window blowing up on large PRs** → natural split **by file/chunk**, not by phase: N parallel runs (one per file group) + aggregation. Scales better and still parallelizes.
+
+3. **Observability of Phase 1 candidates** → expose triage as intermediate JSON (same agent, via `resume`) for debugging why something didn't become a thread.
 
 ---
 
-## Mapa de código relacionado
+## Recommendations (cost-benefit order)
 
-| Módulo | Papel |
-|--------|-------|
-| `src/agent/prompt.ts` | Monta prompt único; `buildTwoPhaseWorkflow()` |
+1. **Cheap (keep):** invest in the deterministic gate (TypeScript) — precision guaranteed without extra LLM cost.
+2. **Medium:** if large PRs are common, **parallelize by file** (multiple runs), not by phase.
+3. **Expensive / only if needed:** dedicated *critic* agent only for `critical` reviews, as a second opinion before posting.
+
+**Conclusion:** the quality bottleneck in a reviewer is not "too many phases in the same agent", but **evidence + gate**. The current design nails this. Splitting into 2 agents adds cost and orchestration complexity without attacking the main risk (monolithic prompt), which is better addressed by shortening/structuring the prompt and reinforcing the deterministic gate.
+
+---
+
+## Related code map
+
+| Module | Role |
+|--------|------|
+| `src/agent/prompt.ts` | Builds single prompt; `buildTwoPhaseWorkflow()` |
 | `src/agent/runner.ts` | `buildAgentPrompt` + `runAgentStream` |
 | `src/engine/cursor-sdk/stream.ts` | `Agent.create`, `agent.send`, stream, `run.wait()` (engine `cursor-sdk`) |
-| `src/engine/opencode/stream.ts` | Sessão OpenCode via `@opencode-ai/sdk`: prompt, SSE, servidor embutido (`event-stream.ts`, `server.ts`) |
-| `src/index.ts` | Orquestração; uma chamada a `runCodeReviewAgent` |
-| `src/ado/review-validation.ts` | Gate determinístico pós-LLM |
-| `skills/SYSTEM_PROMPT.md` | Contrato JSON e filtro de publicação |
-| `run.sh` | Runner remoto/local; ver [README](../README.md#-runner-runsh) |
-| `docs/flow-analysis.md` | Fluxo operacional completo (contexto ADO, parser, gate, CI) |
+| `src/engine/opencode/stream.ts` | OpenCode session via `@opencode-ai/sdk`: prompt, SSE, embedded server (`event-stream.ts`, `server.ts`) |
+| `src/index.ts` | Orchestration; one call to `runCodeReviewAgent` |
+| `src/ado/review-validation.ts` | Deterministic post-LLM gate |
+| `skills/SYSTEM_PROMPT.md` | JSON contract and publication filter |
+| `run.sh` | Remote/local runner; see [README](../README.md) and [`workflows.md`](workflows.md) |
+| `docs/flow-analysis.md` | Full operational flow (ADO context, parser, gate, CI) |
 
 ---
 
-## Referências
+## References
 
-| Recurso | Caminho |
-|---------|---------|
-| Fluxo operacional | [`flow-analysis.md`](flow-analysis.md) |
+| Resource | Path |
+|---------|------|
+| Operational flow | [`flow-analysis.md`](flow-analysis.md) |
+| All execution paths | [`workflows.md`](workflows.md) |
 | README | [`../README.md`](../README.md) |
-| Instruções para agentes | [`../AGENTS.md`](../AGENTS.md) |
+| Agent instructions | [`../AGENTS.md`](../AGENTS.md) |

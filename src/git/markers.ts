@@ -7,6 +7,9 @@ export const REVIEW_SUMMARY_MARKER = '<!-- review-summary -->';
 export const CLEAN_PR_SUMMARY_MESSAGE =
   'All pending issues have been successfully resolved! The PR is ready to be merged. 🚀';
 
+/** Marcador usado nos comentários de sumário do auto-fix. */
+export const AUTO_FIX_SUMMARY_MARKER = '<!-- auto-fix-summary -->';
+
 /** Detecta reply de resolução (canônico ADO, legado GitHub ou texto histórico). */
 export function commentBodyHasResolutionReply(body: string, botTag: string): boolean {
   if (!body) return false;

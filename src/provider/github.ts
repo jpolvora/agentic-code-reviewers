@@ -18,7 +18,7 @@ import {
   type RoundStateCommentInput,
   type RoundStateLocation,
 } from '../ado/round-state.js';
-import { normalizeFilePath, reviewDedupKey } from '../ado/utils.js';
+import { canonicalFilePath, reviewDedupKey } from '../ado/utils.js';
 import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment, LEGACY_BOT_TAG_PREFIX } from '../bot-tag.js';
 
 import {
@@ -110,7 +110,7 @@ export class GithubProvider implements PlatformProvider {
 
         const firstComment = comments[0];
         const rawContent = firstComment.body;
-        const normalizedPath = normalizeFilePath(thread.path);
+        const canonicalPath = canonicalFilePath(thread.path);
         const lineNumber = thread.line;
 
         if (!thread.path || lineNumber == null || lineNumber <= 0) {
@@ -130,16 +130,16 @@ export class GithubProvider implements PlatformProvider {
         );
 
         if (!isResolved) {
-          existingKeys.set(reviewDedupKey(normalizedPath, lineNumber), true);
+          existingKeys.set(reviewDedupKey(canonicalPath, lineNumber), true);
           activeContextRows.push({
-            filePath: normalizedPath,
+            filePath: canonicalPath,
             lineNumber,
             status,
             summary,
           });
           fileReviewThreads.push({
             threadId: thread.id,
-            filePath: normalizedPath,
+            filePath: canonicalPath,
             lineNumber,
             status,
             summary,
@@ -150,7 +150,7 @@ export class GithubProvider implements PlatformProvider {
           pendingThreads.push({
             threadId: thread.id,
             status: 'active',
-            filePath: normalizedPath,
+            filePath: canonicalPath,
             lineNumber,
             author: firstComment.author?.login ?? 'unknown',
             isBot,
@@ -159,7 +159,7 @@ export class GithubProvider implements PlatformProvider {
           });
         } else {
           resolvedContextRows.push({
-            filePath: normalizedPath,
+            filePath: canonicalPath,
             lineNumber,
             status,
             summary,
@@ -435,6 +435,23 @@ These issues were reported in a previous round and already resolved/closed. Do *
     }
 
     return posted;
+  }
+
+  async postPrComment(
+    botTag: string,
+    commentBody: string,
+    log: (msg: string) => void,
+  ): Promise<boolean> {
+    const body = [botTag, '', commentBody].join('\n');
+    try {
+      const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/${this.config.pullRequestId}/comments`;
+      await this.client.restPost(path, { body });
+      log('Comment posted to PR conversation.');
+      return true;
+    } catch (error) {
+      log(`Error: failed to post PR comment: ${String(error)}`);
+      return false;
+    }
   }
 
   async setPullRequestReviewSummary(

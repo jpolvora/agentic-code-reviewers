@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import {
   filterValidResolvedItems,
   getNewReviewsFromPlan,
@@ -236,5 +236,50 @@ describe('GithubProvider — parseRoundStateFromThreads', () => {
       ],
     };
     assert.equal(provider.parseRoundStateFromThreads(threads, BOT).round, 5);
+  });
+});
+
+describe('GithubProvider — postPrComment', () => {
+  it('posts an issue comment with bot tag and summary body', async () => {
+    const posts: { path: string; body: unknown }[] = [];
+    const log = mock.fn();
+    const provider = new GithubProvider();
+    await provider.initialize(
+      { organization: 'test-org', repositoryName: 'test-repo', pullRequestId: 18, githubToken: 'fake-token' } as any,
+      { info: mock.fn(), error: mock.fn(), warn: mock.fn(), section: mock.fn() } as any,
+    );
+    (provider as any).client.restPost = async (path: string, body: unknown) => {
+      posts.push({ path, body });
+      return { id: 456 };
+    };
+
+    const ok = await provider.postPrComment('Agentic Code Reviewer test', '<!-- auto-fix-summary -->\nsummary body', log);
+
+    assert.equal(ok, true);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].path, '/repos/test-org/test-repo/issues/18/comments');
+    assert.match((posts[0].body as any).body, /Agentic Code Reviewer test/);
+    assert.match((posts[0].body as any).body, /auto-fix-summary/);
+    assert.equal(log.mock.callCount(), 1);
+    assert.match(log.mock.calls[0].arguments[0], /posted/i);
+  });
+
+  it('returns false when restPost throws', async () => {
+    const logCalls: string[] = [];
+    const log = (msg: string) => { logCalls.push(msg); };
+    const provider = new GithubProvider();
+    await provider.initialize(
+      { organization: 'test-org', repositoryName: 'test-repo', pullRequestId: 18, adoAccessToken: 'fake-token' } as any,
+      { info: mock.fn(), error: mock.fn(), warn: mock.fn(), section: mock.fn() } as any,
+    );
+    (provider as any).client.restPost = async () => {
+      throw new Error('API error');
+    };
+
+    const ok = await provider.postPrComment('BotTag', 'body', log);
+
+    assert.equal(ok, false);
+    assert.equal(logCalls.length, 1);
+    assert.match(logCalls[0], /failed/);
   });
 });
