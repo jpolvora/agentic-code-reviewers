@@ -53,7 +53,10 @@ describe('run.sh', () => {
     function toWslPath(winPath: string): string {
       try {
         const winPathSafe = winPath.replace(/\\/g, '/');
-        return execFileSync('wsl', ['wslpath', '-u', winPathSafe], { encoding: 'utf8' }).trim();
+        return execFileSync('wsl', ['wslpath', '-u', winPathSafe], {
+          env: { ...process.env, MSYS_NO_PATHCONV: '1' },
+          encoding: 'utf8'
+        }).trim();
       } catch {
         const drive = winPath.match(/^([a-zA-Z]):/);
         if (drive) {
@@ -114,7 +117,7 @@ describe('run.sh', () => {
 
       execFileSync('bash', ['-c', `HOME="${mockHomeUnix}" bash "${runSh}"`], {
         cwd: repoRoot,
-        env: { ...process.env, ...customEnv },
+        env: { ...process.env, ...customEnv, MSYS_NO_PATHCONV: '1' },
         encoding: 'utf8',
       });
 
@@ -144,7 +147,7 @@ describe('run.sh', () => {
 
       execFileSync('bash', ['-c', `HOME="${mockHomeUnix}" bash "${runSh}"`], {
         cwd: repoRoot,
-        env: { ...process.env, ...customEnv },
+        env: { ...process.env, ...customEnv, MSYS_NO_PATHCONV: '1' },
         encoding: 'utf8',
       });
 
