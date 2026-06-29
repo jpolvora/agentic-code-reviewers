@@ -30,6 +30,8 @@ O revisor publica threads acionáveis nas linhas afetadas da PR. **Não altera a
 
 Para detalhes arquiteturais e teóricos profundos, consulte a pasta [`docs/`](docs/):
 
+*   **[Índice da documentação](docs/index.md):** Visão geral enxuta de cada feature com links para os deep-dives (em inglês).
+*   **[Caminhos de Execução](docs/workflows.md):** Todos os modos (local, CI ADO, CI GitHub deste repo e de consumidores, auto-fix, skills IDE, engines) — em inglês.
 *   **[Fluxo de Análise e Decisão](docs/flow-analysis.md):** Guia completo de ciclo de vida, do carregamento de contexto ao gate final.
 *   **[Fluxo de Auto-Fix e Self-Healing](docs/auto-fix.md):** Como configurar pipelines para corrigir código automaticamente e revalidar o review em um loop seguro.
 *   **[Perguntas Frequentes (FAQ)](docs/faq.md):** Dúvidas comuns de configuração, comportamento do bot e regras.
