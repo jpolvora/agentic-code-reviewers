@@ -437,6 +437,23 @@ These issues were reported in a previous round and already resolved/closed. Do *
     return posted;
   }
 
+  async postPrComment(
+    botTag: string,
+    commentBody: string,
+    log: (msg: string) => void,
+  ): Promise<boolean> {
+    const body = [botTag, '', commentBody].join('\n');
+    try {
+      const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/${this.config.pullRequestId}/comments`;
+      await this.client.restPost(path, { body });
+      log('Comment posted to PR conversation.');
+      return true;
+    } catch (error) {
+      log(`Error: failed to post PR comment: ${String(error)}`);
+      return false;
+    }
+  }
+
   async setPullRequestReviewSummary(
     botTag: string,
     summaryText: string,

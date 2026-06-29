@@ -9,6 +9,7 @@ import { extractJsonFromAgentOutput } from '../parser/review-response.js';
 import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '../git/autofix-commit.js';
 import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
+import { AUTO_FIX_SUMMARY_MARKER } from '../git/markers.js';
 
 export interface Replacement {
   startLine: number;
@@ -204,6 +205,71 @@ export function getAutoFixThreads(reviewContext: ReviewContextResult): ActiveThr
   return reviewContext.fileReviewThreads;
 }
 
+function buildThreadUrl(
+  config: ReviewerConfig,
+  thread: ActiveThreadInfo,
+): string {
+  if (config.provider === 'github') {
+    return `https://github.com/${config.organization}/${config.repositoryName}/pull/${config.pullRequestId}#discussion_r${thread.botCommentId}`;
+  }
+  return `https://dev.azure.com/${config.organization}/${config.project}/_git/${config.repositoryName}/pullrequest/${config.pullRequestId}?threadId=${thread.threadId}`;
+}
+
+function buildAutoFixSummary(
+  config: ReviewerConfig,
+  resolvedItems: ResolvedThreadItem[],
+  activeThreads: ActiveThreadInfo[],
+  modifiedFiles: string[],
+): string {
+  const resolvedWithThreads = resolvedItems
+    .map((item) => {
+      const thread = activeThreads.find(
+        (t) => String(t.threadId) === String(item.threadId),
+      );
+      return { item, thread };
+    })
+    .filter((x) => x.thread != null);
+
+  const lines: string[] = [];
+  lines.push(AUTO_FIX_SUMMARY_MARKER);
+  lines.push('');
+  lines.push('## Auto-Fix Summary');
+  lines.push('');
+  lines.push(
+    `The auto-fix workflow successfully applied **${resolvedItems.length} fix(es)** across **${modifiedFiles.length} file(s)**.`,
+  );
+  lines.push('');
+
+  if (modifiedFiles.length > 0) {
+    lines.push('### Files Changed');
+    for (const file of modifiedFiles) {
+      lines.push(`- \`${file}\``);
+    }
+    lines.push('');
+  }
+
+  if (resolvedWithThreads.length > 0) {
+    lines.push('### Resolved Issues');
+    lines.push('');
+    lines.push('| # | File | Line | Thread | Resolution |');
+    lines.push('|---|------|------|--------|------------|');
+    let idx = 0;
+    for (const { item, thread } of resolvedWithThreads) {
+      idx++;
+      const url = buildThreadUrl(config, thread!);
+      const file = (thread!.filePath || '').replace(/^\/+/, '');
+      const resolution = (item.note || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+      lines.push(
+        `| ${idx} | \`${file}\` | ${thread!.lineNumber} | [discussion](${url}) | ${resolution} |`,
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push('> A new code review round will be triggered automatically to validate the changes.');
+  return lines.join('\n');
+}
+
 export async function runAutoFixFlow(
   config: ReviewerConfig,
   reviewContext: ReviewContextResult,
@@ -381,7 +447,8 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
 
   // commit local → build → fechar threads com explicação detalhada → push
   logger.section('Consolidando alterações com Git (commit local)');
-  const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles);
+  const resolvedThreadIds = resolvedItems.map((item) => String(item.threadId));
+  const commitSuccess = await commitAutoFixChanges(config, logger, modifiedFiles, resolvedThreadIds);
   if (!commitSuccess) {
     logger.info('Commit local não realizado; abortando build, resolução e push.');
     return;
@@ -423,6 +490,19 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
     throw new Error(
       'Gate cooperativo: push falhou após resolução de threads — PR e remoto podem estar inconsistentes.',
     );
+  }
+
+  logger.section('Publicando sumário do auto-fix na PR');
+  const summary = buildAutoFixSummary(config, resolvedItems, activeThreads, modifiedFiles);
+  if (config.dryRun) {
+    logger.info(`[dry-run] Sumário do auto-fix seria publicado:\n${summary}`);
+  } else {
+    const posted = await provider.postPrComment(config.botTag, summary, (msg) => logger.info(msg));
+    if (posted) {
+      logger.info('Sumário do auto-fix publicado na PR.');
+    } else {
+      logger.warn('Falha ao publicar sumário do auto-fix na PR.');
+    }
   }
 }
 

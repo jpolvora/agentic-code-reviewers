@@ -96,6 +96,8 @@ Findings that violate any rule below are automatically discarded:
 
 The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending runner threads** remain on the PR (`Agentic Code Reviewer` prefix). `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`. Comment tag is `buildBotTag(engine)` from `src/bot-tag.ts`.
 
+Additionally, the **auto-fix flow** posts its own **detailed summary comment** after a successful commit/build/resolve/push cycle, listing changed files, resolved threads with links, and using the `AUTO_FIX_SUMMARY_MARKER` (`<!-- auto-fix-summary -->`). This gives developers visibility into what was fixed and triggers the next code review round.
+
 ### Safe Outputs (`src/ado/safe-outputs.ts`)
 
 After `isPublishableReview`, the **Safe Outputs** gate (default ON via `AGENTIC_CODE_REVIEWERS_SAFE_OUTPUTS`) applies additional deterministic validation:
@@ -180,7 +182,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `.cursor/rules/karpathy-guidelines.mdc` | Behavioral guidelines referenced by auto-fix and developer agents |
 | `src/agent/runner.ts` | Builds the prompt and delegates to the injected `ExecutionEngine`. |
 | `src/provider/` | `PlatformProvider` interface + `AdoProvider` and `GithubProvider` implementations. |
-| `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`). |
+| `src/ado/` | Gate (`gate.ts`), validation (`review-validation.ts`), safe outputs (`safe-outputs.ts`), formatting (`format-thread.ts`), rounds (`round-state.ts`), comment posting (`post-comments.ts`). |
 | `src/orchestrator/` | In-process parallelism (`parallel-runner.ts`), merge (`merge-reviews.ts`), optional meta-reviewer. |
 | `src/mcp/` | Read-only context tools (`review-tools.ts`) and prompt injection. |
 | `skills/stacks/` | Per-stack Markdown recommendations (loaded by the runner). |

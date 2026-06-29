@@ -63,6 +63,13 @@ export interface PlatformProvider {
     log: (msg: string) => void,
   ): Promise<void>;
 
+  /** Publica um comentário geral na conversa da PR (issue comment no GitHub, thread fechada no ADO). */
+  postPrComment(
+    botTag: string,
+    commentBody: string,
+    log: (msg: string) => void,
+  ): Promise<boolean>;
+
   emitPipelineReviewOutput(
     gate: GateEvaluation,
     reviews: CodeReviewItem[],

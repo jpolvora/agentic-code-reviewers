@@ -8,15 +8,24 @@ import { buildAutoFixCommitMessage, isLocalAheadOfRemote } from '../src/git/auto
 import type { ReviewerConfig } from '../src/config.js';
 
 describe('buildAutoFixCommitMessage', () => {
-  it('inclui número da PR quando disponível', () => {
-    const msg = buildAutoFixCommitMessage({ pullRequestId: 42 } as ReviewerConfig);
-    assert.match(msg, /PR #42/);
-    assert.match(msg, /^fix\(review\):/);
+  it('inclui número da PR e thread IDs quando disponíveis', () => {
+    const msg = buildAutoFixCommitMessage({ pullRequestId: 42 } as ReviewerConfig, ['10', '20']);
+    assert.match(msg, /fix\(#42\): auto-fix issues from review threads \[10, 20\]/);
   });
 
-  it('usa mensagem genérica sem PR id', () => {
+  it('inclui número da PR sem thread IDs', () => {
+    const msg = buildAutoFixCommitMessage({ pullRequestId: 42 } as ReviewerConfig);
+    assert.equal(msg, 'fix(#42): auto-fix issues from review threads');
+  });
+
+  it('usa mensagem genérica sem PR id mas com thread IDs', () => {
+    const msg = buildAutoFixCommitMessage({ pullRequestId: 0 } as ReviewerConfig, ['a', 'b']);
+    assert.equal(msg, 'fix: auto-fix apply issues from review threads [a, b]');
+  });
+
+  it('usa mensagem genérica sem PR id e sem threads', () => {
     const msg = buildAutoFixCommitMessage({ pullRequestId: 0 } as ReviewerConfig);
-    assert.equal(msg, 'fix(review): apply auto-fixes for active review threads');
+    assert.equal(msg, 'fix: auto-fix apply issues from review threads');
   });
 });
 

@@ -1,80 +1,82 @@
 # FAQ — Agentic Code Reviewers
 
-> **Variáveis:** nomenclatura canônica `AGENTIC_CODE_REVIEWERS_*` para configuração; credenciais `CURSOR_API_KEY` e `OPENCODE_API_KEY` (ver [`AGENTS.md`](../AGENTS.md)).
+> **Variables:** canonical `AGENTIC_CODE_REVIEWERS_*` prefix for configuration; credentials `CURSOR_API_KEY` and `OPENCODE_API_KEY` (see [`../AGENTS.md`](../AGENTS.md)).
+>
+> See [`index.md`](index.md) for an overview and [`workflows.md`](workflows.md) for all execution paths.
 
 ---
 
-## Índice rápido *(ordem de execução)*
+## Quick index (execution order)
 
-| # | Seção | Momento no runner |
-|---|--------|-------------------|
-| 1 | [Visão geral](#1-visão-geral) | — |
-| 2 | [O que faz e não faz](#2-o-que-o-reviewer-faz-e-não-faz) | — |
-| 3 | [Linha do tempo](#3-linha-do-tempo-ordem-de-execução) | Mapa completo |
-| 4 | [Configuração](#4-configuração-e-pré-requisitos) | `loadConfig` |
-| 5 | [Git, diff e arquivos](#5-git-diff-e-seleção-de-arquivos) | `prepareLocalReviewWorkspace` |
-| 6 | [Rules pré-mapeadas](#6-rules-pré-mapeadas) | `buildRulesMap` |
-| 7 | [**User Story, Task e contexto ADO**](#7-user-story-task-e-contexto-ado) | `getPullRequestWorkItemContext` + PR + threads |
-| 8 | [Montagem do prompt](#8-montagem-do-prompt-system_prompt-vs-runtime) | `buildAgentPrompt` |
-| 9 | [Engine de Execução](#9-engine-de-execução) | `runCodeReviewAgent` |
-| 10 | [Análise em duas fases](#10-análise-em-duas-fases) | Dentro do agente |
-| 11 | [Score e severidade](#11-score-severidade-e-o-que-vira-thread) | Classificação no agente |
-| 12 | [JSON e parser](#12-resposta-json-e-parser) | `parseCodeReviewResponse` |
-| 13 | [Escalonamento de rodadas](#13-orçamento-de-rodadas-e-escalonamento) | `round-state` (pré-publicação) |
-| 14 | [Publicação no ADO](#14-publicação-no-azure-devops) | `post-comments` |
-| 15 | [Threads, dedup e resolução](#15-threads-dedup-e-resolução) | `review-context` |
-| 16 | [Pipeline e exit codes](#16-pipeline-ci-e-códigos-de-saída) | `gate` |
+| # | Section | Runner moment |
+|---|---------|----------------|
+| 1 | [Overview](#1-overview) | — |
+| 2 | [What it does and doesn't](#2-what-the-reviewer-does-and-doesnt) | — |
+| 3 | [Timeline](#3-timeline-execution-order) | Full map |
+| 4 | [Configuration](#4-configuration-and-prerequisites) | `loadConfig` |
+| 5 | [Git, diff and files](#5-git-diff-and-file-selection) | `prepareLocalReviewWorkspace` |
+| 6 | [Pre-mapped rules](#6-pre-mapped-rules) | `buildRulesMap` |
+| 7 | [**User Story, Task and ADO context**](#7-user-story-task-and-ado-context) | `getPullRequestWorkItemContext` + PR + threads |
+| 8 | [Prompt assembly](#8-prompt-assembly-system_prompt-vs-runtime) | `buildAgentPrompt` |
+| 9 | [Execution engine](#9-execution-engine) | `runCodeReviewAgent` |
+| 10 | [Two-phase analysis](#10-two-phase-analysis) | Inside the agent |
+| 11 | [Score and severity](#11-score-severity-and-what-becomes-a-thread) | Agent classification |
+| 12 | [JSON and parser](#12-json-response-and-parser) | `parseCodeReviewResponse` |
+| 13 | [Round budget and escalation](#13-round-budget-and-escalation) | `round-state` (pre-publish) |
+| 14 | [Posting to Azure DevOps](#14-posting-to-azure-devops) | `post-comments` |
+| 15 | [Threads, dedup and resolution](#15-threads-dedup-and-resolution) | `review-context` |
+| 16 | [Pipeline and exit codes](#16-pipeline-ci-and-exit-codes) | `gate` |
 | 17 | [Troubleshooting](#17-troubleshooting) | — |
-| 18 | [Auto-Fix e self-healing](#18-auto-fix-e-self-healing) | `--auto-fix`, `auto-fix.yml` |
-| 19 | [Mapa de evidências](#19-mapa-de-evidências-no-código) | — |
+| 18 | [Auto-fix and self-healing](#18-auto-fix-and-self-healing) | `--auto-fix`, `auto-fix.yml` |
+| 19 | [Evidence map](#19-evidence-map-in-the-code) | — |
 
 ---
 
-## 1. Visão geral
+## 1. Overview
 
-### O que é o Agentic Code Reviewers?
+### What is Agentic Code Reviewers?
 
-**Resposta:** **Multi Agent Code Reviewer** plugável e extensível para Pull Requests em **Azure DevOps** e **GitHub**. Orquestra engines agênticas (`cursor-sdk`, `opencode`, extensível via `ExecutionEngine`) sobre o diff, aplica regras do projeto (`AGENTS.md`, `.cursor/rules/`, skill `code-review`) e **publica threads** na PR. **Não altera código.** Fork, adicione sua engine ou provider, revise e abra PR.
+**Answer:** A pluggable, extensible **multi-agent code reviewer** for Pull Requests on **Azure DevOps** and **GitHub**. It orchestrates agentic engines (`cursor-sdk`, `opencode`, extensible via `ExecutionEngine`) over the diff, applies project rules (`AGENTS.md`, `.cursor/rules/`, code-review skill) and **publishes threads** on the PR. **It does not modify code.** Fork it, add your engine or provider, review and open a PR.
 
-*Evidência:* `README.md`; `src/index.ts`.
+*Evidence:* `README.md`; `src/index.ts`.
 
-### Quem decide se um achado é válido?
+### Who decides whether a finding is valid?
 
-**Resposta:** Duas camadas — (1) **agente LLM:** triagem, investigação, score, JSON; (2) **TypeScript:** gate score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 (default 6–10), campos obrigatórios, dedup (`review-validation.ts`, `post-comments.ts`).
+**Answer:** Two layers — (1) **LLM agent:** triage, investigation, score, JSON; (2) **TypeScript:** gate score `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 (default 6–10), required fields, dedup (`review-validation.ts`, `post-comments.ts`).
 
-*Evidência:* `docs/flow-analysis.md`; `parseCodeReviewResponse`.
+*Evidence:* [`flow-analysis.md`](flow-analysis.md); `parseCodeReviewResponse`.
 
-### O review bloqueia o merge?
+### Does the review block the merge?
 
-**Resposta:** **Não por padrão.** Exit **0** mesmo com threads pendentes. Exit **1** só em erro fatal (config, ADO, agente).
+**Answer:** **Not by default.** Exit **0** even with pending threads. Exit **1** only on a fatal error (config, ADO, agent). A GitHub ruleset `required_review_thread_resolution` can block merge independently.
 
-*Evidência:* `src/index.ts`; `README.md`.
-
----
-
-## 2. O que o reviewer faz e não faz
-
-### O que o reviewer faz?
-
-**Resposta:** (1) Prepara git e diff; (2) filtra arquivos elegíveis da stack; (3) coleta work items e threads; (4) executa agente em duas fases (**read-only**); (5) parseia JSON e aplica gate (`scoreMin` + Safe Outputs); (6) publica/resolve threads; (7) emite resumo COM/SEM ISSUES. Opcionalmente, CI dispara **auto-fix** em workflow separado (`--auto-fix`).
-
-*Evidência:* módulos listados em `src/index.ts` (ver [§3](#3-linha-do-tempo-ordem-de-execução)).
-
-### O que o reviewer **não** faz?
-
-**Resposta:** O fluxo **padrão de review** não altera código, não faz commit/push e não resolve thread só porque a linha sumiu do diff. Não publica nits abaixo de `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: score &lt; 6); não bloqueia a pipeline; não trata threads de humanos/outros bots como pendentes do bot.
-
-**Exceção — modo auto-fix:** com `--auto-fix` ou workflow `auto-fix.yml`, o runner **aplica** correções, commit/push e resolve threads parcialmente — ver [§18](#18-auto-fix-e-self-healing).
-
-*Evidência:* `skills/SYSTEM_PROMPT.md` (read-only); `src/orchestrator/autofix-runner.ts`.
+*Evidence:* `src/index.ts`; `README.md`.
 
 ---
 
-## 3. Linha do tempo (ordem de execução)
+## 2. What the reviewer does and doesn't
 
-### Qual a ordem de execução do runner?
+### What does the reviewer do?
 
-**Resposta:** Ver diagrama e tabela abaixo — cada linha aponta para a seção FAQ correspondente.
+**Answer:** (1) Preps git and diff; (2) filters eligible stack files; (3) collects work items and threads; (4) runs the agent in two phases (**read-only**); (5) parses JSON and applies the gate (`scoreMin` + Safe Outputs); (6) publishes/resolves threads; (7) emits a WITH/WITHOUT ISSUES summary. Optionally, CI triggers **auto-fix** in a separate workflow (`--auto-fix`).
+
+*Evidence:* modules listed in `src/index.ts` (see [§3](#3-timeline-execution-order)).
+
+### What doesn't the reviewer do?
+
+**Answer:** The **default review flow** doesn't modify code, doesn't commit/push, and doesn't resolve a thread just because the line disappeared from the diff. It doesn't publish nits below `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default: score &lt; 6); it doesn't block the pipeline; it doesn't treat human/other-bot threads as bot pending.
+
+**Exception — auto-fix mode:** with `--auto-fix` or the `auto-fix.yml` workflow, the runner **applies** fixes, commit/push and partially resolves threads — see [§18](#18-auto-fix-and-self-healing).
+
+*Evidence:* `skills/SYSTEM_PROMPT.md` (read-only); `src/orchestrator/autofix-runner.ts`.
+
+---
+
+## 3. Timeline (execution order)
+
+### What's the runner execution order?
+
+**Answer:** See the diagram and table below — each row points to the FAQ section.
 
 ```mermaid
 flowchart TD
@@ -82,598 +84,627 @@ flowchart TD
     B --> C["§5 getDiffBreakdown + buildDiffPromptSection"]
     C --> D["§6 buildRulesMap"]
     D --> E{hasAdoContext?}
-    E -->|Sim| F["§7 work items + threads + PR description"]
-    E -->|Não| G[Sem contexto ADO]
+    E -->|Yes| F["§7 work items + threads + PR description"]
+    E -->|No| G[No ADO context]
     F --> H{fileCount > 0?}
     G --> H
-    H -->|Sim| I["§8–§10 buildAgentPrompt + runAgent"]
-    H -->|Não| J[Agente omitido]
-    I --> K["§12 parse JSON + gate score"]
+    H -->|Yes| I["§8–§10 buildAgentPrompt + runAgent"]
+    H -->|No| J[Agent omitted]
+    I --> K["§12 parse JSON + score gate"]
     J --> K
-    K --> L["§13 escalonamento MAX_ROUNDS"]
+    K --> L["§13 escalation MAX_ROUNDS"]
     L --> M["§14–§15 post / resolve threads"]
     M --> N["§16 evaluateGate + exit 0"]
 ```
 
-| Etapa | Seção FAQ | O que acontece | Arquivo |
-|-------|-----------|----------------|---------|
-| 1 | [§4](#4-configuração-e-pré-requisitos) | Carrega env, CLI, vars ADO, valida modelo | `src/config.ts` |
-| 2 | [§5](#5-git-diff-e-seleção-de-arquivos) | Checkout/fetch; diff `target...HEAD` | `src/git/diff.ts` |
-| 3 | [§5](#5-git-diff-e-seleção-de-arquivos) | Filtra `.cs`/`.ts`/`.html`; embute diff (~100 KB) | `getDiffBreakdown`, `diff-prompt.ts` |
-| 4 | [§6](#6-rules-pré-mapeadas) | Pré-mapeia `.cursor/rules/*.mdc` | `src/project/rules-map.ts` |
-| 5 | [**§7**](#7-user-story-task-e-contexto-ado) | **Work items (US/Task), descrição PR, threads** | `work-items.ts`, `pull-request.ts`, `review-context.ts` |
-| 6 | [§8](#8-montagem-do-prompt-system_prompt-vs-runtime) | Monta prompt único e chama agente | `src/agent/prompt.ts` |
-| 7 | [§9–§10](#9-engine-de-execução) | Engine de Execução (cursor-sdk / opencode) roda as fases | `runner.ts`, `engine/` |
-| 8 | [§12](#12-resposta-json-e-parser) | Extrai JSON; filtra score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) | `parser/`, `post-comments.ts` |
-| 9 | [§13](#13-orçamento-de-rodadas-e-escalonamento) | Escalonamento (opcional) | `round-state.ts` |
-| 10 | [§14](#14-publicação-no-azure-devops) | Resolve threads → posta novas → summary | `post-comments.ts` |
-| 11 | [§16](#16-pipeline-ci-e-códigos-de-saída) | Resumo COM/SEM ISSUES | `gate.ts` |
+| Step | FAQ section | What happens | File |
+|------|-------------|--------------|------|
+| 1 | [§4](#4-configuration-and-prerequisites) | Loads env, CLI, ADO vars, validates model | `src/config.ts` |
+| 2 | [§5](#5-git-diff-and-file-selection) | Checkout/fetch; diff `target...HEAD` | `src/git/diff.ts` |
+| 3 | [§5](#5-git-diff-and-file-selection) | Filters `.cs`/`.ts`/`.html`; embeds diff (~100 KB) | `getDiffBreakdown`, `diff-prompt.ts` |
+| 4 | [§6](#6-pre-mapped-rules) | Pre-maps `.cursor/rules/*.mdc` | `src/project/rules-map.ts` |
+| 5 | [**§7**](#7-user-story-task-and-ado-context) | **Work items (US/Task), PR description, threads** | `work-items.ts`, `pull-request.ts`, `review-context.ts` |
+| 6 | [§8](#8-prompt-assembly-system_prompt-vs-runtime) | Builds single prompt, calls agent | `src/agent/prompt.ts` |
+| 7 | [§9–§10](#9-execution-engine) | Execution engine (cursor-sdk / opencode) runs the phases | `runner.ts`, `engine/` |
+| 8 | [§12](#12-json-response-and-parser) | Extracts JSON; filters score ≥ AGENTIC_CODE_REVIEWERS_SCORE_MIN (default 6) | `parser/`, `post-comments.ts` |
+| 9 | [§13](#13-round-budget-and-escalation) | Escalation (optional) | `round-state.ts` |
+| 10 | [§14](#14-posting-to-azure-devops) | Resolves threads → posts new → summary | `post-comments.ts` |
+| 11 | [§16](#16-pipeline-ci-and-exit-codes) | WITH/WITHOUT ISSUES summary | `gate.ts` |
 
-*Evidência:* `src/index.ts` (~158–222) — diff vazio + ADO válido omite etapas 6–7; 8–11 ainda rodam.
+*Evidence:* `src/index.ts` (~158–222) — empty diff + valid ADO omits steps 6–7; steps 8–11 still run.
 
-### O que acontece se o diff estiver vazio mas houver contexto ADO?
+### What happens if the diff is empty but there's ADO context?
 
-**Resposta:** O agente é **omitido**; o gate ainda avalia threads pendentes do bot.
+**Answer:** The agent is **omitted**; the gate still lists the bot's pending threads.
 
-*Evidência:* `src/index.ts`.
-
----
-
-## 4. Configuração e pré-requisitos
-
-### O que posso editar no runner?
-
-**Resposta:** `skills/SYSTEM_PROMPT.md` (contrato JSON, read-only — **sem** US/Task) e `skills/CODE_REVIEW.md` (roteamento ao harness). Critérios de negócio ficam no repo analisado (`.agents/skills/code-review/`, `.cursor/rules/`, `docs/`). Referência local: `.env.example`.
-
-*Evidência:* `src/config.ts`; `README.md`.
-
-### Como configurar o modelo LLM?
-
-**Resposta:** Prioridade: (1) CLI `--model <id>`; (2) env `AGENTIC_CODE_REVIEWERS_MODEL`; (3) default por engine (`composer-2.5` em `cursor-sdk`, `anthropic/claude-sonnet-4-6` em `opencode`). Validação: `cursor-sdk` → enum em `src/engine/cursor-sdk/model.ts`; `opencode` → formato `provider/model` em `src/engine/opencode/model.ts`. Macro ADO não expandida → default.
-
-*Evidência:* `src/config.ts` (`AGENTIC_CODE_REVIEWERS_ENGINE`, `resolveReviewerModel`); `src/engine/`.
-
-### O que é obrigatório para rodar?
-
-**Resposta:** Com engine `cursor-sdk`: `CURSOR_API_KEY`. Com `opencode`: `OPENCODE_API_KEY` (ou `auth.json`). PAT/OAuth só se precisar de ADO (US/Task, threads, publicação).
-
-### Preciso de PAT local?
-
-**Resposta:** Só para contexto ADO ou publicação real. Dry-run básico: só API key. Ver [§7](#7-user-story-task-e-contexto-ado).
-
-### Qual a diferença entre dry-run e publicação real?
-
-**Resposta:** `--dry-run`: analisa e loga preview; **sem POST** no ADO. Publicação real: org + project + repo + pr-id + token.
-
-### Quais variáveis de ambiente são mais usadas?
-
-**Resposta:** `CURSOR_API_KEY` (cursor-sdk) ou `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (fallback `GITHUB_TOKEN`/`GH_TOKEN`), `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 10), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK` (seleção de stack). Lista completa: [`../README.md`](../README.md).
-
-*Evidência:* `src/config.ts`; `test/config.test.ts`.
-
-### Nomes legados `CURSOR_REVIEWER_*` ainda funcionam?
-
-**Resposta:** **Não.** O runner lê apenas `AGENTIC_CODE_REVIEWERS_*` (via `src/env.ts`). Macros ADO não expandidas como `$(CURSOR_REVIEWER_MODEL)` ainda caem no default — atualize variable groups e `.env` para os nomes canônicos. `AGENTIC_CODE_REVIEWERS_REPO_URL` e `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` existem só em `run.sh`/workflow GitHub; não passam por `env.ts`.
-
-*Evidência:* `src/env.ts`; `run.sh`; `.github/workflows/code-review.yml`.
-
-### Qual a diferença entre `skills/` e `.agents/skills/`?
-
-**Resposta:** Duas camadas:
-- **`skills/`** — prompts embutidos pelo runner em **toda** execução CI/local (`SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, `stacks/`). Montados por `buildAgentPrompt()`.
-- **`.agents/skills/`** — skills do **Cursor/IDE** invocadas manualmente (`/code-review-self`, `/megabrain`, `/solve-pr`).
-
-Use o runner em produção; use skills IDE para dry-run sem SDK, threads conversacionais ou auto-fix no GitHub. Roteamento: [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão).
-
-### Como funciona a seleção de Stacks Tecnológicas?
-
-**Resposta:** Permite focar o review em determinadas extensões de arquivos e carregar recomendações de arquitetura/segurança adequadas. É configurada explicitamente via flag CLI `--stack` ou env `AGENTIC_CODE_REVIEWERS_STACK`. Se a stack informada for desconhecida, ocorre um erro fail-fast. Caso a variável contiver uma macro não-expandida do ADO (como `$(AGENTIC_CODE_REVIEWERS_STACK)`), o runner resolve automaticamente para o default. Se nenhuma stack ou env for informada, o runner tentará autodetectar a stack do projeto.
-
-*Evidência:* `src/config.ts`; `test/config.test.ts`.
-
-### Como funciona a estratégia de autodetecção automática da stack?
-
-**Resposta:** O runner inspeciona a raiz do repositório (`repoRoot`) procurando por arquivos específicos ou pacotes declarados no `package.json`:
-1.  **PHP/Laravel:** Presença do arquivo `artisan` ou `composer.json`.
-2.  **Next.js/React:** Presença de arquivos de configuração como `next.config.js`/`next.config.mjs`/`next.config.ts`, ou o pacote `next` nas dependências do `package.json`.
-3.  **ABP/Angular:** Presença de arquivos `angular.json`, diretório `angular/` ou dependência `@angular/core` no `package.json`.
-4.  **TypeScript:** Presença de `tsconfig.json` ou pacote `typescript`/`tsx` no `package.json`.
-5.  **C#/.NET (ABP/Angular):** Presença de arquivos com extensões `.sln` ou `.csproj`.
-
-Caso nenhuma das heurísticas acima identifique uma stack, o runner assume a stack padrão `ABP/Angular` como fallback. O log da inicialização indica explicitamente qual stack foi ativada e de onde veio sua definição (`configurada via CLI`, `configurada via env`, `autodetectada` ou `fallback padrão`).
-
-*Evidência:* `src/config.ts`; `src/index.ts`; `test/config.test.ts`.
-
-### Quais stacks são suportadas por padrão e o que elas filtram?
-
-**Resposta:**
-- **ABP/Angular** (Padrão): Filtra `.cs`, `.ts`, `.html` (mantendo 100% de compatibilidade).
-- **PHP/Laravel**: Filtra `.php`, `.js`, `.ts`, `.vue`, `.html`, `.css`, `.json`.
-- **Next.js/React**: Filtra `.ts`, `.tsx`, `.js`, `.jsx`, `.html`, `.css`, `.json`.
-- **TypeScript**: Filtra `.ts`, `.json`.
-
-*Evidência:* `src/config.ts`.
-
-### Como a stack se comporta em execuções de testes E2E (`--seed-test`)?
-
-**Resposta:** Quando a flag `--seed-test` é fornecida, o runner ignora qualquer valor de stack configurado por env var e força a stack para `ABP/Angular`. Isso impede que fixtures C# e Angular de validação sejam filtradas e causem falhas nos testes locais.
-
-*Evidência:* `src/config.ts`; `test/config.test.ts`.
-
-### Como os arquivos de recomendação por stack são embutidos?
-
-**Resposta:** Durante a montagem do prompt, o runner busca o arquivo de recomendações estáticas em `skills/stacks/<nome-da-stack>.md` (como `typescript.md` ou `php-laravel.md`) e anexa seu conteúdo na seção `# Recomendações Específicas da Stack (<nome>)` no prompt final do agente.
-
-*Evidência:* `src/agent/prompt.ts`; `test/prompt.test.ts`.
+*Evidence:* `src/index.ts`.
 
 ---
 
-## 5. Git, diff e seleção de arquivos
+## 4. Configuration and prerequisites
 
-### Qual diff é usado?
+### What can I edit in the runner?
 
-**Resposta:** Local: `{targetRef}...HEAD`. CI: `origin/{target}...origin/{source}` após fetch. Com `--include-uncommitted`: acrescenta working tree vs `HEAD`.
+**Answer:** `skills/SYSTEM_PROMPT.md` (JSON contract, read-only — **no** US/Task) and `skills/CODE_REVIEW.md` (harness routing). Business criteria live in the analyzed repo (`.agents/skills/code-review/`, `.cursor/rules/`, `docs/`). Local reference: `.env.example`.
 
-*Evidência:* `src/git/diff.ts`.
+*Evidence:* `src/config.ts`; `README.md`.
 
-### Quais arquivos entram no review?
+### How do I configure the LLM model?
 
-**Resposta:** Include: `**/*.cs`, `**/*.ts`, `**/*.html`. Exclude: proxies, bin/obj, `.md`, `.csproj`, diretório do runner (legado: `scripts/cursor-reviewer/**`) — anti self-review. Só arquivos **AMR** no diff.
+**Answer:** Precedence: (1) CLI `--model <id>`; (2) env `AGENTIC_CODE_REVIEWERS_MODEL`; (3) engine default (`composer-2.5` in `cursor-sdk`, `anthropic/claude-sonnet-4-6` in `opencode`). Validation: `cursor-sdk` → enum in `src/engine/cursor-sdk/model.ts`; `opencode` → `provider/model` format in `src/engine/opencode/model.ts`. Unexpanded ADO macro → default.
 
-*Evidência:* `src/config.ts`; `src/git/diff.ts`.
+*Evidence:* `src/config.ts` (`AGENTIC_CODE_REVIEWERS_ENGINE`, `resolveReviewerModel`); `src/engine/`.
 
-### Como o diff entra no prompt?
+### What's required to run?
 
-**Resposta:** `buildDiffPromptSection` — até **100 KB** embutido (`full` ou `per-file`); acima disso o agente complementa via tools.
+**Answer:** With `cursor-sdk`: `CURSOR_API_KEY`. With `opencode`: `OPENCODE_API_KEY` (or `auth.json`). PAT/OAuth only needed for ADO (US/Task, threads, publication).
 
-*Evidência:* `src/git/diff-prompt.ts` — `MAX_DIFF_PROMPT_BYTES = 100_000`.
+### Do I need a PAT locally?
 
-### Qual a diferença entre modo local e CI?
+**Answer:** Only for ADO context or real publication. Basic dry-run: just the API key. See [§7](#7-user-story-task-and-ado-context).
 
-**Resposta:** Local usa branch atual como source; CI usa refs remotas após fetch em detached HEAD. Token ADO na etapa seguinte: PAT local ou `SYSTEM_ACCESSTOKEN` na pipeline.
+### What's the difference between dry-run and real publication?
 
-*Evidência:* `README.md` § “Modos git”.
+**Answer:** `--dry-run`: analyzes and logs a preview; **no POST** to ADO. Real publication: org + project + repo + pr-id + token.
 
----
+### Which env variables are most used?
 
-## 6. Rules pré-mapeadas
+**Answer:** `CURSOR_API_KEY` (cursor-sdk) or `OPENCODE_API_KEY` (opencode); `AGENTIC_CODE_REVIEWERS_MODEL`, `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT`, `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (fallback `GITHUB_TOKEN`/`GH_TOKEN`), `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH`, `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 10), `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`, `AGENTIC_CODE_REVIEWERS_REPO_ROOT`, `AGENTIC_CODE_REVIEWERS_STACK`. Full list: [`../README.md`](../README.md) and [`workflows.md`](workflows.md).
 
-### O que são rules pré-mapeadas?
+*Evidence:* `src/config.ts`; `test/config.test.ts`.
 
-**Resposta:** Após o diff, `buildRulesMap` lê `.cursor/rules/*.mdc` e inclui rules cujos globs batem com arquivos alterados (+ `alwaysApply: true`).
+### Do the legacy names `CURSOR_REVIEWER_*` still work?
 
-### Onde entram no prompt?
+**Answer:** **No.** The runner reads only `AGENTIC_CODE_REVIEWERS_*` (via `src/env.ts`). Unexpanded ADO macros like `$(CURSOR_REVIEWER_MODEL)` still fall back to the default — update variable groups and `.env` to the canonical names. `AGENTIC_CODE_REVIEWERS_REPO_URL` and `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` exist only in `run.sh`/GitHub workflow; they don't go through `env.ts`.
 
-**Resposta:** Na seção “Contexto da execução” do prompt ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)) — **não** no `SYSTEM_PROMPT.md`.
+*Evidence:* `src/env.ts`; `run.sh`; `.github/workflows/code-review.yml`.
 
-### O agente pode ler mais rules depois?
+### What's the difference between `skills/` and `.agents/skills/`?
 
-**Resposta:** **Sim**, na Fase 2 via tools (`settingSources: ['project']`).
+**Answer:** Two layers:
+- **`skills/`** — prompts embedded by the runner in **every** CI/local execution (`SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, `stacks/`, `tasks/`). Assembled by `buildAgentPrompt()`.
+- **`.agents/skills/`** — **Cursor/IDE** skills invoked manually (`/code-review-self`, `/megabrain`, `/solve-pr`).
 
-*Evidência:* `src/project/rules-map.ts`; `src/index.ts` ~144–147.
+Use the runner in production; use IDE skills for SDK-free dry-runs, conversational threads, or local GitHub fixes. Routing: [`../AGENTS.md`](../AGENTS.md) § Skills — Routing and Management; execution paths: [`workflows.md`](workflows.md).
 
----
+### How does tech-stack selection work?
 
-## 7. User Story, Task e contexto ADO
+**Answer:** Lets you focus the review on specific file extensions and load architecture/security recommendations for the selected stack. Configured explicitly via CLI `--stack` or env `AGENTIC_CODE_REVIEWERS_STACK`. Unknown stack → fail-fast. If the env value contains an unexpanded ADO macro (like `$(AGENTIC_CODE_REVIEWERS_STACK)`) the runner auto-resolves to the default. If no stack/env is set, the runner tries to auto-detect.
 
-### Em que momento User Story e Task são recuperados?
+*Evidence:* `src/config.ts`; `test/config.test.ts`.
 
-**Resposta:** Somente com `hasAdoContext` (org, project, repo, `pullRequestId`, token). Na etapa **“Coletando contexto Azure DevOps”**, **em paralelo** com threads e descrição da PR — **depois** do diff/rules e **antes** do prompt/agente. Ordem: config → git/diff → rules → **ADO (WI + PR + threads)** → prompt → agente.
+### How does automatic stack auto-detection work?
 
-*Evidência:* `src/index.ts` ~187–195 (`Promise.all` de `getPullRequestWorkItemContext`, `getPullRequestReviewContext`, `getPullRequestContext`).
+**Answer:** The runner inspects the repo root (`repoRoot`) looking for specific files or packages declared in `package.json`:
 
-### Como a API busca User Story / Task?
+1. **PHP/Laravel:** `artisan` file or `composer.json`.
+2. **Next.js/React:** `next.config.js`/`next.config.mjs`/`next.config.ts`, or the `next` package in `package.json`.
+3. **ABP/Angular:** `angular.json`, an `angular/` directory, or the `@angular/core` dependency.
+4. **TypeScript:** `tsconfig.json` or the `typescript`/`tsx` package.
+5. **C#/.NET (ABP/Angular):** `.sln` or `.csproj` files.
 
-**Resposta:** (1) `GET .../pullRequests/{id}/workitems` → IDs linkados à PR; (2) `GET .../wit/workitems?ids=...&$expand=all` → detalhes. Por item: tipo, título, estado, descrição, critérios de aceite (se houver). Limite default: **10** work items.
+If none of the heuristics identify a stack, the runner assumes `ABP/Angular` as a fallback. The startup log explicitly states which stack is active and where it came from (`CLI`, `env`, `auto-detected`, or `default fallback`).
 
-*Evidência:* `src/ado/work-items.ts` — `getPullRequestWorkItemContext`; log `formatWorkItemsLoadedLogMessage`.
+*Evidence:* `src/config.ts`; `src/index.ts`; `test/config.test.ts`.
 
-### User Story e Task fazem parte do `SYSTEM_PROMPT.md`?
+### Which stacks are supported by default and what they filter?
 
-**Resposta:** **Não.** `skills/SYSTEM_PROMPT.md` é **estático** (contrato JSON, score/severity). US/Task vêm da **API ADO em runtime** e entram no prompt composto ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)).
+**Answer:**
 
-| Camada | Varia por PR? |
-|--------|---------------|
-| `SYSTEM_PROMPT.md` + `CODE_REVIEW.md` | Não |
-| Descrição PR, work items, threads, diff, rules | **Sim** |
+- **ABP/Angular** (default): filters `.cs`, `.ts`, `.html` (100% backward compatibility).
+- **PHP/Laravel**: filters `.php`, `.js`, `.ts`, `.vue`, `.html`, `.css`, `.json`.
+- **Next.js/React**: filters `.ts`, `.tsx`, `.js`, `.jsx`, `.html`, `.css`, `.json`.
+- **TypeScript**: filters `.ts`, `.json`.
 
-### Onde US/Task entram no prompt composto?
+*Evidence:* `src/config.ts`.
 
-**Resposta:** `buildAgentPrompt` concatena um **único string** (sem system message separado). Ordem relevante: (6) descrição PR; (8) workflow duas fases; **(9) `workItemContext`** — seção `## Linked Work Items`; (10) threads do bot. Work items ficam **perto do final**, após instruções das fases, antes das threads.
+### How does the stack behave in E2E tests (`--seed-test`)?
 
-*Evidência:* `src/agent/prompt.ts` ~246–252; formato em `work-items.ts`.
+**Answer:** When `--seed-test` is set, the runner ignores any env-configured stack and forces `ABP/Angular`. This prevents C# and Angular validation fixtures from being filtered out and failing local tests.
 
-### PR ID é o mesmo que Work Item ID?
+*Evidence:* `src/config.ts`; `test/config.test.ts`.
 
-**Resposta:** **Não.** A seção da PR avisa explicitamente: ID da PR (#610) ≠ IDs de US/Task (#2418) em `Linked Work Items`.
+### How are per-stack recommendation files embedded?
 
-*Evidência:* `buildPullRequestContextForLlm` em `src/ado/pull-request.ts`.
+**Answer:** During prompt assembly, the runner reads the static recommendations from `skills/stacks/<stack-name>.md` (e.g. `typescript.md` or `php-laravel.md`) and appends its content to the `# Stack-specific recommendations (<name>)` section in the final agent prompt.
 
-### Como o agente usa US/Task no code-review?
-
-**Resposta:** Fase 1 incorpora descrição PR, work items e threads como **contexto de escopo**. Fase 2 confronta diff com critérios de aceite. AC evidente faltando → tendência `critical`; parcial → `warning`. O WI é **contexto**, não checklist infinita — o agente não inventa requisitos. Planos locais (`.cursor/plans/`) **não** são buscados automaticamente; só se lidos via tools na Fase 2.
-
-*Evidência:* `buildTwoPhaseWorkflow` em `src/agent/prompt.ts`; `scripts/code-review/prompts/exemplo.codereviewprompt.md`.
-
-### E se não houver work items linkados?
-
-**Resposta:** Sem WIs na PR → `contextForLlm = ''` (seção omitida). Sem contexto ADO (dry-run sem `--pr-id`) → nenhuma chamada API. Falha na API → warning no log; review **continua** sem WI.
-
-*Evidência:* `getPullRequestWorkItemContext` — retorno vazio ou catch.
-
-### Quais permissões ADO são necessárias para work items?
-
-**Resposta:** Build Service precisa **View work items in this node** (Read) e **Contribute to pull requests** para publicar threads.
-
-*Evidência:* `README.md` § “Pré-requisitos no Azure DevOps”.
+*Evidence:* `src/agent/prompt.ts`; `test/prompt.test.ts`.
 
 ---
 
-## 8. Montagem do prompt (system_prompt vs runtime)
+## 5. Git, diff and file selection
 
-### Como o prompt final é montado?
+### What diff is used?
 
-**Resposta:** `buildAgentPrompt` concatena seções nesta ordem: (1) `SYSTEM_PROMPT.md`; (2) `CODE_REVIEW.md`; (3) contexto de execução; (4) rules pré-mapeadas; (5) diff; (6) descrição PR; (7) seed test (se `--seed-test`); (8) workflow duas fases + veredito; (9) work items; (10) threads existentes. Posições **1–2** são estáticas; **3–10** são runtime (git, ADO, threads).
+**Answer:** Local: `{targetRef}...HEAD`. CI: `origin/{target}...origin/{source}` after fetch. With `--include-uncommitted`: adds working tree vs `HEAD`.
 
-*Evidência:* `src/agent/prompt.ts` — `buildAgentPrompt`.
+*Evidence:* `src/git/diff.ts`.
 
-### O harness do projeto (`AGENTS.md`, skill `code-review`, `docs/`) entra colado no prompt?
+### Which files enter the review?
 
-**Resposta:** **Não.** O agente **lê via tools** na Fase 2. Só entram colados: `SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, diff, rules pré-mapeadas e contexto ADO.
+**Answer:** Include: per stack (default `**/*.cs`, `**/*.ts`, `**/*.html`). Exclude: proxies, bin/obj, `.md`, `.csproj`, the runner directory (legacy: `scripts/cursor-reviewer/**`) — anti self-review. Only **AMR** files in the diff.
 
-*Evidência:* `src/agent/prompt.ts`; `skills/CODE_REVIEW.md`.
+*Evidence:* `src/config.ts`; `src/git/diff.ts`.
 
----
+### How does the diff enter the prompt?
 
-## 9. Engine de Execução
+**Answer:** `buildDiffPromptSection` — up to **100 KB** embedded (`full` or `per-file`); above that the agent completes it via tools.
 
-### Como o agente é executado tecnicamente?
+*Evidence:* `src/git/diff-prompt.ts` — `MAX_DIFF_PROMPT_BYTES = 100_000`.
 
-**Resposta:** `runCodeReviewAgent` monta o prompt → `Agent.create` (apiKey, model, opções `local`) → `agent.send(prompt)` → stream de eventos → `run.wait()` → texto final em `result.result`.
+### What's the difference between local and CI mode?
 
-*Evidência:* `src/agent/runner.ts`; `src/engine/` (`getEngine`, `ExecutionEngine.run`).
+**Answer:** Local uses the current branch as source; CI uses remote refs after fetch in detached HEAD. ADO token in the next step: local PAT or `SYSTEM_ACCESSTOKEN` in the pipeline.
 
-### Quais opções locais o agente usa?
-
-**Resposta:** `cwd` = `repoRoot`; `settingSources: ['project']` (harness via tools); sandbox read-only default (`AGENTIC_CODE_REVIEWERS_SANDBOX=false` desativa); `enableAgentRetries: true`.
-
-*Evidência:* `buildLocalOptions` em `src/engine/cursor-sdk/stream.ts`.
-
-### O agente pode alterar arquivos?
-
-**Resposta:** **Não** — três camadas: (1) prompt proíbe edição; (2) sandbox SDK; (3) runner não implementa auto-fix. Se sandbox não for suportado, reexecuta **sem sandbox** mantendo contrato read-only do prompt.
-
-*Evidência:* `skills/SYSTEM_PROMPT.md`; `src/engine/cursor-sdk/stream.ts` — `isSandboxUnsupportedError`.
-
-### Qual o timeout padrão?
-
-**Resposta:** **10 minutos** (`AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`). Ao estourar, chama `run.cancel()`.
-
-*Evidência:* `DEFAULT_TIMEOUT_MS` em `src/engine/cursor-sdk/stream.ts` e `src/engine/opencode/stream.ts`.
-
-### Qual modelo LLM é usado?
-
-**Resposta:** Default **`composer-2.5`**. Prioridade: `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default. Detalhes: [§4](#4-configuração-e-pré-requisitos).
-
-*Evidência:* `src/engine/cursor-sdk/model.ts`, `src/engine/opencode/model.ts`; `src/config.ts`.
+*Evidence:* `README.md` § git modes; [`workflows.md`](workflows.md).
 
 ---
 
-## 10. Análise em duas fases
+## 6. Pre-mapped rules
 
-### Quantas fases de análise existem?
+### What are pre-mapped rules?
 
-**Resposta:** **Duas** na **mesma** chamada ao agente (não são dois agentes separados). Detalhes: [`two-phase-execution-model.md`](two-phase-execution-model.md).
+**Answer:** After the diff, `buildRulesMap` reads `.cursor/rules/*.mdc` and includes rules whose globs match changed files (+ `alwaysApply: true`).
 
-### O que é a Fase 1 — Triagem?
+### Where do they enter the prompt?
 
-**Resposta:** Mapa de **hipóteses** `(arquivo, linha, hipótese)` — sem veredito final. Usa diff embutido ou `git diff`; incorpora PR, work items e threads ([§7](#7-user-story-task-e-contexto-ado)). Descarta nits, estilo e teoria sem runtime. Em `*.html`: ignora layout/CSS; foca segurança, permissões, bindings.
+**Answer:** In the "execution context" section of the prompt ([§8](#8-prompt-assembly-system_prompt-vs-runtime)) — **not** in `SYSTEM_PROMPT.md`.
 
-*Evidência:* `buildTwoPhaseWorkflow` em `src/agent/prompt.ts` § Fase 1.
+### Can the agent read more rules later?
 
-### O que é a Fase 2 — Investigação?
+**Answer:** **Yes**, in Phase 2 via tools (`settingSources: ['project']`).
 
-**Resposta:** Por candidato, **provar com tools** antes de publicar: (2.1) ler rules + skill `code-review`; (2.2) expandir contexto (entidade, AppService, EF, Angular, testes); (2.3) **4 provas obrigatórias** em `analysis` + `impactPaths`; (2.4) atribuir severity/score; filtrar score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6); (2.5) generalizar por classe (`grep`/`glob` por ocorrências irmãs). Sem as 4 provas → **não entra** em `reviews`.
-
-*Evidência:* `src/agent/prompt.ts` § Fase 2; `.agents/skills/code-review/SKILL.md`.
-
-### Por que “completude na mesma rodada”?
-
-**Resposta:** Evitar loop infinito fix→review. O mandato é listar **todos** os achados materiais de uma vez ou `"reviews": []`.
-
-*Evidência:* `skills/SYSTEM_PROMPT.md` § “Missão”; passo 2.5 em `prompt.ts`.
+*Evidence:* `src/project/rules-map.ts`; `src/index.ts` ~144–147.
 
 ---
 
-## 11. Score, severidade e o que vira thread
+## 7. User Story, Task and ADO context
 
-### Existe fórmula de cálculo do score?
+### When are User Story and Task retrieved?
 
-**Resposta:** **Não.** O agente **atribui** score (0–10) e severity qualitativamente. O TypeScript só aceita **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** para publicação (default **6–10**). Documentação completa: [`score_calc.md`](score_calc.md).
+**Answer:** Only with `hasAdoContext` (org, project, repo, `pullRequestId`, token). In the **"Collecting Azure DevOps context"** step, **in parallel** with threads and PR description — **after** diff/rules and **before** prompt/agent. Order: config → git/diff → rules → **ADO (WI + PR + threads)** → prompt → agent.
 
-*Evidência:* `src/ado/review-validation.ts` — `DEFAULT_SCORE_MIN = 6`; `src/config.ts` — `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min`; `skills/SYSTEM_PROMPT.md`.
+*Evidence:* `src/index.ts` ~187–195 (`Promise.all` of `getPullRequestWorkItemContext`, `getPullRequestReviewContext`, `getPullRequestContext`).
 
-### Quais scores são publicados?
+### How does the API fetch User Story / Task?
 
-**Resposta:** Com o default (`AGENTIC_CODE_REVIEWERS_SCORE_MIN=6`): 0–5 → não publica; 6–8 → `warning` ou `suggestion`; 9–10 → `critical`. Com `AGENTIC_CODE_REVIEWERS_SCORE_MIN` menor (ex.: `4`), scores 4–5 também podem virar thread se passarem no gate completo.
+**Answer:** (1) `GET .../pullRequests/{id}/workitems` → IDs linked to the PR; (2) `GET .../wit/workitems?ids=...&$expand=all` → details. Per item: type, title, state, description, acceptance criteria (if any). Default limit: **10** work items.
 
-*Evidência:* `src/ado/review-validation.ts`; [`score_calc.md`](score_calc.md).
+*Evidence:* `src/ado/work-items.ts` — `getPullRequestWorkItemContext`; log `formatWorkItemsLoadedLogMessage`.
 
-### Como configurar o limiar de publicação (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`)?
+### Are User Story and Task part of `SYSTEM_PROMPT.md`?
 
-**Resposta:** Opcional. Env `AGENTIC_CODE_REVIEWERS_SCORE_MIN=N` ou CLI `--score-min N` (precedência: CLI &gt; env &gt; default `6`). **Omitir** ambos mantém pipelines existentes intactas — sem breaking change. O valor é injetado no prompt (`buildExecutionContext`, Fase 2.4), aplicado em `isPublishableReview` e em Safe Outputs (`severity-score`).
+**Answer:** **No.** `skills/SYSTEM_PROMPT.md` is **static** (JSON contract, score/severity). US/Task come from the **ADO API at runtime** and enter the composed prompt ([§8](#8-prompt-assembly-system_prompt-vs-runtime)).
 
-*Evidência:* `src/config.ts`; `src/agent/prompt.ts`; `src/ado/safe-outputs.ts`; `README.md`.
+| Layer | Varies per PR? |
+|-------|----------------|
+| `SYSTEM_PROMPT.md` + `CODE_REVIEW.md` | No |
+| PR description, work items, threads, diff, rules | **Yes** |
 
-### O `score_min` vale igual para cursor-sdk e opencode?
+### Where do US/Task enter the composed prompt?
 
-**Resposta:** **Sim.** Ambas as engines usam o mesmo `config.scoreMin` via `buildAgentPrompt` e `parseCodeReviewResponse`. Não há limiar separado por engine.
+**Answer:** `buildAgentPrompt` concatenates a **single string** (no separate system message). Relevant order: (6) PR description; (8) two-phase workflow; **(9) `workItemContext`** — `## Linked Work Items` section; (10) bot threads. Work items sit **near the end**, after the phase instructions, before threads.
 
-*Evidência:* `src/agent/runner.ts`; `src/index.ts`.
+*Evidence:* `src/agent/prompt.ts` ~246–252; format in `work-items.ts`.
 
-### Por que um review score 5 não virou thread com `SCORE_MIN=4`?
+### Is PR ID the same as a Work Item ID?
 
-**Resposta:** Verifique: (1) `severity`/`score` consistentes no Safe Outputs; (2) `analysis` com 4 seções numeradas; (3) linha no diff (`REQUIRE_DIFF_LINE`); (4) path protegido; (5) agente omitiu no JSON (filtro prompt). Logs: `Policy: N review(s) descartado(s)` e `Safe Outputs: N review(s) descartado(s)`.
+**Answer:** **No.** The PR section explicitly warns: PR ID (#610) ≠ US/Task IDs (#2418) in `Linked Work Items`.
 
-*Evidência:* `post-comments.ts`; `safe-outputs.ts`.
+*Evidence:* `buildPullRequestContextForLlm` in `src/ado/pull-request.ts`.
 
----
+### How does the agent use US/Task in code review?
 
-## 12. Resposta JSON e parser
+**Answer:** Phase 1 incorporates PR description, work items and threads as **scope context**. Phase 2 confronts the diff with the acceptance criteria. Evident AC missing → `critical` tendency; partial → `warning`. The WI is **context**, not an infinite checklist — the agent doesn't invent requirements. Local plans (`.cursor/plans/`) are **not** fetched automatically; only if read via tools in Phase 2.
 
-### Qual o formato JSON esperado?
+*Evidence:* `buildTwoPhaseWorkflow` in `src/agent/prompt.ts`; `scripts/code-review/prompts/exemplo.codereviewprompt.md`.
 
-**Resposta:** Objeto com `reviews[]` (fileName, lineNumber, severity, comment, score, developerAction, analysis, impactPaths, suggestedFix?), `resolvedThreads[]` e `reviewSummary`.
+### What if there are no linked work items?
 
-*Evidência:* `skills/SYSTEM_PROMPT.md`; `src/ado/types.ts`.
+**Answer:** No WIs on the PR → `contextForLlm = ''` (section omitted). No ADO context (dry-run without `--pr-id`) → no API call. API failure → warning in the log; review **continues** without WIs.
 
-### Como o JSON é extraído da saída do agente?
+*Evidence:* `getPullRequestWorkItemContext` — empty return or catch.
 
-**Resposta:** `extractJsonFromAgentOutput`: (1) preferência — último bloco ` ```json ` válido; (2) fallback — último objeto `{...}` balanceado com `"reviews"`; (3) sanitização se `JSON.parse` falhar. Depois `parseCodeReviewResponse` aplica `filterPublishableReviews`.
+### Which ADO permissions are needed for work items?
 
-*Evidência:* `src/parser/review-response.ts` — `extractJsonFromAgentOutput`.
+**Answer:** Build Service needs **View work items in this node** (Read) and **Contribute to pull requests** to publish threads.
 
----
-
-## 13. Orçamento de rodadas e escalonamento
-
-### Por que existe escalonamento de rodadas?
-
-**Resposta:** Evitar loop infinito **correção ↔ reviewer** (manual, `solve-pr`, auto-fix CI) quando issues residuais persistem após várias rodadas.
-
-### Como funciona o escalonamento?
-
-**Resposta:** Contador em thread geral (`<!-- reviewer-round-state -->`). `currentRound = rodadasAnteriores + 1`. Se `currentRound > maxRounds` **e** há issues abertas: publica **só** `critical`; suprime novos `warning`/`suggestion`; avisa **revisão humana recomendada**. Default `maxRounds`: **10** (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; `0` desabilita).
-
-*Evidência:* `src/ado/round-state.ts`; `src/index.ts` ~261–283; `src/config.ts` — `DEFAULT_MAX_ROUNDS = 10`.
+*Evidence:* `README.md` § Azure DevOps prerequisites.
 
 ---
 
-## 14. Publicação no Azure DevOps
+## 8. Prompt assembly (system_prompt vs runtime)
 
-### Quando uma review vira thread?
+### How is the final prompt assembled?
 
-**Resposta:** Quando passa em `isPublishableReview` (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6, campos OK) **e** não é duplicata na mesma linha.
+**Answer:** `buildAgentPrompt` concatenates sections in this order: (1) `SYSTEM_PROMPT.md`; (2) `CODE_REVIEW.md`; (3) execution context; (4) pre-mapped rules; (5) diff; (6) PR description; (7) seed test (if `--seed-test`); (8) two-phase workflow + verdict; (9) work items; (10) existing threads. Positions **1–2** are static; **3–10** are runtime (git, ADO, threads).
 
-*Evidência:* `src/ado/post-comments.ts` — `setPullRequestComments`, `isDuplicateReview`.
+*Evidence:* `src/agent/prompt.ts` — `buildAgentPrompt`.
 
-### Qual o formato da thread publicada?
+### Does the project harness (`AGENTS.md`, code-review skill, `docs/`) get pasted into the prompt?
 
-**Resposta:** `Agentic Code Reviewer {engine}` + emoji/severity + comentário + correção sugerida (opcional) + `<details>` com score, análise e caminhos. A tag é derivada de `AGENTIC_CODE_REVIEWERS_ENGINE` (ex.: `Agentic Code Reviewer cursor-sdk`). **Não** usa ` ```suggestion ` — ADO não aplica sugestões inline como GitHub.
+**Answer:** **No.** The agent **reads via tools** in Phase 2. Only these are pasted: `SYSTEM_PROMPT.md`, `CODE_REVIEW.md`, diff, pre-mapped rules and ADO context.
 
-*Evidência:* `formatCommentForPosting` em `src/ado/format-thread.ts`.
-
-### Como funciona a política `reviews` vs `reviewSummary`?
-
-**Resposta:** `score_min` define quais achados viram **threads** na PR (auto-fix lê só threads). O comentário de resumo é publicado **no final** do review, após resolver/publicar threads, quando **não restam** threads ativas/pendentes do bot — mensagem fixa (`CLEAN_PR_SUMMARY_MESSAGE`); texto do LLM ignorado.
-
-*Evidência:* `shouldPostReviewSummary` e `getCodeReviewPostingPlan` em `src/ado/post-comments.ts`; `src/index.ts` (refresh antes do resumo).
-
-### O que aparece na build do Azure DevOps?
-
-**Resposta:** Com `TF_BUILD=true`, emite `##vso[task.logissue]` por achado e `##vso[task.uploadsummary]` com markdown — **sem alterar exit code**.
-
-*Evidência:* `src/ado/pipeline-logging.ts`; `src/index.ts` ~424.
+*Evidence:* `src/agent/prompt.ts`; `skills/CODE_REVIEW.md`.
 
 ---
 
-## 15. Threads, dedup e resolução
+## 9. Execution engine
 
-### Como funciona o dedup de publicação?
+### How is the agent executed technically?
 
-**Resposta:** Chave `caminhoNormalizado|line:N` — não reposta na mesma linha se já existir thread **active/pending** do bot.
+**Answer:** `runCodeReviewAgent` builds the prompt → `Agent.create` (apiKey, model, `local` options) → `agent.send(prompt)` → event stream → `run.wait()` → final text in `result.result`.
 
-*Evidência:* `src/ado/review-context.ts` (`existingKeys`); `isDuplicateReview` em `post-comments.ts`.
+*Evidence:* `src/agent/runner.ts`; `src/engine/` (`getEngine`, `ExecutionEngine.run`).
 
-### Quais threads entram no prompt?
+### Which local options does the agent use?
 
-**Resposta:** Bot active/pending → sim (prompt + dedup). Bot resolvidas → sim (memória anti re-litígio), sem dedup. Humanos/outros bots → não.
+**Answer:** `cwd` = `repoRoot`; `settingSources: ['project']` (harness via tools); read-only sandbox default (`AGENTIC_CODE_REVIEWERS_SANDBOX=false` disables); `enableAgentRetries: true`.
 
-*Evidência:* `docs/flow-analysis.md` § “Threads ADO”.
+*Evidence:* `buildLocalOptions` in `src/engine/cursor-sdk/stream.ts`.
 
-### Como threads antigas são resolvidas?
+### Can the agent modify files?
 
-**Resposta:** O agente retorna `resolvedThreads` com `threadId` ou `fileName`+`lineNumber` **somente se verificou** a correção via tools — não porque a linha sumiu do diff. O runner posta reply com `<!-- resolution-reply -->` e status `fixed`.
+**Answer:** **No** — three layers: (1) prompt forbids editing; (2) SDK sandbox; (3) the runner doesn't implement auto-fix in this path. If the sandbox is unsupported, it retries **without sandbox** keeping the read-only contract from the prompt.
 
-*Evidência:* `resolvePullRequestReviewThreads` em `src/ado/post-comments.ts`; `src/git/markers.ts`.
+*Evidence:* `skills/SYSTEM_PROMPT.md`; `src/engine/cursor-sdk/stream.ts` — `isSandboxUnsupportedError`.
+
+### What's the default timeout?
+
+**Answer:** **10 minutes** (`AGENTIC_CODE_REVIEWERS_TIMEOUT_MS`). On expiry, calls `run.cancel()`.
+
+*Evidence:* `DEFAULT_TIMEOUT_MS` in `src/engine/cursor-sdk/stream.ts` and `src/engine/opencode/stream.ts`.
+
+### Which LLM model is used?
+
+**Answer:** Default **`composer-2.5`**. Precedence: `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default. Details: [§4](#4-configuration-and-prerequisites).
+
+*Evidence:* `src/engine/cursor-sdk/model.ts`, `src/engine/opencode/model.ts`; `src/config.ts`.
 
 ---
 
-## 16. Pipeline CI e códigos de saída
+## 10. Two-phase analysis
 
-### Quais são os exit codes?
+### How many analysis phases are there?
 
-**Resposta:** **0** — execução concluída (com ou sem issues). **1** — erro fatal (config, PAT/API key, ADO, agente). O gate interno (`evaluateGate`) reporta “COM ISSUES PENDENTES” mas **não** muda exit para 1.
+**Answer:** **Two** in the **same** agent call (not two separate agents). Details: [`two-phase-execution-model.md`](two-phase-execution-model.md).
 
-*Evidência:* `src/ado/gate.ts`; `src/index.ts`; `README.md` § “Códigos de saída”.
+### What is Phase 1 — Triage?
 
-### O que o dry-run faz em relação ao exit code?
+**Answer:** A **hypothesis** map `(file, line, hypothesis)` — no final verdict. Uses the embedded diff or `git diff`; incorporates PR, work items and threads ([§7](#7-user-story-task-and-ado-context)). Discards nits, style and theory without runtime. On `*.html`: ignores layout/CSS; focuses on security, permissions, bindings.
 
-**Resposta:** Simula JSON, preview de threads e resoluções; **sem POST** no ADO. Exit **0** salvo erro de execução.
+*Evidence:* `buildTwoPhaseWorkflow` in `src/agent/prompt.ts` § Phase 1.
 
-*Evidência:* `src/index.ts` bloco `if (config.dryRun)`.
+### What is Phase 2 — Investigation?
+
+**Answer:** Per candidate, **prove with tools** before publishing: (2.1) read rules + code-review skill; (2.2) expand context (entity, AppService, EF, Angular, tests); (2.3) **4 mandatory proofs** in `analysis` + `impactPaths`; (2.4) assign severity/score; filter score &lt; `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6); (2.5) generalize by class (`grep`/`glob` for sibling occurrences). Without the 4 proofs → **not in** `reviews`.
+
+*Evidence:* `src/agent/prompt.ts` § Phase 2; `.agents/skills/code-review/SKILL.md`.
+
+### Why "completeness in the same round"?
+
+**Answer:** To avoid the infinite fix→review loop. The mandate is to list **all** material findings at once or `"reviews": []`.
+
+*Evidence:* `skills/SYSTEM_PROMPT.md` § "Mission"; step 2.5 in `prompt.ts`.
+
+---
+
+## 11. Score, severity and what becomes a thread
+
+### Is there a score formula?
+
+**Answer:** **No.** The agent **assigns** score (0–10) and severity qualitatively. TypeScript only accepts **AGENTIC_CODE_REVIEWERS_SCORE_MIN–10** for publication (default **6–10**). Full doc: [`score_calc.md`](score_calc.md).
+
+*Evidence:* `src/ado/review-validation.ts` — `DEFAULT_SCORE_MIN = 6`; `src/config.ts` — `AGENTIC_CODE_REVIEWERS_SCORE_MIN` / `--score-min`; `skills/SYSTEM_PROMPT.md`.
+
+### Which scores are published?
+
+**Answer:** With the default (`AGENTIC_CODE_REVIEWERS_SCORE_MIN=6`): 0–5 → not published; 6–8 → `warning` or `suggestion`; 9–10 → `critical`. With a lower `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (e.g. `4`), scores 4–5 may also become threads if they pass the full gate.
+
+*Evidence:* `src/ado/review-validation.ts`; [`score_calc.md`](score_calc.md).
+
+### How do I configure the publication threshold (`AGENTIC_CODE_REVIEWERS_SCORE_MIN`)?
+
+**Answer:** Optional. Env `AGENTIC_CODE_REVIEWERS_SCORE_MIN=N` or CLI `--score-min N` (precedence: CLI > env > default `6`). **Omitting** both keeps existing pipelines intact — no breaking change. The value is injected into the prompt (`buildExecutionContext`, Phase 2.4), applied in `isPublishableReview` and in Safe Outputs (`severity-score`).
+
+*Evidence:* `src/config.ts`; `src/agent/prompt.ts`; `src/ado/safe-outputs.ts`; `README.md`.
+
+### Is `score_min` the same for cursor-sdk and opencode?
+
+**Answer:** **Yes.** Both engines use the same `config.scoreMin` via `buildAgentPrompt` and `parseCodeReviewResponse`. There is no per-engine threshold.
+
+*Evidence:* `src/agent/runner.ts`; `src/index.ts`.
+
+### Why didn't a score-5 review become a thread with `SCORE_MIN=4`?
+
+**Answer:** Check: (1) consistent `severity`/`score` in Safe Outputs; (2) `analysis` with 4 numbered sections; (3) line in the diff (`REQUIRE_DIFF_LINE`); (4) protected path; (5) agent omitted it in JSON (prompt filter). Logs: `Policy: N review(s) discarded` and `Safe Outputs: N review(s) discarded`.
+
+*Evidence:* `post-comments.ts`; `safe-outputs.ts`.
+
+---
+
+## 12. JSON response and parser
+
+### What's the expected JSON format?
+
+**Answer:** Object with `reviews[]` (fileName, lineNumber, severity, comment, score, developerAction, analysis, impactPaths, suggestedFix?), `resolvedThreads[]` and `reviewSummary`.
+
+*Evidence:* `skills/SYSTEM_PROMPT.md`; `src/ado/types.ts`.
+
+### How is the JSON extracted from the agent output?
+
+**Answer:** `extractJsonFromAgentOutput`: (1) preference — last valid ```` ```json ```` fence; (2) fallback — last balanced `{...}` object with `"reviews"`; (3) sanitization if `JSON.parse` fails. Then `parseCodeReviewResponse` applies `filterPublishableReviews`.
+
+*Evidence:* `src/parser/review-response.ts` — `extractJsonFromAgentOutput`.
+
+---
+
+## 13. Round budget and escalation
+
+### Why is there round escalation?
+
+**Answer:** To avoid the infinite **fix ↔ reviewer** loop (manual, `solve-pr`, CI auto-fix) when residual issues persist after several rounds.
+
+### How does escalation work?
+
+**Answer:** Counter in a general thread (`<!-- reviewer-round-state -->`). `currentRound = previous rounds + 1`. If `currentRound > maxRounds` **and** there are open issues: publishes **only** `critical`; suppresses new `warning`/`suggestion`; warns **human review recommended**. Default `maxRounds`: **10** (`AGENTIC_CODE_REVIEWERS_MAX_ROUNDS`; `0` disables).
+
+*Evidence:* `src/ado/round-state.ts`; `src/index.ts` ~261–283; `src/config.ts` — `DEFAULT_MAX_ROUNDS = 10`.
+
+---
+
+## 14. Posting to Azure DevOps
+
+### When does a review become a thread?
+
+**Answer:** When it passes `isPublishableReview` (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6, fields OK) **and** it isn't a duplicate on the same line.
+
+*Evidence:* `src/ado/post-comments.ts` — `setPullRequestComments`, `isDuplicateReview`.
+
+### What's the format of the posted thread?
+
+**Answer:** `Agentic Code Reviewer {engine}` + emoji/severity + comment + suggested fix (optional) + `<details>` with score, analysis and paths. The tag is derived from `AGENTIC_CODE_REVIEWERS_ENGINE` (e.g. `Agentic Code Reviewer cursor-sdk`). **Does not** use ```` ```suggestion ```` — ADO doesn't apply inline suggestions like GitHub.
+
+*Evidence:* `formatCommentForPosting` in `src/ado/format-thread.ts`.
+
+### How does the `reviews` vs `reviewSummary` policy work?
+
+**Answer:** `score_min` defines which findings become **threads** on the PR (auto-fix reads only threads). The summary comment is posted **at the end** of the review, after resolving/posting threads, when **no remaining** active/pending bot threads — fixed message (`CLEAN_PR_SUMMARY_MESSAGE`); LLM text ignored.
+
+*Evidence:* `shouldPostReviewSummary` and `getCodeReviewPostingPlan` in `src/ado/post-comments.ts`; `src/index.ts` (refresh before summary).
+
+### What shows up on the Azure DevOps build?
+
+**Answer:** With `TF_BUILD=true`, emits `##vso[task.logissue]` per finding and `##vso[task.uploadsummary]` with markdown — **without changing the exit code**.
+
+*Evidence:* `src/ado/pipeline-logging.ts`; `src/index.ts` ~424.
+
+---
+
+## 15. Threads, dedup and resolution
+
+### How does publication dedup work?
+
+**Answer:** Key `normalizedPath\|line:N` — not re-posted on the same line if there's already an **active/pending** bot thread.
+
+*Evidence:* `src/ado/review-context.ts` (`existingKeys`); `isDuplicateReview` in `post-comments.ts`.
+
+### Which threads enter the prompt?
+
+**Answer:** Bot active/pending → yes (prompt + dedup). Bot resolved → yes (anti-re-litigation memory), without dedup. Humans/other bots → no.
+
+*Evidence:* [`flow-analysis.md`](flow-analysis.md) § ADO threads.
+
+### How are old threads resolved?
+
+**Answer:** The agent returns `resolvedThreads` with `threadId` or `fileName`+`lineNumber` **only if it verified** the fix via tools — not because the line disappeared from the diff. The runner posts a reply with `<!-- resolution-reply -->` and status `fixed`.
+
+*Evidence:* `resolvePullRequestReviewThreads` in `src/ado/post-comments.ts`; `src/git/markers.ts`.
+
+---
+
+## 16. Pipeline CI and exit codes
+
+### What are the exit codes?
+
+**Answer:** **0** — execution completed (with or without review issues). **1** — fatal error (config, PAT/API key, ADO, agent). The internal gate (`evaluateGate`) reports "WITH PENDING ISSUES" but **does not** change exit to 1.
+
+*Evidence:* `src/ado/gate.ts`; `src/index.ts`; `README.md` § exit codes.
+
+### What does dry-run do regarding the exit code?
+
+**Answer:** Simulates JSON, thread preview and resolutions; **no POST** to ADO. Exit **0** unless execution error.
+
+*Evidence:* `src/index.ts` `if (config.dryRun)` block.
 
 ---
 
 ## 17. Troubleshooting
 
-### Nenhum arquivo elegível no diff — o que fazer?
+### No eligible files in the diff — what to do?
 
-**Resposta:** O diff não contém `.cs`/`.ts`/`.html` revisáveis, ou tudo foi excluído (proxies, bin/obj, etc.).
+**Answer:** The diff contains no reviewable `.cs`/`.ts`/`.html` (per stack), or all were excluded (proxies, bin/obj, etc.).
 
-*Evidência:* `README.md` § Troubleshooting.
+*Evidence:* `README.md` § Troubleshooting.
 
-### Agente omitido mas pipeline continua — por quê?
+### Agent omitted but the pipeline continues — why?
 
-**Resposta:** Diff vazio com contexto ADO válido → pula agente; gate ainda lista threads pendentes do bot.
+**Answer:** Empty diff with valid ADO context → skips the agent; the gate still lists the bot's pending threads.
 
-*Evidência:* `src/index.ts` ~153–160, ~225–227.
+*Evidence:* `src/index.ts` ~153–160, ~225–227.
 
-### JSON inválido na resposta — como diagnosticar?
+### Invalid JSON in the response — how to diagnose?
 
-**Resposta:** Parser tenta fences + objetos balanceados + sanitização. Rode `--verbose` e inspecione saída bruta.
+**Answer:** The parser tries fences + balanced objects + sanitization. Run `--verbose` and inspect the raw output.
 
-*Evidência:* `src/parser/review-response.ts`.
+*Evidence:* `src/parser/review-response.ts`.
 
-### Threads não aparecem na PR — o que verificar?
+### Threads don't show up on the PR — what to check?
 
-**Resposta:** Score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6, não fixo 6 se configurado)? Campos obrigatórios? Safe Outputs (diff-line, analysis)? Dedup na mesma linha? Dry-run ativo? Build Service com “Contribute to pull requests”? OAuth token habilitado na pipeline?
+**Answer:** Score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6, not fixed 6 if configured)? Required fields? Safe Outputs (diff-line, analysis)? Dedup on same line? Dry-run active? Build Service with "Contribute to pull requests"? OAuth token enabled in the pipeline?
 
-*Evidência:* `review-validation.ts`, `safe-outputs.ts`, `post-comments.ts`, `README.md` § “Pré-requisitos no Azure DevOps”.
+*Evidence:* `review-validation.ts`, `safe-outputs.ts`, `post-comments.ts`, `README.md` § Azure DevOps prerequisites.
 
-### Reviewer aponta o próprio código (diretório do runner) — por quê?
+### The reviewer points at its own code (the runner directory) — why?
 
-**Resposta:** Exclude ativo por padrão (anti self-review). `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` só para desenvolver o runner.
+**Answer:** Exclude active by default (anti self-review). `AGENTIC_CODE_REVIEWERS_REVIEW_SELF=true` only for developing the runner.
 
-*Evidência:* `src/config.ts` — padrões exclude.
+*Evidence:* `src/config.ts` — exclude patterns.
 
-### Work items (US/Task) não aparecem no review — o que verificar?
+### Work items (US/Task) don't appear in the review — what to check?
 
-**Resposta:** PR tem work items **vinculados** no ADO? Contexto ADO completo + token? Dry-run **com** `--pr-id` e PAT? Se a API falhar, o runner loga warning e continua **sem** a seção `Linked Work Items`. Ver [§7](#7-user-story-task-e-contexto-ado).
+**Answer:** Are WIs **linked** to the PR in ADO? Full ADO context + token? Dry-run **with** `--pr-id` and PAT? If the API fails, the runner logs a warning and continues **without** the `Linked Work Items` section. See [§7](#7-user-story-task-and-ado-context).
 
-*Evidência:* `getPullRequestWorkItemContext` em `src/ado/work-items.ts`.
+*Evidence:* `getPullRequestWorkItemContext` in `src/ado/work-items.ts`.
 
-### Por que o bot re-levantou um issue já corrigido?
+### Why did the bot re-raise an already-fixed issue?
 
-**Resposta:** Só deve reabrir com **nova evidência**. Threads resolvidas entram no prompt como memória; o agente não deve duplicar sem prova.
+**Answer:** It should only re-open with **new evidence**. Resolved threads enter the prompt as memory; the agent shouldn't duplicate without proof.
 
-*Evidência:* `buildVerdictAndAdoPolicy` em `prompt.ts`; `flow-analysis.md`.
+*Evidence:* `buildVerdictAndAdoPolicy` in `prompt.ts`; `flow-analysis.md`.
+
+### `Resource not accessible by integration` when resolving threads on GitHub
+
+The default `GITHUB_TOKEN` of Actions **publishes** comments with `pull-requests: write`, but the GraphQL `resolveReviewThread` mutation is typically **rejected** for integration tokens — even on threads created by the bot itself.
+
+The runner treats this as a warning (does not fail the pipeline): the resolution reply may be posted, but the thread remains open in the UI.
+
+**To enable automatic resolution**, configure a PAT (classic `repo` or fine-grained `pull_requests: write`) as the secret `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` in the repository. The `code-review.yml` and `review-remote.yml` workflows use that secret when present; otherwise they fall back to `github.token`.
+
+```yaml
+# .github/workflows/code-review.yml (already supported)
+AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
+```
+
+### OpenCode stops after `Session created` with no progress
+
+1. Confirm `opencode` is in `PATH` and credentials (`auth.json` or `OPENCODE_API_KEY`) exist.
+2. Enable logs: `AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL=DEBUG` (default).
+3. Verify the preferred port is free, or use `AGENTIC_CODE_REVIEWERS_OPENCODE_PORT=0` or let the runner pick a free port automatically.
+4. In non-interactive CI, do **not** use `ask` permissions — the runner denies automatically in the embedded config.
+
+### `HeadersTimeoutError` / `fetch failed` with OpenCode
+
+`session.prompt` only returns HTTP when the agent finishes (tool calls + LLM). The OpenCode client uses `undici.fetch` with `headersTimeout`/`bodyTimeout` equal to `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` (default 10 min), cancellation via `AbortSignal` and recursive detection of `UND_ERR_HEADERS_TIMEOUT`/`UND_ERR_BODY_TIMEOUT`. If the review takes longer, bump it:
+
+```bash
+AGENTIC_CODE_REVIEWERS_TIMEOUT_MS=1200000 npm run review -- --dry-run --engine opencode ...
+```
 
 ---
 
-## 18. Auto-Fix e self-healing
+## 18. Auto-fix and self-healing
 
-### O reviewer corrige código automaticamente?
+### Does the reviewer fix code automatically?
 
-**Resposta:** O **review padrão** (`npm run review`) é **read-only**. Correção automática existe no modo **`--auto-fix`** (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) ou na pipeline [`auto-fix.yml`](../.github/workflows/auto-fix.yml): subagentes por arquivo aplicam replacements, commit local, **build de validação**, resolução de threads e push.
+**Answer:** The **standard review** (`npm run review`) is **read-only**. Automatic fixing exists in the **`--auto-fix`** mode (`AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`) or in the [`auto-fix.yml`](../.github/workflows/auto-fix.yml) pipeline: per-file sub-agents apply replacements, local commit, **validation build**, thread resolution and push.
 
-*Evidência:* `src/index.ts` (`config.autoFix`); `src/orchestrator/autofix-runner.ts`; [`auto-fix.md`](auto-fix.md).
+*Evidence:* `src/index.ts` (`config.autoFix`); `src/orchestrator/autofix-runner.ts`; [`auto-fix.md`](auto-fix.md).
 
-### Qual a diferença entre auto-fix (CI) e skill `solve-pr`?
+### What's the difference between auto-fix (CI) and the `solve-pr` skill?
 
-**Resposta:** **Auto-fix CI** — acionado por `workflow_run` após code review; usa `run.sh --auto-fix` com engines configuradas; corrige somente threads do bot. **`solve-pr`** — skill IDE (`.agents/skills/solve-pr/`) para operador local: busca **todas** as threads abertas da PR, corrige, commit/push manualmente. Ambos exigem token com escrita na PR.
+**Answer:** **Auto-fix CI** — triggered by `workflow_run` after code review; uses `run.sh --auto-fix` with configured engines; fixes only bot threads. **`solve-pr`** — IDE skill (`.agents/skills/solve-pr/`) for the local operator: fetches **all** open threads on the PR, fixes them, manually commits/pushes. Both require a token with PR write access.
 
-*Evidência:* `AGENTS.md` § Skills routing.
+*Evidence:* `AGENTS.md` § Skills routing; [`workflows.md`](workflows.md) § Auto-fix and § solve-pr.
 
-### Por que o loop review → fix → review parou após a primeira correção?
+### Why did the review → fix → review loop stop after the first fix?
 
-**Resposta:** (1) `GITHUB_TOKEN` padrão não re-dispara workflows — use PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix não produziu commit (working tree limpa); (3) `MAX_ROUNDS` escalonou para handoff humano; (4) build pós-commit ou push falhou — o job auto-fix termina com exit ≠ 0 (verifique logs do engine e do step “Fail if all configured auto-fix engines failed”).
+**Answer:** (1) Default `GITHUB_TOKEN` doesn't re-trigger workflows — use a PAT (`AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`); (2) auto-fix produced no commit (clean working tree); (3) `MAX_ROUNDS` escalated to human handoff; (4) post-commit build or push failed — the auto-fix job ends with exit ≠ 0 (check engine logs and the "Fail if all configured auto-fix engines failed" step).
 
-*Evidência:* [`auto-fix.md`](auto-fix.md); `.github/workflows/auto-fix.yml`.
+*Evidence:* [`auto-fix.md`](auto-fix.md); `.github/workflows/auto-fix.yml`.
 
-### O auto-fix resolve todas as threads de um arquivo de uma vez?
+### Does auto-fix resolve all threads of a file at once?
 
-**Resposta:** **Não necessariamente.** Só threads cujo **conteúdo na linha** mudou após os replacements são marcadas como resolvidas. Threads dentro de um intervalo amplo mas sem alteração na linha permanecem abertas.
+**Answer:** **Not necessarily.** Only threads whose **line content** changed after the replacements are marked as resolved. Threads inside a wide range but with no change on their line remain open.
 
-*Evidência:* `isThreadLineModified` em `autofix-runner.ts`; `test/autofix.test.ts`.
+*Evidence:* `isThreadLineModified` in `autofix-runner.ts`; `test/autofix.test.ts`.
 
-### Posso rodar auto-fix localmente?
+### Can I run auto-fix locally?
 
-**Resposta:** Sim, com contexto de PR e token:
+**Answer:** Yes, with PR context and a token:
 
 ```bash
 npm run review -- --gh --pr-id 42 --source-branch feat/x --target-branch main --auto-fix
 ```
 
-Use `--dry-run` no runner de review para validar threads sem publicar; auto-fix respeita `dryRun` (simula commit/resolução).
+Use `--dry-run` on the review runner to validate threads without publishing; auto-fix respects `dryRun` (simulates commit/resolution).
 
-*Evidência:* `src/config.ts` — `--auto-fix`; `autofix-runner.ts`.
+*Evidence:* `src/config.ts` — `--auto-fix`; `autofix-runner.ts`.
 
-### O que um agente/desenvolvedor deve atualizar ao mudar o runner?
+### What should an agent/developer update when changing the runner?
 
-**Resposta:** Toda alteração de comportamento exige **testes** (`npm test`) **e** documentação em sync no mesmo PR: `AGENTS.md`, `README.md`, `docs/` afetados (`faq.md`, `index.md`, `flow-analysis.md`, `score_calc.md`, `auto-fix.md`), `skills/` se prompts/gates mudarem, `.env.example` se env vars mudarem, workflows/exemplos se CI mudar. Ver [`AGENTS.md`](../AGENTS.md) § Definition of Done.
+**Answer:** Every behavior change requires **tests** (`npm test`) **and** documentation in sync in the same PR: `AGENTS.md`, `README.md`, affected `docs/` (`faq.md`, `index.md`, `flow-analysis.md`, `score_calc.md`, `auto-fix.md`, `workflows.md`, `two-phase-execution-model.md`), `skills/` if prompts/gates change, `.env.example` if env vars change, workflows/examples if CI changes. See [`../AGENTS.md`](../AGENTS.md) § Definition of Done.
 
-*Evidência:* `AGENTS.md` — Invariant Behavior (Developer Agent).
+*Evidence:* `AGENTS.md` — Invariant Behavior (Developer Agent).
 
 ---
 
-## 19. Mapa de evidências no código
+## 19. Evidence map in the code
 
-### Onde encontrar no código cada tema documentado?
+### Where to find each documented topic in the code?
 
-**Resposta:** Tabela de referência rápida:
-
-| Tema | Arquivo principal |
-|------|-------------------|
-| Orquestração | `src/index.ts` |
+| Topic | Main file |
+|-------|-----------|
+| Orchestration | `src/index.ts` |
 | Config / CLI / env | `src/config.ts` |
-| Modelo LLM | `src/engine/cursor-sdk/model.ts`, `src/engine/opencode/model.ts` |
+| LLM model | `src/engine/cursor-sdk/model.ts`, `src/engine/opencode/model.ts` |
 | Git diff | `src/git/diff.ts`, `src/git/diff-prompt.ts` |
-| Montagem do prompt | `src/agent/prompt.ts` |
-| Execução do agente | `src/agent/runner.ts`, `src/engine/` (`getEngine`) |
-| Rules pré-mapeadas | `src/project/rules-map.ts` |
-| Parser JSON | `src/parser/review-response.ts` |
-| Gate score | `src/ado/review-validation.ts` |
+| Prompt assembly | `src/agent/prompt.ts` |
+| Agent execution | `src/agent/runner.ts`, `src/engine/` (`getEngine`) |
+| Pre-mapped rules | `src/project/rules-map.ts` |
+| JSON parser | `src/parser/review-response.ts` |
+| Score gate | `src/ado/review-validation.ts` |
 | Safe Outputs | `src/ado/safe-outputs.ts` |
 | Auto-fix | `src/orchestrator/autofix-runner.ts`, `src/git/autofix-commit.ts` |
-| Post ADO | `src/ado/post-comments.ts` |
-| Formato thread | `src/ado/format-thread.ts` |
-| Contexto threads | `src/ado/review-context.ts` |
-| Descrição PR | `src/ado/pull-request.ts` |
+| ADO post | `src/ado/post-comments.ts` |
+| Thread format | `src/ado/format-thread.ts` |
+| Threads context | `src/ado/review-context.ts` |
+| PR description | `src/ado/pull-request.ts` |
 | Work items / US / Task | `src/ado/work-items.ts` |
-| Escalonamento | `src/ado/round-state.ts` |
-| Resumo / exit | `src/ado/gate.ts` |
-| Logging pipeline | `src/ado/pipeline-logging.ts` |
-| Contrato LLM | `skills/SYSTEM_PROMPT.md` |
+| Escalation | `src/ado/round-state.ts` |
+| Summary / exit | `src/ado/gate.ts` |
+| Pipeline logging | `src/ado/pipeline-logging.ts` |
+| LLM contract | `skills/SYSTEM_PROMPT.md` |
 | Harness | `skills/CODE_REVIEW.md` |
-| Critérios projeto | `.agents/skills/code-review/SKILL.md` |
+| Project criteria | `.agents/skills/code-review/SKILL.md` |
 
 ---
 
-## Índice alfabético (respostas em uma frase)
+## Alphabetical index (one-line answers)
 
-| Pergunta | Resposta curta |
-|----------|----------------|
-| O bot corrige código? | **Review padrão: não.** Modo `--auto-fix` / `auto-fix.yml`: **sim** (commit + push). |
-| Bloqueia merge? | **Não** — exit 0 com issues (ruleset GitHub pode exigir threads resolvidas). |
-| Auto-fix vs solve-pr? | CI: `auto-fix.yml` + `--auto-fix`. Local IDE: skill `/solve-pr`. |
-| score_min por engine? | **Não** — mesmo `config.scoreMin` para cursor-sdk e opencode. |
-| Como o prompt é montado? | System Prompt + CODE_REVIEW + contexto + diff + rules + ADO + workflow 2 fases (`prompt.ts`). |
-| O agente lê o repo? | **Sim** — tools com `settingSources: ['project']` e sandbox read-only. |
-| Quantas fases de análise? | **Duas** na mesma execução: triagem → investigação. |
-| Como o score é calculado? | **Atribuição qualitativa** pelo LLM; gate `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 no TypeScript (default 6) ([`score_calc.md`](score_calc.md)). |
-| O que vira thread? | Review com score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6), campos OK, linha não duplicada. |
-| Como abaixar o limiar de threads? | `AGENTIC_CODE_REVIEWERS_SCORE_MIN=4` ou `--score-min 4` (opt-in; omitir = default 6). |
-| Por que sumiu um warning na rodada 4? | Escalonamento `MAX_ROUNDS` — só `critical` segue sendo publicado. |
-| Posso testar localmente? | `npm run review -- --dry-run` na raiz do repositório (ou no submódulo, se instalado em `scripts/agentic-code-reviewers/`). |
-| Como contribuir ao runner? | Fork → implemente → `npm test` → atualize docs (`AGENTS.md` § Definition of Done) → PR. |
-| Onde customizar critérios? | Repo alvo: `.agents/skills/code-review/`; runner: `skills/SYSTEM_PROMPT.md`. |
-| Skills IDE vs runtime? | Runtime: `skills/` (CI); IDE: `.agents/skills/` — ver [`AGENTS.md`](../AGENTS.md#skills--roteamento-e-gestão). |
-| Work items no review? | Se vinculados à PR + token ADO — etapa [§7](#7-user-story-task-e-contexto-ado), **não** no `SYSTEM_PROMPT.md`. |
-| US/Task faz parte do system prompt? | **Não** — conteúdo dinâmico da API ADO, append no prompt composto ([§8](#8-montagem-do-prompt-system_prompt-vs-runtime)). |
-| Como configurar o modelo? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; IDs em `model.ts`. |
-| Modelo inválido na pipeline? | Macro ADO vazia cai no default; ID inexistente no enum → exit 1 na subida. |
-| Preciso de PAT local? | Só para ADO (threads/work items/publicação); dry-run básico: credencial da engine (`CURSOR_API_KEY` ou `OPENCODE_API_KEY`). |
+| Question | Short answer |
+|----------|--------------|
+| Does the bot fix code? | **Standard review: no.** `--auto-fix` / `auto-fix.yml` mode: **yes** (commit + push). |
+| Does it block merge? | **No** — exit 0 with issues (a GitHub ruleset can require resolved threads). |
+| Auto-fix vs solve-pr? | CI: `auto-fix.yml` + `--auto-fix`. Local IDE: `/solve-pr` skill. |
+| Per-engine `score_min`? | **No** — same `config.scoreMin` for cursor-sdk and opencode. |
+| How is the prompt assembled? | System Prompt + CODE_REVIEW + context + diff + rules + ADO + 2-phase workflow (`prompt.ts`). |
+| Does the agent read the repo? | **Yes** — tools with `settingSources: ['project']` and read-only sandbox. |
+| How many analysis phases? | **Two** in the same execution: triage → investigation. |
+| How is the score calculated? | **Qualitative assignment** by the LLM; gate `AGENTIC_CODE_REVIEWERS_SCORE_MIN`–10 in TypeScript (default 6) ([`score_calc.md`](score_calc.md)). |
+| What becomes a thread? | Review with score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN` (default 6), fields OK, non-duplicated line. |
+| How to lower the threshold? | `AGENTIC_CODE_REVIEWERS_SCORE_MIN=4` or `--score-min 4` (opt-in; omit = default 6). |
+| Why did a warning vanish in round 4? | Escalation `MAX_ROUNDS` — only `critical` keeps being published. |
+| Can I test locally? | `npm run review -- --dry-run` at the repo root (or in the submodule if installed in `scripts/agentic-code-reviewers/`). |
+| How to contribute to the runner? | Fork → implement → `npm test` → update docs (`AGENTS.md` § Definition of Done) → PR. |
+| Where to customize criteria? | Target repo: `.agents/skills/code-review/`; runner: `skills/SYSTEM_PROMPT.md`. |
+| IDE skills vs runtime? | Runtime: `skills/` (CI); IDE: `.agents/skills/` — see [`../AGENTS.md`](../AGENTS.md) § Skills and [`workflows.md`](workflows.md). |
+| Work items in the review? | If linked to the PR + ADO token — step [§7](#7-user-story-task-and-ado-context); **not** in `SYSTEM_PROMPT.md`. |
+| Is US/Task part of the system prompt? | **No** — dynamic ADO API content appended to the composed prompt ([§8](#8-prompt-assembly-system_prompt-vs-runtime)). |
+| How to configure the model? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; IDs in `model.ts`. |
+| Invalid model in the pipeline? | Empty ADO macro falls back to default; nonexistent enum ID → exit 1 on startup. |
+| Do I need a local PAT? | Only for ADO (threads/work items/publication); basic dry-run: engine credential (`CURSOR_API_KEY` or `OPENCODE_API_KEY`). |
 
 ---
 
-## Referências
+## References
 
-| Documento | Conteúdo |
-|-----------|----------|
-| [`auto-fix.md`](auto-fix.md) | Ciclo self-healing, PAT, proteções |
-| [`flow-analysis.md`](flow-analysis.md) | Fluxo técnico completo |
-| [`score_calc.md`](score_calc.md) | Score e severidade |
-| [`two-phase-execution-model.md`](two-phase-execution-model.md) | Modelo das duas fases |
-| [`../README.md`](../README.md) | Instalação, pipeline ADO, CLI |
-| [`../SEED-ISSUES.md`](../SEED-ISSUES.md) | Teste local com defeitos intencionais |
+| Document | Content |
+|-----------|---------|
+| [`auto-fix.md`](auto-fix.md) | Self-healing cycle, PAT, protections |
+| [`flow-analysis.md`](flow-analysis.md) | Full technical flow |
+| [`score_calc.md`](score_calc.md) | Score and severity |
+| [`two-phase-execution-model.md`](two-phase-execution-model.md) | Two-phase model |
+| [`workflows.md`](workflows.md) | All execution paths (local, CI, IDE, engines) |
+| [`../README.md`](../README.md) | Installation, ADO pipeline, CLI |
+| [`../SEED-ISSUES.md`](../SEED-ISSUES.md) | Local test with intentional defects |

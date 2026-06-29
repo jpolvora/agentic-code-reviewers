@@ -37,10 +37,11 @@ Do not close a thread without a corresponding fix listed explicitly (`resolvedTh
 1. Fetch open threads (file+line)
 2. Deeply analyze each description
 3. Apply surgical fixes
-4. git add + local commit
+4. git add + local commit (`fix(#N): auto-fix issues from review threads [threadId, ...]`)
 5. Execute validation build (`npm test` / `npm run build` or `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND`; failure = exit ≠ 0)
 6. Close each resolved thread with a detailed comment (root cause + what changed)
 7. git push — only if build and attempted resolutions succeed
+8. Post detailed summary comment on PR (changed files, resolved threads with links, `<!-- auto-fix-summary -->`)
 ```
 
 If step 5 or 6 fails: **do not push**. Local commit preserved for manual inspection.

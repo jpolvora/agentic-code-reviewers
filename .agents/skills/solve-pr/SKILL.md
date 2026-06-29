@@ -62,7 +62,7 @@ npm test
 
 ```bash
 git add <arquivos>
-git commit -m "fix(review): resolve issues from review threads of PR #<PR_ID>"
+git commit -m "fix(#<PR_ID>): auto-fix issues from review threads [<THREAD_ID1>, <THREAD_ID2>, ...]"
 ```
 
 ### 5. Resolver threads (gate obrigatório)
