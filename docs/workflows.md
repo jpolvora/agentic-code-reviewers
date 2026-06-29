@@ -317,7 +317,7 @@ You must pass `--org`, `--project`, `--repo`, `--pr-id` to use ADO outside a pip
 | Threads missing on the PR | ADO | `SYSTEM_ACCESSTOKEN` enabled; Build Service has **Contribute to pull requests** |
 | Threads not auto-resolved on GitHub | GitHub | Use PAT `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`; `github.token` can't call `resolveReviewThread` |
 | Auto-fix stops after first correction | GitHub | `github.token` doesn't re-trigger workflows; use PAT |
-| OpenCode hangs after `Sessão criada` | opencode | CLI in PATH, `auth.json`/`OPENCODE_API_KEY` set, free port (or `_PORT=0`) |
+| OpenCode hangs after `Session created` | opencode | CLI in PATH, `auth.json`/`OPENCODE_API_KEY` set, free port (or `_PORT=0`) |
 | `HeadersTimeoutError` (opencode) | opencode | bump `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` |
 
 More: [`faq.md`](faq.md) § Troubleshooting.
