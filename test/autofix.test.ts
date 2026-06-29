@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync } from 'node:child_process';
-import { applyReplacements, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, runAutoFixFlow, testAutoFixSummaryAlreadyPosted } from '../src/orchestrator/autofix-runner.js';
+import { applyReplacements, buildRecoverySummary, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, parseAutoFixCommitThreadIds, runAutoFixFlow, testAutoFixSummaryAlreadyPosted } from '../src/orchestrator/autofix-runner.js';
 import { AUTO_FIX_SUMMARY_MARKER } from '../src/git/markers.js';
 
 describe('applyReplacements', () => {
@@ -120,6 +120,33 @@ describe('getAutoFixThreads', () => {
   it('retorna fileReviewThreads do contexto', () => {
     const threads = [{ threadId: '1', filePath: '/a.ts', lineNumber: 1 } as any];
     assert.deepEqual(getAutoFixThreads({ fileReviewThreads: threads } as any), threads);
+  });
+});
+
+describe('parseAutoFixCommitThreadIds', () => {
+  it('returns null for non auto-fix commits', () => {
+    assert.equal(parseAutoFixCommitThreadIds('pending from prior engine'), null);
+  });
+
+  it('parses thread ids from auto-fix commit subject', () => {
+    assert.deepEqual(
+      parseAutoFixCommitThreadIds('fix(#18): auto-fix issues from review threads [PRRT_a, PRRT_b]'),
+      ['PRRT_a', 'PRRT_b'],
+    );
+  });
+
+  it('returns empty array when auto-fix commit has no thread list', () => {
+    assert.deepEqual(parseAutoFixCommitThreadIds('fix(#18): auto-fix issues from review threads'), []);
+  });
+});
+
+describe('buildRecoverySummary', () => {
+  it('includes marker, files, and thread ids', () => {
+    const summary = buildRecoverySummary(['src/foo.ts'], ['PRRT_1']);
+    assert.match(summary, /auto-fix-summary/);
+    assert.match(summary, /dual-engine recovery path/);
+    assert.match(summary, /src\/foo\.ts/);
+    assert.match(summary, /PRRT_1/);
   });
 });
 
@@ -489,8 +516,10 @@ describe('runAutoFixFlow', () => {
 
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true } as any;
     const reviewContext = { fileReviewThreads: [] } as any;
+    const postPrComment = mock.fn(async () => true);
     const provider = {
       resolvePullRequestReviewThreads: mock.fn(async () => 0),
+      postPrComment,
     } as any;
     const engine = {
       run: mock.fn(async () => {
@@ -501,6 +530,7 @@ describe('runAutoFixFlow', () => {
     await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
 
     assert.equal(engine.run.mock.callCount(), 0);
+    assert.equal(postPrComment.mock.callCount(), 0);
     const remoteAfter = execSync('git ls-remote origin refs/heads/master', {
       cwd: tmpDir,
       encoding: 'utf8',
@@ -510,6 +540,45 @@ describe('runAutoFixFlow', () => {
     assert.notEqual(remoteBefore, remoteAfter);
     const localHead = execSync('git rev-parse HEAD', { cwd: tmpDir, encoding: 'utf8' }).trim();
     assert.equal(localHead, remoteAfter);
+  });
+
+  it('recovery: publica sumário após push de commit auto-fix pendente', async () => {
+    const tmpDir = setupTempWorkspace();
+    execSync('git push -u origin master', { cwd: tmpDir, stdio: 'ignore' });
+    fs.writeFileSync(path.join(tmpDir, 'file.txt'), 'linha 1\nlinha 2 alterada\nlinha 3');
+    execSync(
+      'git add file.txt && git commit -m "fix(#18): auto-fix issues from review threads [PRRT_a]"',
+      { cwd: tmpDir, stdio: 'ignore' },
+    );
+
+    const config = {
+      repoRoot: tmpDir,
+      runnerRoot: tmpDir,
+      dryRun: false,
+      autoFix: true,
+      pullRequestId: 18,
+      botTag: 'Agentic Code Reviewer test',
+    } as any;
+    const reviewContext = { fileReviewThreads: [], allThreads: { value: [] } } as any;
+    const postPrComment = mock.fn(async () => true);
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 0),
+      postPrComment,
+    } as any;
+    const engine = {
+      run: mock.fn(async () => {
+        throw new Error('engine não deve rodar sem threads');
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    assert.equal(postPrComment.mock.callCount(), 1);
+    const summaryBody = postPrComment.mock.calls[0].arguments[1] as string;
+    assert.match(summaryBody, /auto-fix-summary/);
+    assert.match(summaryBody, /dual-engine recovery path/);
+    assert.match(summaryBody, /file\.txt/);
+    assert.match(summaryBody, /PRRT_a/);
   });
 
   it('falha quando push falha após resolução bem-sucedida', async () => {
