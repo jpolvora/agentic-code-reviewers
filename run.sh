@@ -118,6 +118,7 @@ prepare_opencode() {
   fi
 
   local api_key="${OPENCODE_API_KEY:-}"
+  api_key="$(printf '%s' "$api_key" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
   if ! command -v opencode >/dev/null 2>&1; then
     echo "=== [Runner] Instalando OpenCode CLI ==="
@@ -137,12 +138,13 @@ prepare_opencode() {
   if [[ -n "$api_key" ]]; then
     echo "=== [Runner] Configurando credenciais OpenCode Go ==="
     mkdir -p "${HOME}/.local/share/opencode"
-    OPENCODE_API_KEY="$api_key" node <<'NODE'
+    export OPENCODE_API_KEY="$api_key"
+    node <<'NODE'
 const fs = require('node:fs');
 const path = require('node:path');
 const authPath = path.join(process.env.HOME, '.local/share/opencode/auth.json');
 const auth = {
-  'opencode-go': { type: 'api', key: (process.env.OPENCODE_API_KEY || '').trim() },
+  'opencode-go': { type: 'api', key: process.env.OPENCODE_API_KEY || '' },
 };
 fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
 NODE

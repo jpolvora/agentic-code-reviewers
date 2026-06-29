@@ -123,7 +123,10 @@ jobs:
           git fetch origin "$BRANCH"
           LOCAL=$(git rev-parse HEAD)
           REMOTE=$(git rev-parse "origin/$BRANCH")
-          if [ "$LOCAL" = "$REMOTE" ]; then
+          if [ "${{ steps.autofix-cursor.outcome }}" = "failure" ]; then
+            echo "::warning::cursor-sdk falhou (build ou resolução incompleta). Descartando commits locais e resetando para origin/$BRANCH."
+            git reset --hard "origin/$BRANCH"
+          elif [ "$LOCAL" = "$REMOTE" ]; then
             echo "Workspace já sincronizado com origin/$BRANCH."
           elif git merge-base --is-ancestor "$REMOTE" "$LOCAL" 2>/dev/null; then
             echo "::notice::Preservando commits locais não enviados (gate cooperativo)."
