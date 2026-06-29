@@ -42,6 +42,7 @@ function activeThread(overrides: Partial<ActiveThreadInfo> = {}): ActiveThreadIn
     lineNumber: 42,
     status: 'active',
     summary: 'issue',
+    description: 'issue description',
     botCommentId: 100,
     hasResolutionReply: false,
     ...overrides,
