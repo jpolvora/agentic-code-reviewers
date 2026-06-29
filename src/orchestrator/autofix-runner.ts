@@ -10,7 +10,7 @@ import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '
 import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 import { AUTO_FIX_SUMMARY_MARKER } from '../git/markers.js';
-import { isAgenticReviewerComment } from '../bot-tag.js';
+import { isAgenticReviewerComment, stripAgenticBotTags } from '../bot-tag.js';
 
 export interface Replacement {
   startLine: number;
@@ -274,15 +274,21 @@ function buildAutoFixSummary(
   return lines.join('\n');
 }
 
-function testAutoFixSummaryAlreadyPosted(
+function normalizeAutoFixSummaryBody(text: string): string {
+  let body = stripAgenticBotTags(text);
+  body = body.replace(AUTO_FIX_SUMMARY_MARKER, '');
+  return body.replace(/\s+/g, ' ').trim();
+}
+
+export function testAutoFixSummaryAlreadyPosted(
   reviewContext: ReviewContextResult,
-  botTag: string,
+  _botTag: string,
   summaryText: string,
 ): boolean {
   const threads = reviewContext.allThreads;
   if (!threads) return false;
 
-  const normalizedSummary = summaryText.replace(/\s+/g, ' ').trim();
+  const normalizedSummary = normalizeAutoFixSummaryBody(summaryText);
 
   for (const thread of threads.value) {
     if (thread.threadContext?.filePath) continue;
@@ -291,10 +297,7 @@ function testAutoFixSummaryAlreadyPosted(
       if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) continue;
       if (!comment.content.includes(AUTO_FIX_SUMMARY_MARKER)) continue;
 
-      let existing = comment.content.replace(AUTO_FIX_SUMMARY_MARKER, '');
-      existing = existing.replace(/\s+/g, ' ').trim();
-
-      if (existing === normalizedSummary) {
+      if (normalizeAutoFixSummaryBody(comment.content) === normalizedSummary) {
         return true;
       }
     }

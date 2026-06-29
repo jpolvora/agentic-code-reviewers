@@ -4,7 +4,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execSync } from 'node:child_process';
-import { applyReplacements, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, runAutoFixFlow } from '../src/orchestrator/autofix-runner.js';
+import { applyReplacements, computeUpdatedLineNumber, getAutoFixThreads, isThreadLineModified, runAutoFixFlow, testAutoFixSummaryAlreadyPosted } from '../src/orchestrator/autofix-runner.js';
+import { AUTO_FIX_SUMMARY_MARKER } from '../src/git/markers.js';
 
 describe('applyReplacements', () => {
   it('aplica substituição simples em arquivo', () => {
@@ -119,6 +120,62 @@ describe('getAutoFixThreads', () => {
   it('retorna fileReviewThreads do contexto', () => {
     const threads = [{ threadId: '1', filePath: '/a.ts', lineNumber: 1 } as any];
     assert.deepEqual(getAutoFixThreads({ fileReviewThreads: threads } as any), threads);
+  });
+});
+
+describe('testAutoFixSummaryAlreadyPosted', () => {
+  const botTag = 'Agentic Code Reviewer cursor-sdk';
+  const summaryBody = `${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+
+  it('returns true when stored comment matches after bot-tag and marker normalization', () => {
+    const stored = `${botTag}\n\n${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            comments: [{ id: 1, parentCommentId: 0, content: stored, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), true);
+  });
+
+  it('returns false when no prior auto-fix summary exists', () => {
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            comments: [{ id: 1, parentCommentId: 0, content: `${botTag}\n\nOther comment`, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), false);
+  });
+
+  it('ignores file-anchored threads', () => {
+    const stored = `${botTag}\n\n${AUTO_FIX_SUMMARY_MARKER}\n\n## Auto-Fix Summary\n\nApplied 1 fix.`;
+    const reviewContext = {
+      allThreads: {
+        value: [
+          {
+            id: 1,
+            status: 'active',
+            threadContext: { filePath: '/src/foo.ts' },
+            comments: [{ id: 1, parentCommentId: 0, content: stored, commentType: 1 }],
+          },
+        ],
+      },
+    } as any;
+
+    assert.equal(testAutoFixSummaryAlreadyPosted(reviewContext, botTag, summaryBody), false);
   });
 });
 
