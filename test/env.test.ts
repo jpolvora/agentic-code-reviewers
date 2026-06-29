@@ -41,8 +41,8 @@ describe('env', () => {
     assert.equal(ENV.SCORE_MIN, 'AGENTIC_CODE_REVIEWERS_SCORE_MIN');
   });
 
-  it('env.cursorApiKey lê CURSOR_API_KEY', () => {
-    setEnv('CURSOR_API_KEY', 'cursor_direct');
+  it('env.cursorApiKey lê CURSOR_API_KEY e trima espaços', () => {
+    setEnv('CURSOR_API_KEY', '  cursor_direct  ');
     assert.equal(env.cursorApiKey(), 'cursor_direct');
   });
 

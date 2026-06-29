@@ -142,7 +142,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const authPath = path.join(process.env.HOME, '.local/share/opencode/auth.json');
 const auth = {
-  'opencode-go': { type: 'api', key: process.env.OPENCODE_API_KEY },
+  'opencode-go': { type: 'api', key: (process.env.OPENCODE_API_KEY || '').trim() },
 };
 fs.writeFileSync(authPath, JSON.stringify(auth, null, 2));
 NODE
