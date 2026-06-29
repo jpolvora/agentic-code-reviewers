@@ -228,7 +228,7 @@ describe('getPullRequestReviewContext', () => {
     );
 
     assert.equal(context.fileReviewThreads.length, 1);
-    assert.equal(context.fileReviewThreads[0].filePath, '/src/human.cs');
+    assert.equal(context.fileReviewThreads[0].filePath, '/src/Human.cs');
   });
 
   it('marca hasResolutionReply quando reply real (parentCommentId!=0) contém o marcador', async () => {

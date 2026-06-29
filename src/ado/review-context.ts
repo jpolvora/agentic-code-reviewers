@@ -1,5 +1,5 @@
 import { AdoClient } from './client.js';
-import { normalizeFilePath, stripHtml } from './utils.js';
+import { canonicalFilePath, normalizeFilePath, stripHtml } from './utils.js';
 import {
   commentBodyHasResolutionReply,
   RESOLUTION_MARKER,
@@ -130,7 +130,8 @@ export async function getPullRequestReviewContext(
         continue;
       }
 
-      const normalizedPath = normalizeFilePath(thread.threadContext.filePath);
+      const canonicalPath = canonicalFilePath(thread.threadContext.filePath);
+      const normalizedPath = normalizeFilePath(canonicalPath);
       const lineNumber = thread.threadContext.rightFileStart?.line ?? 0;
       if (lineNumber <= 0) {
         continue;
@@ -149,14 +150,14 @@ export async function getPullRequestReviewContext(
       if (isOpen) {
         existingKeys.set(`${normalizedPath}|line:${lineNumber}`, true);
         activeContextRows.push({
-          filePath: normalizedPath,
+          filePath: canonicalPath,
           lineNumber,
           status: threadStatus,
           summary,
         });
         fileReviewThreads.push({
           threadId: String(thread.id),
-          filePath: normalizedPath,
+          filePath: canonicalPath,
           lineNumber,
           status: threadStatus,
           summary,
@@ -166,7 +167,7 @@ export async function getPullRequestReviewContext(
         });
       } else {
         resolvedContextRows.push({
-          filePath: normalizedPath,
+          filePath: canonicalPath,
           lineNumber,
           status: threadStatus,
           summary,

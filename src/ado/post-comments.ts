@@ -129,7 +129,7 @@ export function matchesResolvedItem(threadInfo: ActiveThreadInfo, item: Resolved
   }
   if (item.fileName && item.lineNumber != null && item.lineNumber > 0) {
     const normalizedFile = normalizeFilePath(item.fileName);
-    return normalizedFile === threadInfo.filePath && item.lineNumber === threadInfo.lineNumber;
+    return normalizedFile === normalizeFilePath(threadInfo.filePath) && item.lineNumber === threadInfo.lineNumber;
   }
   return false;
 }

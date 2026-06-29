@@ -182,6 +182,41 @@ describe('runAutoFixFlow', () => {
     assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 0);
   });
 
+  it('encontra arquivo PascalCase usando filePath preservando case (regressão Linux)', async () => {
+    const tmpDir = setupTempWorkspace();
+    fs.mkdirSync(path.join(tmpDir, 'Controllers'), { recursive: true });
+    const pascalFile = path.join(tmpDir, 'Controllers', 'AuditController.cs');
+    fs.writeFileSync(pascalFile, 'linha 1\nlinha 2\nlinha 3');
+    execSync('git add . && git commit -m "add pascal"', { cwd: tmpDir, stdio: 'ignore' });
+
+    const config = {
+      repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: false, autoFix: true,
+      provider: 'github', organization: 'o', repositoryName: 'r', pullRequestId: 1,
+      project: '', botTag: 'Agentic Code Reviewer test',
+    } as any;
+    const reviewContext = {
+      fileReviewThreads: [{ filePath: '/Controllers/AuditController.cs', lineNumber: 1, summary: 'authz missing', threadId: '1', botCommentId: 9 }],
+    } as any;
+    const provider = {
+      resolvePullRequestReviewThreads: mock.fn(async () => 1),
+      postPrComment: mock.fn(async () => true),
+    } as any;
+    const engine = {
+      run: async () => ({
+        fullText: agentJson({
+          replacements: [{ startLine: 1, endLine: 1, replacementContent: 'linha 1 fix' }],
+          resolvedThreads: [{ threadId: '1', explanation: 'Added authz check.' }],
+        }),
+      }),
+    } as any;
+
+    await runAutoFixFlow(config, reviewContext, provider, engine, dummyLogger);
+
+    const content = fs.readFileSync(pascalFile, 'utf8');
+    assert.equal(content, 'linha 1 fix\nlinha 2\nlinha 3', 'arquivo PascalCase deve ser encontrado e alterado');
+    assert.equal(provider.resolvePullRequestReviewThreads.mock.callCount(), 1);
+  });
+
   it('dry-run não grava arquivo nem resolve threads na API', async () => {
     const tmpDir = setupTempWorkspace();
     const config = { repoRoot: tmpDir, runnerRoot: tmpDir, dryRun: true, autoFix: true } as any;

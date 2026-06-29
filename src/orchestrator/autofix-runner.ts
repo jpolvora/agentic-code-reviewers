@@ -10,6 +10,7 @@ import { commitAutoFixChanges, isLocalAheadOfRemote, pushAutoFixChanges } from '
 import { runAutoFixBuild } from '../git/autofix-build.js';
 import { simulateThreadResolution } from '../ado/post-comments.js';
 import { AUTO_FIX_SUMMARY_MARKER } from '../git/markers.js';
+import { isAgenticReviewerComment } from '../bot-tag.js';
 
 export interface Replacement {
   startLine: number;
@@ -239,7 +240,7 @@ function buildAutoFixSummary(
   lines.push('## Auto-Fix Summary');
   lines.push('');
   lines.push(
-    `The auto-fix workflow successfully applied **${resolvedItems.length} fix(es)** across **${modifiedFiles.length} file(s)**.`,
+    `The auto-fix workflow successfully applied **${resolvedWithThreads.length} fix(es)** across **${modifiedFiles.length} file(s)**.`,
   );
   lines.push('');
 
@@ -271,6 +272,34 @@ function buildAutoFixSummary(
 
   lines.push('> A new code review round will be triggered automatically to validate the changes.');
   return lines.join('\n');
+}
+
+function testAutoFixSummaryAlreadyPosted(
+  reviewContext: ReviewContextResult,
+  botTag: string,
+  summaryText: string,
+): boolean {
+  const threads = reviewContext.allThreads;
+  if (!threads) return false;
+
+  const normalizedSummary = summaryText.replace(/\s+/g, ' ').trim();
+
+  for (const thread of threads.value) {
+    if (thread.threadContext?.filePath) continue;
+
+    for (const comment of thread.comments) {
+      if (comment.isDeleted || !isAgenticReviewerComment(comment.content)) continue;
+      if (!comment.content.includes(AUTO_FIX_SUMMARY_MARKER)) continue;
+
+      let existing = comment.content.replace(AUTO_FIX_SUMMARY_MARKER, '');
+      existing = existing.replace(/\s+/g, ' ').trim();
+
+      if (existing === normalizedSummary) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export async function runAutoFixFlow(
@@ -500,13 +529,18 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
   if (config.dryRun) {
     logger.info(`[dry-run] Sumário do auto-fix seria publicado:\n${summary}`);
   } else {
-    const posted = await provider.postPrComment(config.botTag, summary, (msg) => logger.info(msg));
-    if (!posted) {
-      throw new Error(
-        'Gate cooperativo: auto-fix push/resolução concluídos, mas falha ao publicar sumário na PR.',
-      );
+    if (testAutoFixSummaryAlreadyPosted(reviewContext, config.botTag, summary)) {
+      logger.info('Auto-fix summary já publicado anteriormente — pulando duplicata.');
+    } else {
+      const posted = await provider.postPrComment(config.botTag, summary, (msg) => logger.info(msg));
+      if (!posted) {
+        logger.warn(
+          'Auto-fix push/resolução concluídos, mas falha ao publicar sumário na PR — push já foi bem-sucedido.',
+        );
+      } else {
+        logger.info('Sumário do auto-fix publicado na PR.');
+      }
     }
-    logger.info('Sumário do auto-fix publicado na PR.');
   }
 }
 
