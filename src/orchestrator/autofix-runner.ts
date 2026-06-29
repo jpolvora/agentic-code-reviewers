@@ -19,8 +19,6 @@ export interface Replacement {
   replacementContent: string;
 }
 
-const AUTOFIX_CONCURRENCY = 3;
-
 export function validateReplacements(replacements: Replacement[]): void {
   for (const rep of replacements) {
     if (
@@ -157,27 +155,6 @@ function buildResolvedItemsFromAgent(
 interface FileFixResult {
   relativePath: string;
   resolvedItems: ResolvedThreadItem[];
-}
-
-async function mapPool<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R | undefined>,
-): Promise<R[]> {
-  const queue = [...items];
-  const buckets = await Promise.all(
-    Array.from({ length: Math.min(limit, queue.length) }, async () => {
-      const local: R[] = [];
-      while (queue.length) {
-        const item = queue.shift();
-        if (item === undefined) continue;
-        const result = await fn(item);
-        if (result !== undefined) local.push(result);
-      }
-      return local;
-    }),
-  );
-  return buckets.flat();
 }
 
 /** Dual-engine sequencial: publica commit deixado pelo engine anterior quando threads já foram resolvidas. */
@@ -439,33 +416,34 @@ export async function runAutoFixFlow(
   const resolvedItems: ResolvedThreadItem[] = [];
   const modifiedFiles: string[] = [];
   const filePaths = Array.from(threadsByFile.keys());
+  const fileResults: FileFixResult[] = [];
 
-  const fileResults = await mapPool(filePaths, AUTOFIX_CONCURRENCY, async (filePath) => {
-      const threads = threadsByFile.get(filePath)!;
-      const relativePath = filePath.replace(/^\/+/,'');
-      const fullFilePath = path.resolve(config.repoRoot, relativePath);
+  for (const filePath of filePaths) {
+    const threads = threadsByFile.get(filePath)!;
+    const relativePath = filePath.replace(/^\/+/, '');
+    const fullFilePath = path.resolve(config.repoRoot, relativePath);
 
-      // Validação de segurança contra Directory Traversal
-      const rel = path.relative(path.resolve(config.repoRoot), fullFilePath);
-      if (rel.startsWith('..') || path.isAbsolute(rel)) {
-        logger.error(`Acesso fora do repositório bloqueado: ${filePath}`);
-        return undefined;
-      }
+    // Validação de segurança contra Directory Traversal
+    const rel = path.relative(path.resolve(config.repoRoot), fullFilePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      logger.error(`Acesso fora do repositório bloqueado: ${filePath}`);
+      continue;
+    }
 
-      if (!fs.existsSync(fullFilePath)) {
-        logger.error(`Arquivo não encontrado para correção: ${filePath} (caminho resolvido: ${fullFilePath})`);
-        return undefined;
-      }
+    if (!fs.existsSync(fullFilePath)) {
+      logger.error(`Arquivo não encontrado para correção: ${filePath} (caminho resolvido: ${fullFilePath})`);
+      continue;
+    }
 
-      const fileContent = fs.readFileSync(fullFilePath, 'utf8');
-      const threadListText = threads
-        .map(
-          (t) =>
-            `### Thread ${t.threadId} (linha ${t.lineNumber})\n${t.description || t.summary}`,
-        )
-        .join('\n\n');
+    const fileContent = fs.readFileSync(fullFilePath, 'utf8');
+    const threadListText = threads
+      .map(
+        (t) =>
+          `### Thread ${t.threadId} (linha ${t.lineNumber})\n${t.description || t.summary}`,
+      )
+      .join('\n\n');
 
-      const prompt = `${autoFixSystemPrompt}
+    const prompt = `${autoFixSystemPrompt}
 
 ---
 ## Arquivo a ser modificado:
@@ -483,89 +461,87 @@ ${threadListText}
 Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhada por thread corrigida).
 `;
 
-      logger.info(`Disparando subagente de correção para o arquivo: ${filePath}`);
-      try {
-        const result = await engine.run(
-          config,
-          {
-            name: `autofix-${path.basename(filePath)}`,
-            prompt,
-          },
-          logger,
-        );
+    logger.info(`Disparando subagente de correção para o arquivo: ${filePath}`);
+    try {
+      const result = await engine.run(
+        config,
+        {
+          name: `autofix-${path.basename(filePath)}`,
+          prompt,
+        },
+        logger,
+      );
 
-        const jsonText = extractJsonFromAgentOutput(result.fullText);
-        if (!jsonText) {
-          logger.error(`Falha ao extrair JSON da resposta do agente para o arquivo: ${filePath}`);
-          return undefined;
-        }
-
-        const parsed = JSON.parse(jsonText) as AutoFixAgentResponse;
-
-        if (!parsed.replacements || !Array.isArray(parsed.replacements)) {
-          logger.error(`Formato de replacements inválido retornado para o arquivo: ${filePath}`);
-          return undefined;
-        }
-
-        if (parsed.replacements.length === 0) {
-          logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}.`);
-          return undefined;
-        }
-
-        let updatedContent: string;
-        try {
-          updatedContent = applyReplacements(fileContent, parsed.replacements);
-        } catch (err: any) {
-          logger.error(`Erro ao aplicar substituições em ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
-          return undefined;
-        }
-
-        if (updatedContent === fileContent) {
-          logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}.`);
-          return undefined;
-        }
-
-        const localResolvedItems = buildResolvedItemsFromAgent(threads, parsed, config.dryRun);
-
-        const verifiedResolvedItems = localResolvedItems.filter((item) => {
-          const thread = threads.find(
-            (t) =>
-              (Number.isNaN(Number(item.threadId)) ? item.threadId : Number(item.threadId)) ===
-              (Number.isNaN(Number(t.threadId)) ? t.threadId : Number(t.threadId)),
-          );
-          if (!thread) return false;
-          if (
-            !isThreadLineModified(fileContent, updatedContent, thread.lineNumber, parsed.replacements)
-          ) {
-            logger.warn(
-              `Thread ${thread.threadId} declarada resolvida mas linha ${thread.lineNumber} não foi alterada — ignorada.`,
-            );
-            return false;
-          }
-          return true;
-        });
-
-        if (verifiedResolvedItems.length === 0) {
-          logger.warn(
-            `Arquivo ${filePath} alterado mas nenhuma thread confirmada após verificação determinística — correção descartada.`,
-          );
-          return undefined;
-        }
-
-        if (config.dryRun) {
-          logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
-        } else {
-          logger.info(`Aplicando correções no arquivo local: ${filePath}`);
-          fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
-        }
-
-        return { relativePath, resolvedItems: verifiedResolvedItems };
-
-      } catch (err: any) {
-        logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
-        return undefined;
+      const jsonText = extractJsonFromAgentOutput(result.fullText);
+      if (!jsonText) {
+        logger.error(`Falha ao extrair JSON da resposta do agente para o arquivo: ${filePath}`);
+        continue;
       }
-  });
+
+      const parsed = JSON.parse(jsonText) as AutoFixAgentResponse;
+
+      if (!parsed.replacements || !Array.isArray(parsed.replacements)) {
+        logger.error(`Formato de replacements inválido retornado para o arquivo: ${filePath}`);
+        continue;
+      }
+
+      if (parsed.replacements.length === 0) {
+        logger.warn(`Nenhuma substituição retornada para o arquivo: ${filePath}.`);
+        continue;
+      }
+
+      let updatedContent: string;
+      try {
+        updatedContent = applyReplacements(fileContent, parsed.replacements);
+      } catch (err: any) {
+        logger.error(`Erro ao aplicar substituições em ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
+
+      if (updatedContent === fileContent) {
+        logger.warn(`Substituições idempotentes retornadas para o arquivo: ${filePath}.`);
+        continue;
+      }
+
+      const localResolvedItems = buildResolvedItemsFromAgent(threads, parsed, config.dryRun);
+
+      const verifiedResolvedItems = localResolvedItems.filter((item) => {
+        const thread = threads.find(
+          (t) =>
+            (Number.isNaN(Number(item.threadId)) ? item.threadId : Number(item.threadId)) ===
+            (Number.isNaN(Number(t.threadId)) ? t.threadId : Number(t.threadId)),
+        );
+        if (!thread) return false;
+        if (
+          !isThreadLineModified(fileContent, updatedContent, thread.lineNumber, parsed.replacements)
+        ) {
+          logger.warn(
+            `Thread ${thread.threadId} declarada resolvida mas linha ${thread.lineNumber} não foi alterada — ignorada.`,
+          );
+          return false;
+        }
+        return true;
+      });
+
+      if (verifiedResolvedItems.length === 0) {
+        logger.warn(
+          `Arquivo ${filePath} alterado mas nenhuma thread confirmada após verificação determinística — correção descartada.`,
+        );
+        continue;
+      }
+
+      if (config.dryRun) {
+        logger.info(`[dry-run] Simulando ${parsed.replacements.length} substituição(ões) em ${filePath}.`);
+      } else {
+        logger.info(`Aplicando correções no arquivo local: ${filePath}`);
+        fs.writeFileSync(fullFilePath, updatedContent, 'utf8');
+      }
+
+      fileResults.push({ relativePath, resolvedItems: verifiedResolvedItems });
+    } catch (err: any) {
+      logger.error(`Erro ao executar correção para o arquivo ${filePath}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   for (const result of fileResults) {
     modifiedFiles.push(result.relativePath);
