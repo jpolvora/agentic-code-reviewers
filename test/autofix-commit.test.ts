@@ -20,12 +20,12 @@ describe('buildAutoFixCommitMessage', () => {
 
   it('usa mensagem genérica sem PR id mas com thread IDs', () => {
     const msg = buildAutoFixCommitMessage({ pullRequestId: 0 } as ReviewerConfig, ['a', 'b']);
-    assert.equal(msg, 'fix: auto-fix apply issues from review threads [a, b]');
+    assert.equal(msg, 'fix: auto-fix issues from review threads [a, b]');
   });
 
   it('usa mensagem genérica sem PR id e sem threads', () => {
     const msg = buildAutoFixCommitMessage({ pullRequestId: 0 } as ReviewerConfig);
-    assert.equal(msg, 'fix: auto-fix apply issues from review threads');
+    assert.equal(msg, 'fix: auto-fix issues from review threads');
   });
 });
 

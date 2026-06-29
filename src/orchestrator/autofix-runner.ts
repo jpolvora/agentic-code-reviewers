@@ -212,7 +212,10 @@ function buildThreadUrl(
   if (config.provider === 'github') {
     return `https://github.com/${config.organization}/${config.repositoryName}/pull/${config.pullRequestId}#discussion_r${thread.botCommentId}`;
   }
-  return `https://dev.azure.com/${config.organization}/${config.project}/_git/${config.repositoryName}/pullrequest/${config.pullRequestId}?threadId=${thread.threadId}`;
+  const org = encodeURIComponent(config.organization);
+  const project = encodeURIComponent(config.project);
+  const repo = encodeURIComponent(config.repositoryName);
+  return `https://dev.azure.com/${org}/${project}/_git/${repo}/pullrequest/${config.pullRequestId}?threadId=${thread.threadId}`;
 }
 
 function buildAutoFixSummary(
@@ -498,11 +501,12 @@ Retorne o JSON com \`replacements\` e \`resolvedThreads\` (explicação detalhad
     logger.info(`[dry-run] Sumário do auto-fix seria publicado:\n${summary}`);
   } else {
     const posted = await provider.postPrComment(config.botTag, summary, (msg) => logger.info(msg));
-    if (posted) {
-      logger.info('Sumário do auto-fix publicado na PR.');
-    } else {
-      logger.warn('Falha ao publicar sumário do auto-fix na PR.');
+    if (!posted) {
+      throw new Error(
+        'Gate cooperativo: auto-fix push/resolução concluídos, mas falha ao publicar sumário na PR.',
+      );
     }
+    logger.info('Sumário do auto-fix publicado na PR.');
   }
 }
 

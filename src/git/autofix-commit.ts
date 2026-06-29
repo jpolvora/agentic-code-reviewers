@@ -25,7 +25,7 @@ export function buildAutoFixCommitMessage(config: ReviewerConfig, threadIds?: st
   if (config.pullRequestId > 0) {
     return `fix(#${config.pullRequestId}): auto-fix issues from review threads${threadList}`;
   }
-  return `fix: auto-fix apply issues from review threads${threadList}`;
+  return `fix: auto-fix issues from review threads${threadList}`;
 }
 
 /** HEAD local à frente de origin/<branch> (commit pendente de push). */
