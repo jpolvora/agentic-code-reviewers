@@ -1,0 +1,271 @@
+import { createOpencodeClient, } from '@opencode-ai/sdk';
+import { logAgentPromptBeforeSend } from '../../agent/log-prompt.js';
+import { env, ENV } from '../../env.js';
+import { ENGINE_METRIC_KEYS, EMPTY_METRICS } from '../types.js';
+import { startOpencodeEventStream, OpencodeStreamInactivityError } from './event-stream.js';
+import { resolveOpencodeModelSelection } from './model.js';
+import { buildSessionPromptBody, shouldFallbackSessionPromptWithoutModel, } from './prompt-body.js';
+import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
+import { createEmbeddedOpencodeServer } from './server.js';
+import { closeAllOpencodeAgents, createOpencodeFetch, isHeadersTimeoutError, withAbortSignal, } from './fetch.js';
+const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_HOSTNAME = '127.0.0.1';
+const DEFAULT_PORT = 4096;
+const DEFAULT_AGENT = 'explore';
+function resolveTimeoutMs() {
+    const envValue = env.timeoutMs()?.trim();
+    if (!envValue)
+        return DEFAULT_TIMEOUT_MS;
+    const parsed = Number(envValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TIMEOUT_MS;
+}
+function resolveServerUrl() {
+    const raw = env.opencodeUrl()?.trim();
+    return raw || undefined;
+}
+function resolveHostname() {
+    return env.opencodeHostname()?.trim() || DEFAULT_HOSTNAME;
+}
+function resolvePort() {
+    const raw = env.opencodePort()?.trim();
+    if (!raw || raw.toLowerCase() === 'auto')
+        return DEFAULT_PORT;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0)
+        return DEFAULT_PORT;
+    return parsed;
+}
+function resolveAgentName() {
+    return env.opencodeAgent()?.trim() || DEFAULT_AGENT;
+}
+function assertResponseData(result, context) {
+    if (result.error) {
+        throw new Error(`${context}: ${JSON.stringify(result.error)}`);
+    }
+    if (result.data === undefined) {
+        throw new Error(`${context}: resposta vazia do servidor OpenCode`);
+    }
+    return result.data;
+}
+function extractTextFromParts(parts) {
+    return parts
+        .filter((part) => part.type === 'text')
+        .map((part) => part.text)
+        .join('');
+}
+function logToolParts(parts, logger) {
+    for (const part of parts) {
+        if (part.type === 'tool') {
+            logger.info(`[tool] ${part.tool} — ${part.state.status}`);
+        }
+    }
+}
+function assistantMessageToMetrics(info) {
+    const tokens = info.tokens;
+    if (!tokens || (tokens.input === 0 && tokens.output === 0)) {
+        return { ...EMPTY_METRICS };
+    }
+    const metrics = {
+        [ENGINE_METRIC_KEYS.inputTokens]: tokens.input,
+        [ENGINE_METRIC_KEYS.outputTokens]: tokens.output,
+        [ENGINE_METRIC_KEYS.totalTokens]: tokens.input + tokens.output,
+    };
+    if (tokens.cache.read > 0) {
+        metrics[ENGINE_METRIC_KEYS.cacheReadTokens] = tokens.cache.read;
+    }
+    if (tokens.cache.write > 0) {
+        metrics[ENGINE_METRIC_KEYS.cacheWriteTokens] = tokens.cache.write;
+    }
+    return metrics;
+}
+async function createRuntime(config, model, timeoutMs, signal, logger) {
+    const directory = config.repoRoot;
+    const externalUrl = resolveServerUrl();
+    const runFetch = createOpencodeFetch(timeoutMs, signal);
+    const cleanupFetch = createOpencodeFetch(timeoutMs);
+    if (externalUrl) {
+        logger.info(`OpenCode: conectando ao servidor existente em ${externalUrl}`);
+        logger.info('OpenCode harness: AGENTS.md/opencode.json nativos do repo + prompt do runner (sem inject via OPENCODE_CONFIG_CONTENT)');
+        return {
+            client: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: runFetch }),
+            cleanupClient: createOpencodeClient({ baseUrl: externalUrl, directory, fetch: cleanupFetch }),
+            close: () => { },
+        };
+    }
+    const hostname = resolveHostname();
+    const port = resolvePort();
+    logger.info(port === 0
+        ? `OpenCode: servidor embutido em ${hostname} (porta livre do SO)`
+        : `OpenCode: servidor embutido ${hostname}:${port} (reutiliza, sequência ou porta livre)`);
+    const logServerOutput = resolveServerLogEnabled();
+    const serverConfig = buildOpencodeServerConfig(model, config);
+    const server = await createEmbeddedOpencodeServer({
+        hostname,
+        port,
+        signal,
+        timeout: 30_000,
+        config: serverConfig,
+        logServerOutput,
+        logger,
+    });
+    logger.info(`OpenCode server: ${server.url} (porta ${server.port})`);
+    if (serverConfig.instructions?.length) {
+        logger.info(`OpenCode harness instructions: ${serverConfig.instructions.join(', ')}`);
+    }
+    if (logServerOutput) {
+        logger.info('OpenCode server log: ON (defina AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG=false para desativar)');
+    }
+    return {
+        client: createOpencodeClient({ baseUrl: server.url, directory, fetch: runFetch }),
+        cleanupClient: createOpencodeClient({ baseUrl: server.url, directory, fetch: cleanupFetch }),
+        close: () => server.close(),
+    };
+}
+async function resolveSessionId(client, options, directory, logger, signal) {
+    if (options.resumeSessionId) {
+        const existing = await client.session.get({
+            path: { id: options.resumeSessionId },
+            query: { directory },
+            signal,
+        });
+        assertResponseData(existing, 'session.get');
+        logger.info(`Sessão retomada: ${options.resumeSessionId}`);
+        return options.resumeSessionId;
+    }
+    const created = await client.session.create({
+        body: { title: options.name },
+        query: { directory },
+        signal,
+    });
+    const session = assertResponseData(created, 'session.create');
+    logger.info(`Sessão criada: ${session.id}`);
+    return session.id;
+}
+async function sendSessionPrompt(client, sessionId, directory, agentName, prompt, modelSelection, logger, signal) {
+    const withModel = await client.session.prompt({
+        path: { id: sessionId },
+        query: { directory },
+        body: buildSessionPromptBody(agentName, prompt, modelSelection),
+        signal,
+    });
+    if (!withModel.error) {
+        logger.info(`Modelo no prompt: ${modelSelection.composite}`);
+        return assertResponseData(withModel, 'session.prompt');
+    }
+    if (!shouldFallbackSessionPromptWithoutModel(withModel.error)) {
+        throw new Error(`session.prompt: ${JSON.stringify(withModel.error)}`);
+    }
+    logger.warn(`session.prompt com model=${modelSelection.composite} rejeitado pelo servidor; ` +
+        `usando default do OpenCode. Erro: ${JSON.stringify(withModel.error)}`);
+    const fallback = await client.session.prompt({
+        path: { id: sessionId },
+        query: { directory },
+        body: buildSessionPromptBody(agentName, prompt),
+        signal,
+    });
+    return assertResponseData(fallback, 'session.prompt (fallback sem model)');
+}
+export async function runOpencodeStream(config, options, logger) {
+    logger.section(`Agente (OpenCode): ${options.name}`);
+    const modelSelection = resolveOpencodeModelSelection(config.model);
+    const timeoutMs = resolveTimeoutMs();
+    const agentName = resolveAgentName();
+    const directory = config.repoRoot;
+    logger.info(`Modelo (config): ${modelSelection.composite}`);
+    logger.info(`Agente OpenCode: ${agentName}`);
+    logger.info(`CWD: ${directory}`);
+    logger.info(`Timeout: ${(timeoutMs / 1000).toFixed(0)}s`);
+    logger.debug('Prompt length (chars):', options.prompt.length);
+    logAgentPromptBeforeSend(logger, options.prompt);
+    const abortController = new AbortController();
+    const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+    let runtime;
+    let sessionId;
+    try {
+        runtime = await createRuntime(config, modelSelection.composite, timeoutMs, abortController.signal, logger);
+        const { client } = runtime;
+        sessionId = await resolveSessionId(client, options, directory, logger, abortController.signal);
+        const eventStream = startOpencodeEventStream({
+            client,
+            sessionId,
+            directory,
+            logger,
+            verbose: config.verbose,
+            signal: abortController.signal,
+            fatalAbort: abortController,
+        });
+        logger.info('Enviando prompt ao agente OpenCode (aguarde — progresso via event stream)...');
+        let response;
+        try {
+            response = await withAbortSignal(abortController.signal, sendSessionPrompt(client, sessionId, directory, agentName, options.prompt, modelSelection, logger, abortController.signal));
+        }
+        finally {
+            eventStream.stop();
+        }
+        const info = response.info;
+        const fullText = extractTextFromParts(response.parts);
+        logToolParts(response.parts, logger);
+        if (info.error) {
+            throw new Error(`OpenCode assistant error: ${info.error.name} — ${JSON.stringify(info.error.data)}`);
+        }
+        if (!fullText.trim()) {
+            throw new Error('OpenCode retornou resposta vazia (nenhum TextPart na mensagem).');
+        }
+        logger.info('');
+        logger.info(`Mensagem concluída: ${info.finish ?? 'completed'}`);
+        return {
+            sessionId,
+            runId: info.id,
+            status: info.finish ?? 'completed',
+            fullText,
+            metrics: assistantMessageToMetrics(info),
+        };
+    }
+    catch (error) {
+        if (error instanceof OpencodeStreamInactivityError) {
+            process.exitCode = 1;
+            throw error;
+        }
+        if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+            const reason = abortController.signal.reason;
+            if (reason instanceof OpencodeStreamInactivityError) {
+                process.exitCode = 1;
+                throw reason;
+            }
+            if (runtime?.cleanupClient && sessionId) {
+                await runtime.cleanupClient.session
+                    .abort({ path: { id: sessionId }, query: { directory } })
+                    .catch(() => { });
+            }
+            throw new Error(`Timeout: agente OpenCode excedeu ${(timeoutMs / 1000).toFixed(0)}s. ` +
+                `Aumente ${ENV.TIMEOUT_MS} se necessário.`);
+        }
+        if (isHeadersTimeoutError(error)) {
+            throw new Error(`OpenCode session.prompt excedeu o limite HTTP antes de devolver resposta. ` +
+                `Aumente ${ENV.TIMEOUT_MS} (atual: ${timeoutMs}ms).`, { cause: error instanceof Error ? error : undefined });
+        }
+        logger.error('\n[DETALHES DO ERRO FATAL - OPENCODE]');
+        if (error instanceof Error) {
+            logger.error(`Message: ${error.message}`);
+            if (error.cause)
+                logger.error(`Cause: ${error.cause}`);
+            logger.error(`Stack: ${error.stack}`);
+        }
+        else {
+            logger.error(String(error));
+        }
+        process.exitCode = 1;
+        throw error;
+    }
+    finally {
+        clearTimeout(timeoutHandle);
+        if (runtime?.cleanupClient && sessionId && !options.resumeSessionId) {
+            await runtime.cleanupClient.session
+                .delete({ path: { id: sessionId }, query: { directory } })
+                .catch(() => { });
+        }
+        runtime?.close();
+        await closeAllOpencodeAgents().catch(() => { });
+    }
+}
+//# sourceMappingURL=stream.js.map

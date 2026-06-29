@@ -1,0 +1,473 @@
+import { writeFileSync } from 'node:fs';
+import { formatCommentForPosting } from '../ado/format-thread.js';
+import { getReviewSummaryFromComment, getThreadDescription } from '../ado/review-context.js';
+import { filterValidResolvedItems, isActiveOrPendingStatus, isDuplicateReview, isPublishableReview, matchesResolvedItem, } from '../ado/post-comments.js';
+import { buildRoundStateComment, ROUND_STATE_MARKER, } from '../ado/round-state.js';
+import { canonicalFilePath, reviewDedupKey } from '../ado/utils.js';
+import { BOT_TAG_PREFIX, extractAgenticBotTagLine, isAgenticReviewerComment, LEGACY_BOT_TAG_PREFIX } from '../bot-tag.js';
+import { commentBodyHasResolutionReply, RESOLUTION_MARKER, REVIEW_SUMMARY_MARKER, } from '../git/markers.js';
+import { sanitizeUserProvidedContent } from '../agent/input-sanitization.js';
+import { GithubClient, isGithubIntegrationAccessError } from './github-client.js';
+import { formatTokenCount, hasEngineMetrics, } from '../agent/metrics-display.js';
+import { ENGINE_METRIC_KEYS } from '../engine/types.js';
+export class GithubProvider {
+    name = 'github';
+    config;
+    client;
+    headRefOid = '';
+    async initialize(config, _logger) {
+        this.config = config;
+        const token = config.adoAccessToken;
+        this.client = new GithubClient(config.organization, // Reuses organization as owner
+        config.repositoryName, token);
+    }
+    async getPullRequestContext(log) {
+        const path = `/repos/${this.config.organization}/${this.config.repositoryName}/pulls/${this.config.pullRequestId}`;
+        try {
+            const pr = await this.client.restGet(path);
+            const title = pr.title?.trim() ?? '';
+            const body = pr.body?.trim() ?? '';
+            const contextForLlm = [
+                '## Pull Request (GitHub)',
+                '',
+                `> **Pull Request ID:** #${this.config.pullRequestId} — use **somente este número** ao referenciar a PR.`,
+                '',
+                title ? sanitizeUserProvidedContent('Título da PR', title, 500) : '',
+                body ? sanitizeUserProvidedContent('Descrição da PR', body) : '',
+            ]
+                .filter(Boolean)
+                .join('\n\n');
+            log?.(`Iniciando revisão somente leitura da PR #${this.config.pullRequestId} sobre ${title}.`);
+            return {
+                pullRequestId: this.config.pullRequestId,
+                title,
+                contextForLlm,
+            };
+        }
+        catch (error) {
+            log?.(`Warning: failed to load PR details: ${String(error)}`);
+            return {
+                pullRequestId: this.config.pullRequestId,
+                title: '',
+                contextForLlm: `## Pull Request (GitHub)\n\n> **Pull Request ID:** #${this.config.pullRequestId}`,
+            };
+        }
+    }
+    async getPullRequestReviewContext(botTag, log) {
+        try {
+            const pr = await this.client.fetchPullRequestContextData(this.config.pullRequestId, log);
+            this.headRefOid = pr.headRefOid;
+            const existingKeys = new Map();
+            const activeContextRows = [];
+            const resolvedContextRows = [];
+            const fileReviewThreads = [];
+            const pendingThreads = [];
+            for (const thread of pr.reviewThreads) {
+                const comments = thread.comments.filter((c) => c && c.body);
+                if (comments.length === 0)
+                    continue;
+                const firstComment = comments[0];
+                const rawContent = firstComment.body;
+                const canonicalPath = canonicalFilePath(thread.path);
+                const lineNumber = thread.line;
+                if (!thread.path || lineNumber == null || lineNumber <= 0) {
+                    continue;
+                }
+                const isResolved = thread.isResolved;
+                const status = isResolved ? 'fixed' : 'active';
+                const isBot = isAgenticReviewerComment(rawContent);
+                const detectedBotTag = isBot ? extractAgenticBotTagLine(rawContent) : null;
+                const summary = getReviewSummaryFromComment(rawContent, botTag);
+                const hasResolutionReply = comments.some((c) => c.databaseId !== firstComment.databaseId &&
+                    (commentBodyHasResolutionReply(c.body, botTag) || c.body.includes(RESOLUTION_MARKER)));
+                if (!isResolved) {
+                    existingKeys.set(reviewDedupKey(canonicalPath, lineNumber), true);
+                    activeContextRows.push({
+                        filePath: canonicalPath,
+                        lineNumber,
+                        status,
+                        summary,
+                    });
+                    fileReviewThreads.push({
+                        threadId: thread.id,
+                        filePath: canonicalPath,
+                        lineNumber,
+                        status,
+                        summary,
+                        description: getThreadDescription(rawContent, botTag),
+                        botCommentId: firstComment.databaseId,
+                        hasResolutionReply,
+                    });
+                    pendingThreads.push({
+                        threadId: thread.id,
+                        status: 'active',
+                        filePath: canonicalPath,
+                        lineNumber,
+                        author: firstComment.author?.login ?? 'unknown',
+                        isBot,
+                        botTag: detectedBotTag,
+                        summary: summary || rawContent.slice(0, 160),
+                    });
+                }
+                else {
+                    resolvedContextRows.push({
+                        filePath: canonicalPath,
+                        lineNumber,
+                        status,
+                        summary,
+                    });
+                }
+            }
+            const allThreadsMock = {
+                value: pr.prComments.map((c) => ({
+                    id: c.databaseId,
+                    status: 'closed',
+                    comments: [{
+                            id: c.databaseId,
+                            parentCommentId: 0,
+                            content: c.body,
+                            commentType: 1,
+                            author: { displayName: c.author?.login },
+                        }],
+                })),
+            };
+            log(`Found ${pendingThreads.length} pending thread(s) on PR (all authors).`);
+            log(`Found ${fileReviewThreads.length} open file review thread(s).`);
+            let contextForLlm = '';
+            if (activeContextRows.length > 0 || resolvedContextRows.length > 0) {
+                contextForLlm = `## Existing Pull Request Reviews (DO NOT duplicate)
+
+- Do NOT repeat reviews for the same file+line or semantically identical feedback.
+- You MAY return new reviews for lines that changed materially or were not reviewed before.
+- If the current diff already addresses an **active** issue, add that thread to \`resolvedThreads\` with \`threadId\` or \`fileName\`+\`lineNumber\` and a note explaining what was fixed.
+- Do NOT auto-resolve a thread just because the line disappeared from the diff — only resolve when you verified the underlying issue no longer exists.
+`;
+                contextForLlm += `
+### Risk Patterns Detected in This PR (Intra-PR Memory)
+
+In previous rounds, the following issues were identified in the codebase:
+`;
+                const allSummaries = new Set();
+                for (const row of [...activeContextRows, ...resolvedContextRows]) {
+                    const shortSummary = row.summary.trim();
+                    if (shortSummary) {
+                        allSummaries.add(`- ${shortSummary}`);
+                    }
+                }
+                for (const summary of allSummaries) {
+                    contextForLlm += `${summary}\n`;
+                }
+                contextForLlm += `\n**Mandatory Action (Phases 1 and 2):** When analyzing the current diff, prioritize searching for variations of these same errors. The developer may have fixed the exact line pointed out previously but made the same mistake in new files/lines of this commit. Use tools to actively hunt for the same vulnerabilities and group them via \`relatedOccurrences\`.
+`;
+                contextForLlm += `
+### Active threads (open)
+
+`;
+                if (activeContextRows.length > 0) {
+                    contextForLlm += '| File | Line | Status | Summary |\n|------|------|--------|----------|\n';
+                    for (const row of activeContextRows) {
+                        const escapedSummary = row.summary.replace(/\|/g, '/');
+                        contextForLlm += `| ${row.filePath} | ${row.lineNumber} | ${row.status} | ${escapedSummary} |\n`;
+                    }
+                }
+                else {
+                    contextForLlm += '_No active file review threads at the moment._\n';
+                }
+                if (resolvedContextRows.length > 0) {
+                    contextForLlm += `
+### Already resolved threads (memory — do NOT re-raise without new evidence)
+
+These issues were reported in a previous round and already resolved/closed. Do **not** create new reviews for them unless tools prove the problem was **reintroduced** by the current diff. This prevents an endless fix→review loop.
+
+| File | Line | Status | Summary |
+|------|------|--------|----------|
+`;
+                    for (const row of resolvedContextRows) {
+                        const escapedSummary = row.summary.replace(/\|/g, '/');
+                        contextForLlm += `| ${row.filePath} | ${row.lineNumber} | ${row.status} | ${escapedSummary} |\n`;
+                    }
+                }
+            }
+            return {
+                existingKeys,
+                contextForLlm,
+                fileReviewThreads,
+                allThreads: allThreadsMock,
+                pendingThreads,
+            };
+        }
+        catch (error) {
+            log(`Error: failed to retrieve existing threads: ${String(error)}`);
+            throw new Error(`Failed to retrieve PR threads: ${String(error)}`);
+        }
+    }
+    async getPullRequestWorkItemContext(_maxWorkItems, _log) {
+        return {
+            workItemIds: [],
+            contextForLlm: '',
+            summaries: [],
+        };
+    }
+    async resolvePullRequestReviewThreads(botTag, activeThreads, resolvedItems, log) {
+        if (activeThreads.length === 0) {
+            log('No active review threads to evaluate for resolution.');
+            return 0;
+        }
+        const llmResolved = filterValidResolvedItems(resolvedItems);
+        let resolvedCount = 0;
+        let skippedIntegrationResolve = 0;
+        for (const threadInfo of activeThreads) {
+            if (threadInfo.hasResolutionReply && isActiveOrPendingStatus(threadInfo.status)) {
+                try {
+                    await this.resolveGithubThread(threadInfo.threadId);
+                    log(`Recovered stuck thread ${threadInfo.threadId} (resolve-only after partial resolution).`);
+                    resolvedCount++;
+                }
+                catch (error) {
+                    if (isGithubIntegrationAccessError(error)) {
+                        skippedIntegrationResolve++;
+                        log(`Warning: GitHub denied resolveReviewThread for stuck thread ${threadInfo.threadId} ` +
+                            `(integration token limitation). Configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN with a PAT ` +
+                            `(repo / pull_requests:write) to enable thread resolution.`);
+                        continue;
+                    }
+                    log(`Error: failed to recover stuck thread ${threadInfo.threadId}: ${String(error)}`);
+                    throw error;
+                }
+                continue;
+            }
+            if (threadInfo.hasResolutionReply) {
+                log(`Thread ${threadInfo.threadId} already has a resolution reply. Skipping.`);
+                continue;
+            }
+            const match = llmResolved.find((item) => matchesResolvedItem(threadInfo, item));
+            if (!match) {
+                continue;
+            }
+            const reason = match.note?.trim() || 'Issue verified as fixed in the current iteration.';
+            const replyContent = [
+                botTag,
+                RESOLUTION_MARKER,
+                '',
+                reason.trim(),
+            ].join('\n');
+            try {
+                const replyPath = `/repos/${this.config.organization}/${this.config.repositoryName}/pulls/${this.config.pullRequestId}/comments`;
+                await this.client.restPost(replyPath, {
+                    body: replyContent,
+                    in_reply_to: Number(threadInfo.botCommentId),
+                });
+                await this.resolveGithubThread(threadInfo.threadId);
+                log(`Resolved thread ${threadInfo.threadId} (${threadInfo.filePath}:${threadInfo.lineNumber}).`);
+                resolvedCount++;
+            }
+            catch (error) {
+                if (isGithubIntegrationAccessError(error)) {
+                    skippedIntegrationResolve++;
+                    log(`Warning: GitHub denied resolveReviewThread for ${threadInfo.threadId} ` +
+                        `(integration token limitation). Resolution reply may have been posted; ` +
+                        `configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN with a PAT (repo / pull_requests:write).`);
+                    continue;
+                }
+                log(`Error: failed to resolve thread ${threadInfo.threadId}: ${String(error)}`);
+                throw error;
+            }
+        }
+        if (skippedIntegrationResolve > 0) {
+            log(`Skipped ${skippedIntegrationResolve} thread resolution(s) due to GitHub integration token limits.`);
+        }
+        return resolvedCount;
+    }
+    async resolveGithubThread(threadId) {
+        const mutation = `
+      mutation ResolveThread($threadId: ID!) {
+        resolveReviewThread(input: { threadId: $threadId }) {
+          thread {
+            id
+            isResolved
+          }
+        }
+      }
+    `;
+        await this.client.graphql(mutation, { threadId });
+    }
+    async setPullRequestComments(botTag, reviewsJson, existingKeys, log) {
+        const posted = [];
+        const reviewsObject = JSON.parse(reviewsJson);
+        let reviews = (reviewsObject.reviews ?? []).filter((review) => isPublishableReview(review, this.config.scoreMin));
+        const newReviews = reviews.filter((review) => !isDuplicateReview(review, existingKeys));
+        if (newReviews.length === 0) {
+            log('All comments already exist. No new comments to post.');
+            return posted;
+        }
+        const skipped = reviews.length - newReviews.length;
+        if (skipped > 0) {
+            log(`Skipping ${skipped} duplicate comment(s).`);
+        }
+        const sha = this.headRefOid;
+        if (!sha) {
+            throw new Error('Cannot post comments: head commit SHA (headRefOid) was not loaded.');
+        }
+        const failures = [];
+        for (const review of newReviews) {
+            // Use true for isGithub to keep ```suggestion fences intact
+            const body = formatCommentForPosting(review, botTag, true);
+            const filePath = review.fileName.replace(/^\/+/, '');
+            try {
+                const path = `/repos/${this.config.organization}/${this.config.repositoryName}/pulls/${this.config.pullRequestId}/comments`;
+                const response = await this.client.restPost(path, {
+                    body,
+                    commit_id: sha,
+                    path: filePath,
+                    line: review.lineNumber,
+                    side: 'RIGHT',
+                });
+                log(`Comment posted on '${review.fileName}' line ${review.lineNumber} (Comment ID: ${response.id}).`);
+                posted.push({
+                    threadId: String(response.id),
+                    botCommentId: response.id,
+                    review,
+                });
+            }
+            catch (error) {
+                let failureMsg = String(error);
+                if (isGithubIntegrationAccessError(error)) {
+                    failureMsg += ' (Hint: Configure AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN secret with a Personal Access Token that has pull_requests:write permission)';
+                }
+                const failure = `${review.fileName}:${review.lineNumber} — ${failureMsg}`;
+                log(`Error: failed to post comment on '${review.fileName}' line ${review.lineNumber}: ${failureMsg}`);
+                failures.push(failure);
+            }
+        }
+        if (failures.length > 0) {
+            throw new Error(`Falha ao publicar ${failures.length} review(s):\n${failures.join('\n')}`);
+        }
+        return posted;
+    }
+    async postPrComment(botTag, commentBody, log) {
+        const body = [botTag, '', commentBody].join('\n');
+        try {
+            const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/${this.config.pullRequestId}/comments`;
+            await this.client.restPost(path, { body });
+            log('Comment posted to PR conversation.');
+            return true;
+        }
+        catch (error) {
+            log(`Error: failed to post PR comment: ${String(error)}`);
+            return false;
+        }
+    }
+    async setPullRequestReviewSummary(botTag, summaryText, allThreads, log) {
+        if (!summaryText.trim())
+            return false;
+        const existingComments = allThreads?.value ?? [];
+        const normalizedSummary = summaryText.replace(/\s+/g, ' ').trim();
+        for (const c of existingComments) {
+            const commentContent = c.comments?.[0]?.content ?? '';
+            if (isAgenticReviewerComment(commentContent) && commentContent.includes(REVIEW_SUMMARY_MARKER)) {
+                let existing = commentContent.replaceAll(LEGACY_BOT_TAG_PREFIX, '');
+                existing = existing.replace(/^Agentic Code Reviewer(?: \S+)?\s*\r?\n?/, '');
+                existing = existing.replace(REVIEW_SUMMARY_MARKER, '');
+                existing = existing.replace(/\s+/g, ' ').trim();
+                if (existing === normalizedSummary) {
+                    log('Review summary already posted with identical content. Skipping.');
+                    return false;
+                }
+            }
+        }
+        const commentBody = [botTag, REVIEW_SUMMARY_MARKER, '', summaryText.trim()].join('\n');
+        try {
+            const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/${this.config.pullRequestId}/comments`;
+            await this.client.restPost(path, { body: commentBody });
+            log('Review summary posted to PR conversation.');
+            return true;
+        }
+        catch (error) {
+            log(`Error: failed to post review summary: ${String(error)}`);
+            return false;
+        }
+    }
+    parseRoundStateFromThreads(allThreads, botTag) {
+        const empty = { round: 0, threadId: null, commentId: null };
+        if (!allThreads || !allThreads.value) {
+            return empty;
+        }
+        for (const t of allThreads.value) {
+            const comment = t.comments?.[0];
+            if (!comment || comment.isDeleted)
+                continue;
+            if (isAgenticReviewerComment(comment.content) && comment.content.includes(ROUND_STATE_MARKER)) {
+                const match = comment.content.match(/(?:Round|Rodada):\s*(\d+)/i);
+                const round = match ? Number.parseInt(match[1], 10) : 0;
+                return {
+                    round: Number.isFinite(round) && round > 0 ? round : 0,
+                    threadId: String(t.id),
+                    commentId: comment.id,
+                };
+            }
+        }
+        return empty;
+    }
+    async persistRoundState(botTag, input, existing, log) {
+        const bodyContent = buildRoundStateComment(botTag, input);
+        if (existing.commentId != null) {
+            const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/comments/${existing.commentId}`;
+            await this.client.restPatch(path, { body: bodyContent });
+            log(`Round-state atualizado (comment ${existing.commentId}, rodada ${input.currentRound}).`);
+            return;
+        }
+        const path = `/repos/${this.config.organization}/${this.config.repositoryName}/issues/${this.config.pullRequestId}/comments`;
+        const response = await this.client.restPost(path, { body: bodyContent });
+        log(`Round-state criado (comment ${response.id}, rodada ${input.currentRound}).`);
+    }
+    emitPipelineReviewOutput(gate, reviews, dryRun, metrics, log = console.log) {
+        for (const r of reviews) {
+            const severity = r.severity === 'critical' ? 'error' : 'warning';
+            const file = r.fileName.replace(/^\/+/, '');
+            const firstLine = r.comment.split('\n').find((l) => l.trim().length > 0) ?? '';
+            const cleanMessage = firstLine.replace(/\s+/g, ' ').trim();
+            log(`::${severity} file=${file},line=${r.lineNumber},col=1::${BOT_TAG_PREFIX} ${cleanMessage}`);
+        }
+        const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+        if (summaryFile) {
+            try {
+                const markdown = this.buildGHSummaryMarkdown(gate, reviews, dryRun, metrics);
+                writeFileSync(summaryFile, markdown, { encoding: 'utf8', flag: 'a' });
+            }
+            catch (err) {
+                log(`Warning: failed to write GITHUB_STEP_SUMMARY: ${String(err)}`);
+            }
+        }
+    }
+    buildGHSummaryMarkdown(gate, reviews, dryRun, metrics) {
+        const lines = [];
+        lines.push(`### ${BOT_TAG_PREFIX} Summary`);
+        lines.push('');
+        lines.push(`- **Mode:** ${dryRun ? 'DRY-RUN' : 'PIPELINE'}`);
+        lines.push(`- **Status:** ${gate.shouldFail ? '⚠️ Issues found' : '✅ No issues'}`);
+        lines.push(`- **New reviews:** ${gate.newReviewsCount}`);
+        lines.push(`- **Pending threads:** ${gate.pendingThreadCount}`);
+        lines.push(`- **Resolved threads:** ${gate.resolvedCount}`);
+        lines.push(`- **Severities:** 🛑 ${gate.severities.critical} · ⚠️ ${gate.severities.warning} · 💡 ${gate.severities.suggestion}`);
+        if (hasEngineMetrics(metrics)) {
+            const input = metrics[ENGINE_METRIC_KEYS.inputTokens] ?? 0;
+            const output = metrics[ENGINE_METRIC_KEYS.outputTokens] ?? 0;
+            const total = metrics[ENGINE_METRIC_KEYS.totalTokens] ?? input + output;
+            lines.push(`- **Tokens total:** ${formatTokenCount(total)} (Input: ${formatTokenCount(input)}, Output: ${formatTokenCount(output)})`);
+        }
+        lines.push('');
+        if (reviews.length > 0) {
+            lines.push('#### Posted Reviews');
+            lines.push('');
+            lines.push('| Severity | File & Line | Comment |');
+            lines.push('|---|---|---|');
+            for (const r of reviews) {
+                const file = r.fileName.replace(/^\/+/, '');
+                const summary = r.comment.split('\n').find((l) => l.trim().length > 0) ?? '';
+                lines.push(`| ${r.severity} | \`${file}:${r.lineNumber}\` | ${summary} |`);
+            }
+        }
+        return lines.join('\n');
+    }
+}
+//# sourceMappingURL=github.js.map
