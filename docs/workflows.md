@@ -21,6 +21,7 @@ flowchart TD
     C --> C2[auto-fix.yml workflow_run<br/>--auto-fix]
     D --> D1[reusable review-remote.yml]
     D --> D2[curl run.sh @release]
+    D --> D3[two-workflow loop<br/>code-review + auto-fix]
     E --> E1[/code-review-self<br/>read-only]
     E --> E2[/megabrain<br/>iterative threads]
     E --> E3[/solve-pr<br/>fix+push GitHub]
@@ -188,15 +189,190 @@ For OpenCode replace the credential env and `--engine`/`--model` accordingly (se
 
 > Use the **`release`** branch in the `run.sh` URL — it carries compiled artifacts aligned with the script. The `main` branch contains TypeScript source.
 
-### Thread resolution on GitHub
+### 4.1 Setting up review + auto-fix (two-workflow loop)
 
-`github.token` (`pull-requests: write`) **publishes** comments but the GitHub API rejects `resolveReviewThread` for integration tokens — typical error `Resource not accessible by integration`. The runner treats this as a warning (the pipeline does not fail); the thread stays open in the UI.
+For a complete convergence loop (review → fix → re-review until clean), the consumer repo needs **two workflow files** chained via `workflow_run` + `pull_request synchronize`:
 
-To enable automatic resolution, set a PAT (classic `repo` or fine-grained **Pull requests: Read and write**) as the secret `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN`. Both `code-review.yml` and `review-remote.yml` prefer that secret when present, falling back to `github.token`.
+```mermaid
+flowchart LR
+    PUSH[Developer push<br/>or PR opened] --> RW1[code-review.yml<br/>pull_request]
+    RW1 -->|workflow_run completed| AFW[auto-fix.yml]
+    AFW -->|--auto-fix<br/>commit + push| PUSH
+    AFW -.->|no fix made| STOP[Loop stops<br/>— no pull_request re-fire]
+```
+
+**Why two files?** The auto-fix engine (`opencode`) differs from the review engine (`cursor-sdk`), so each runs in a separate workflow with its own credentials and timeout. The `workflow_run` event bridges them.
+
+#### File 1: `.github/workflows/code-review.yml`
+
+```yaml
+name: Agentic Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
+
+      - name: Run code reviewer
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
+          AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
+        run: |
+          git checkout -B "${{ github.head_ref }}"
+          curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
+            --gh \
+            --source-branch "refs/heads/${{ github.head_ref }}" \
+            --target-branch "refs/heads/${{ github.event.pull_request.base.ref }}"
+
+      - name: Check for active threads
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+        run: |
+          ACTIVE_THREADS=$(node .agents/skills/solve-pr/scripts/fetch_threads.cjs ${{ github.event.pull_request.number }} --json | jq '.activeThreads | length')
+          echo "Active threads: $ACTIVE_THREADS"
+          if [ "$ACTIVE_THREADS" -gt 0 ]; then
+            echo "Unresolved threads found."
+            exit 1
+          fi
+```
+
+The final step exits 1 when threads remain — this makes the workflow conclusion `failure`, which is intentional: auto-fix must fire on *both* `success` and `failure` conclusions to converge.
+
+#### File 2: `.github/workflows/auto-fix.yml`
+
+```yaml
+name: Agentic Auto Fix
+
+on:
+  workflow_run:
+    workflows: ["Agentic Code Review"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    concurrency:
+      group: auto-fix-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Extract PR info
+        id: pr-info
+        env:
+          GH_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
+          HEAD_BRANCH="${{ github.event.workflow_run.pull_requests[0].head.ref }}"
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+            PR_DATA=$(gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/pulls" --jq '.[0]')
+            PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+            HEAD_BRANCH=$(echo "$PR_DATA" | jq -r '.head.ref')
+          fi
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "source_branch=$HEAD_BRANCH" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-info.outputs.source_branch }}
+      - uses: actions/setup-node@v6
+        with: { node-version: 22 }
+
+      - name: Check for active threads
+        id: check-threads
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+        run: |
+          ACTIVE_THREADS=$(node .agents/skills/solve-pr/scripts/fetch_threads.cjs ${{ steps.pr-info.outputs.pr_number }} --json | jq '.activeThreads | length')
+          echo "active_threads_count=$ACTIVE_THREADS" >> "$GITHUB_OUTPUT"
+          echo "Active threads: $ACTIVE_THREADS"
+
+      - name: Run auto-fix
+        if: ${{ steps.check-threads.outputs.active_threads_count != '0' }}
+        env:
+          AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN }}
+          AGENTIC_CODE_REVIEWERS_ENGINE: opencode
+          AGENTIC_CODE_REVIEWERS_MODEL: opencode-go/deepseek-v4-flash
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \
+            --gh \
+            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
+            --source-branch "refs/heads/${{ steps.pr-info.outputs.source_branch }}" \
+            --target-branch "refs/heads/${{ github.event.workflow_run.pull_requests[0].base.ref }}" \
+            --auto-fix
+```
+
+#### How the loop converges
+
+| Step | Event | What happens |
+|------|-------|-------------|
+| 1 | `pull_request` push | `code-review.yml` runs the reviewer, posts threads, exits 1 |
+| 2 | `workflow_run` completed | `auto-fix.yml` fires (accepts both success and failure) |
+| 3 | `--auto-fix` | Runner applies fixes, commits (`fix(#N): auto-fix…`), pushes |
+| 4 | `pull_request` synchronize | Push re-fires `code-review.yml` — threads from fixed issues are gone, new ones may appear |
+| 5 | Loop | Step 2 → 4 repeats until `check-threads` reports 0 (auto-fix skipped, loop ends) or no progress between iterations |
+
+**Loop stops when:** all threads resolved (clean), auto-fix makes no change (no push → no synchronize → no re-fire), or `AGENTIC_CODE_REVIEWERS_MAX_ROUNDS` (default 10) escalates to human handoff.
+
+#### Critical requirements
+
+| Requirement | Why |
+|-------------|-----|
+| **PAT token** as `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | `github.token` cannot call `resolveReviewThread` and its push won't re-trigger `pull_request` workflows. Use a classic `repo` or fine-grained PAT. |
+| **Both conclusion gates** (`success || failure`) | Code review workflow exits 1 when threads exist (conclusion = failure). Auto-fix must fire regardless. |
+| **`concurrency.cancel-in-progress: false`** (auto-fix) | If a developer pushes during an auto-fix run, both should complete without cancellation. |
+| **Node 22+** with `fetch-depth: 0` | Required by the runner (git diff + runtime). |
+| **`curl \| bash` uses `release` branch** | `main` has TypeScript source; `release` carries compiled artifacts (`dist/`). |
+
+#### Tuning
+
+| Parameter | File | Effect |
+|-----------|------|--------|
+| `AGENTIC_CODE_REVIEWERS_SCORE_MIN` | env on review step | Lower = more threads posted (try `4` for verbose) |
+| `AGENTIC_CODE_REVIEWERS_ENGINE` + `_MODEL` | per workflow | Swap `cursor-sdk` ↔ `opencode`; each can have a different model |
+| `AGENTIC_CODE_REVIEWERS_AUTO_FIX_BUILD_COMMAND` | env on auto-fix step | Build command before push (default: `npm test` or `npm run build`). Set empty to skip build gate |
+| `--max-rounds N` | CLI on review | Cap escalation rounds. Stale threads after N rounds stay open for human review |
+
+#### Initial setup checklist
+
+1. Add `code-review.yml` and `auto-fix.yml` to `.github/workflows/`.
+2. Set repository secrets:
+   - `CURSOR_API_KEY` (review engine)
+   - `OPENCODE_API_KEY` (auto-fix engine)
+   - `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` (PAT with `repo` or `pull-requests: read/write`)
+3. On the PR branch, run `node -e "require('child_process').execSync('npm init -y')"` to create a minimal `package.json` if none exists (required for `setup-node` caching).
+4. Verify: open a PR → code review posts threads → auto-fix fires → pushes fix → code review re-runs → converges or stops.
 
 ---
 
-## 5. Auto-fix loop (`auto-fix.yml`)
+## 5. Auto-fix loop (this repo — `auto-fix.yml`)
 
 [`auto-fix.yml`](../.github/workflows/auto-fix.yml) triggers on `workflow_run` after **Agentic Code Review** succeeds (also accept `workflow_dispatch`). A single job runs `cursor-sdk` then `opencode` sequentially (`--auto-fix`), `git fetch + reset` between engines, `concurrency` per PR, and a final step that fails the job if **every** configured engine failed.
 

@@ -16,6 +16,7 @@ Each topic starts with a short overview here. Follow the link for the full deep 
 | Two-phase analysis model (triage → investigation) | [`two-phase-execution-model.md`](two-phase-execution-model.md) |
 | Score, severity and what becomes a thread | [`score_calc.md`](score_calc.md) |
 | Auto-fix self-healing loop | [`auto-fix.md`](auto-fix.md) |
+| Consumer: setting up review + auto-fix workflows | [`workflows.md`](workflows.md#41-setting-up-review--auto-fix-two-workflow-loop) |
 | All execution paths (local, CI, IDE, engines) | [`workflows.md`](workflows.md) |
 | Frequently asked questions | [`faq.md`](faq.md) |
 

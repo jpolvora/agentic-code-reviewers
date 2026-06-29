@@ -107,3 +107,13 @@ npm run review -- --gh --pr-id 42 --source-branch feat/x --target-branch main --
 | Job failed at the final step | All configured engines failed; or cursor-sdk failed and opencode left a divergent local HEAD |
 
 Full workflow details: [`workflows.md`](workflows.md) § Auto-fix loop.
+
+## Known pitfalls
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Loop stops after the first fix | Default `GITHUB_TOKEN` doesn't re-trigger workflows | Use a PAT as `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` |
+| Auto-fix produces no commit but threads exist | Path case mismatch resolved — upgrade to latest release which preserves original-case paths for filesystem lookups while keeping dedup case-insensitive |
+| Loop stopped before resolving | `MAX_ROUNDS` escalated to human handoff | Review the escalation comment on the PR |
+| `Resource not accessible by integration` | Default token lacks `resolveReviewThread` | PAT with `pull-requests: write` resolves this |
+| Auto-fix skips backend files on Linux | Fixed in latest: `filePath` on threads is now canonical (original case); dedup remains case-insensitive | Pull the latest `release` branch |
