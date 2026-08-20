@@ -116,8 +116,7 @@ describe('opencode server-config', () => {
     assert.equal(config.model, 'opencode-go/hy3');
     assert.deepEqual(config.agent, {
       explore: {
-        model: 'opencode-go/hy3',
-        variant: 'high',
+        model: 'opencode-go/hy3#high',
       },
     });
   });

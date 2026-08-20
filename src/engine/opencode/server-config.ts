@@ -33,8 +33,7 @@ export function buildOpencodeServerConfig(model: string, config?: ReviewerConfig
       ? {
           agent: {
             [agentName]: {
-              model,
-              variant,
+              model: `${model}#${variant}`,
             },
           },
         }
