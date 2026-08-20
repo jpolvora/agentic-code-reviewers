@@ -116,4 +116,10 @@ describe('env', () => {
     setEnv('AGENTIC_CODE_REVIEWERS_TARGET_BRANCH', 'refs/heads/develop');
     assert.equal(env.targetBranch(), 'refs/heads/develop');
   });
+
+  it('env.variant lê AGENTIC_CODE_REVIEWERS_VARIANT', () => {
+    setEnv('AGENTIC_CODE_REVIEWERS_VARIANT', 'high');
+    assert.equal(env.variant(), 'high');
+    assert.equal(ENV.VARIANT, 'AGENTIC_CODE_REVIEWERS_VARIANT');
+  });
 });

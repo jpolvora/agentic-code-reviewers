@@ -172,6 +172,8 @@ export interface ReviewerConfig {
   /** Engine de execução LLM (default: cursor-sdk). */
   engine: ReviewerEngineName;
   model: string;
+  /** Variante do modelo / reasoning effort (ex.: low, medium, high, max — opencode). */
+  variant?: string;
   /** Tag nos comentários — derivada da engine (`buildBotTag`). */
   botTag: string;
   verbose: boolean;
@@ -259,6 +261,7 @@ export interface CliArgs {
   includePatterns?: string;
   scoreMin?: number;
   engine?: string;
+  variant?: string;
   generateCommitMessage?: boolean;
   generatePrDescription?: boolean;
   artifactsOnly?: boolean;
@@ -408,6 +411,10 @@ function parseArgs(argv: string[]): CliArgs {
       args.engine = arg.slice(9);
       continue;
     }
+    if (arg.startsWith('--variant=')) {
+      args.variant = arg.slice(10);
+      continue;
+    }
     if (arg === '--generate-commit-message') {
       args.generateCommitMessage = true;
       continue;
@@ -501,6 +508,10 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case '--engine':
         args.engine = next;
+        i++;
+        break;
+      case '--variant':
+        args.variant = next;
         i++;
         break;
       default:
@@ -835,6 +846,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     cursorApiKey,
     engine,
     model: resolveReviewerModel(engine, cli.model),
+    variant: (() => {
+      const raw = cli.variant ?? env.variant();
+      return raw && !isUnexpandedPipelineMacro(raw) ? raw.trim() : undefined;
+    })(),
     botTag: buildBotTag(engine),
     verbose: cli.verbose ?? parseBool(env.verbose(), true),
     dryRun,
@@ -906,6 +921,7 @@ Opções:
   --org, --project, --repo, --pr-id   Contexto Azure DevOps/GitHub
   --model ID             Modelo LLM (default por engine)
   --engine NAME          Engine: cursor-sdk, cursor ou opencode (default: cursor-sdk)
+  --variant NAME         Variante do modelo / reasoning effort (ex: low, medium, high, max — OpenCode)
   --repo-root PATH       Raiz do repositório alvo
   --ado / --gh           Define a estratégia de execução/plataforma (Azure DevOps ou GitHub)
   --stack NAME           Stack tecnológica para o review (ABP/Angular, PHP/Laravel, Next.js/React, TypeScript, Custom. Default: ABP/Angular)

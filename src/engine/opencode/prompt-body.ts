@@ -6,7 +6,9 @@ export type SessionPromptBody = {
   model?: {
     providerID: string;
     modelID: string;
+    variant?: string;
   };
+  variant?: string;
 };
 
 /** Monta o body de session.prompt; model opcional para fallback ao default do servidor. */
@@ -14,17 +16,25 @@ export function buildSessionPromptBody(
   agentName: string,
   prompt: string,
   modelSelection?: OpencodeModelSelection,
+  variant?: string,
 ): SessionPromptBody {
   const body: SessionPromptBody = {
     agent: agentName,
     parts: [{ type: 'text', text: prompt }],
   };
 
+  const normalizedVariant = variant?.trim() || undefined;
+
   if (modelSelection) {
     body.model = {
       providerID: modelSelection.providerID,
       modelID: modelSelection.modelID,
+      ...(normalizedVariant ? { variant: normalizedVariant } : {}),
     };
+  }
+
+  if (normalizedVariant) {
+    body.variant = normalizedVariant;
   }
 
   return body;

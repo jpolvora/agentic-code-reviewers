@@ -30,6 +30,7 @@ export const ENV = {
   OPENCODE_KILL_PORT: primaryKey('OPENCODE_KILL_PORT'),
   OPENCODE_STREAM_REASONING: primaryKey('OPENCODE_STREAM_REASONING'),
   OPENCODE_BIN: primaryKey('OPENCODE_BIN'),
+  VARIANT: primaryKey('VARIANT'),
   /** Credencial OpenCode Go — lida por `run.sh`/CI, não por `env.*`. */
   OPENCODE_API_KEY: 'OPENCODE_API_KEY',
   AZURE_DEVOPS_PAT: primaryKey('AZURE_DEVOPS_PAT'),
@@ -83,6 +84,7 @@ export const env = {
   opencodeKillPort: () => readEnv('OPENCODE_KILL_PORT'),
   opencodeStreamReasoning: () => readEnv('OPENCODE_STREAM_REASONING'),
   opencodeBin: () => readEnv('OPENCODE_BIN'),
+  variant: () => readEnv('VARIANT'),
   azureDevOpsPat: () => readEnv('AZURE_DEVOPS_PAT'),
   githubToken: () =>
     readEnv('GITHUB_TOKEN') ??

@@ -68,6 +68,9 @@ async function main(): Promise<void> {
   logger.section(`${config.projectName} Cursor Reviewer v${config.version}`);
   logger.info(`Modo: ${config.dryRun ? 'DRY-RUN' : 'PIPELINE'}`);
   logger.info(`Model: ${config.model}`);
+  if (config.variant) {
+    logger.info(`Variant: ${config.variant}`);
+  }
   logger.info(`Engine: ${config.engine}`);
   const stackSourceLabel =
     config.stackSource === 'cli'

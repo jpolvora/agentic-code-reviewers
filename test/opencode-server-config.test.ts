@@ -102,4 +102,22 @@ describe('opencode server-config', () => {
     assert.ok(config.instructions?.includes('.agents/skills/code-review/SKILL.md'));
     assert.ok(config.instructions?.includes('docs/**/*.md'));
   });
+
+  it('buildOpencodeServerConfig configura variant do agente quando variant está definido', () => {
+    clearKeys(
+      'AGENTIC_CODE_REVIEWERS_OPENCODE_LOG_LEVEL',
+      'AGENTIC_CODE_REVIEWERS_OPENCODE_SERVER_LOG',
+      'AGENTIC_CODE_REVIEWERS_VARIANT',
+    );
+    const config = buildOpencodeServerConfig('opencode-go/hy3', {
+      variant: 'high',
+    } as any);
+
+    assert.equal(config.model, 'opencode-go/hy3');
+    assert.deepEqual(config.agent, {
+      explore: {
+        model: 'opencode-go/hy3#high',
+      },
+    });
+  });
 });

@@ -133,13 +133,14 @@ All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except creden
 | `OPENCODE_API_KEY` | — | OpenCode Go in CI (`run.sh` → `auth.json`; not via `env.*`) |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | `cursor-sdk` \| `opencode` |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | per engine | Cursor ID or `provider/model` |
+| `AGENTIC_CODE_REVIEWERS_VARIANT` | — | Model variant / reasoning effort (`none`, `low`, `medium`, `high`, `max` in OpenCode) |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | External server; **empty = embedded** |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | ADO PAT (local) |
 | `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | GitHub token (local); fallback `GITHUB_TOKEN` / `GH_TOKEN` |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Diff comparison branch |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Include runner in diff (CI of this repo) |
 
-**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, etc.
+**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VARIANT`, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, etc.
 
 **`run.sh` only:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
@@ -147,7 +148,7 @@ All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except creden
 
 Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/index.md`](docs/index.md).
 
-**Precedence:** CLI flags (`--engine`, `--model`, `--score-min`) > canonical env > default.
+**Precedence:** CLI flags (`--engine`, `--model`, `--variant`, `--score-min`) > canonical env > default.
 
 ---
 

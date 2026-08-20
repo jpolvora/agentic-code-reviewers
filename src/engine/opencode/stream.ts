@@ -226,16 +226,20 @@ async function sendSessionPrompt(
   modelSelection: OpencodeModelSelection,
   logger: Logger,
   signal: AbortSignal,
+  variant?: string,
 ): Promise<SessionPromptResponse> {
   const withModel = await client.session.prompt({
     path: { id: sessionId },
-    query: { directory },
-    body: buildSessionPromptBody(agentName, prompt, modelSelection),
+    query: {
+      directory,
+      ...(variant ? { variant } : {}),
+    },
+    body: buildSessionPromptBody(agentName, prompt, modelSelection, variant),
     signal,
   });
 
   if (!withModel.error) {
-    logger.info(`Modelo no prompt: ${modelSelection.composite}`);
+    logger.info(`Modelo no prompt: ${modelSelection.composite}${variant ? ` (variant: ${variant})` : ''}`);
     return assertResponseData(withModel, 'session.prompt');
   }
 
@@ -250,8 +254,11 @@ async function sendSessionPrompt(
 
   const fallback = await client.session.prompt({
     path: { id: sessionId },
-    query: { directory },
-    body: buildSessionPromptBody(agentName, prompt),
+    query: {
+      directory,
+      ...(variant ? { variant } : {}),
+    },
+    body: buildSessionPromptBody(agentName, prompt, undefined, variant),
     signal,
   });
 
@@ -271,6 +278,9 @@ export async function runOpencodeStream(
   const directory = config.repoRoot;
 
   logger.info(`Modelo (config): ${modelSelection.composite}`);
+  if (config.variant) {
+    logger.info(`Variant: ${config.variant}`);
+  }
   logger.info(`Agente OpenCode: ${agentName}`);
   logger.info(`CWD: ${directory}`);
   logger.info(`Timeout: ${(timeoutMs / 1000).toFixed(0)}s`);
@@ -314,6 +324,7 @@ export async function runOpencodeStream(
           modelSelection,
           logger,
           abortController.signal,
+          config.variant,
         ),
       );
     } finally {

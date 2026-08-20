@@ -17,6 +17,8 @@ const ISOLATED_CI_ENV: Record<string, undefined> = {
   AZURE_DEVOPS_EXT_PAT: undefined,
   AGENTIC_CODE_REVIEWERS_STACK: undefined,
   AGENTIC_CODE_REVIEWERS_SCORE_MIN: undefined,
+  AGENTIC_CODE_REVIEWERS_MODEL: undefined,
+  AGENTIC_CODE_REVIEWERS_VARIANT: undefined,
 };
 
 function withEnv(env: Record<string, string | undefined>, action: () => void): void {
@@ -736,6 +738,73 @@ describe('loadConfig', () => {
       () => {
         const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
         assert.deepEqual(config.includePatterns, ['**/*.py']);
+      },
+    );
+  });
+
+  it('lê --variant via flag CLI', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--engine',
+          'opencode',
+          '--variant',
+          'high',
+        ]);
+        assert.equal(config.variant, 'high');
+
+        const configEq = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--engine',
+          'opencode',
+          '--variant=max',
+        ]);
+        assert.equal(configEq.variant, 'max');
+      },
+    );
+  });
+
+  it('lê variant via AGENTIC_CODE_REVIEWERS_VARIANT', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
+        AGENTIC_CODE_REVIEWERS_VARIANT: 'medium',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature', '--engine', 'opencode']);
+        assert.equal(config.variant, 'medium');
+      },
+    );
+  });
+
+  it('CLI --variant tem precedência sobre AGENTIC_CODE_REVIEWERS_VARIANT', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
+        AGENTIC_CODE_REVIEWERS_VARIANT: 'medium',
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--engine',
+          'opencode',
+          '--variant',
+          'low',
+        ]);
+        assert.equal(config.variant, 'low');
       },
     );
   });
