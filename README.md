@@ -151,13 +151,14 @@ cp .env.example .env
 | `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` instala CLI + `auth.json`). |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
 | `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
+| `AGENTIC_CODE_REVIEWERS_VARIANT` | — | Variante do modelo / reasoning effort (`none`, `low`, `medium`, `high`, `max` no OpenCode). |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |
 | `AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN` | — | Token GitHub (`solve-pr`, publicação, **resolver threads**). Fallback: `GITHUB_TOKEN`, `GH_TOKEN`. Em CI, `github.token` publica comentários mas **não** fecha threads — veja [Resolução de threads](#resolução-automática-de-threads-github). |
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Branch de comparação do diff. |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Incluir o runner no diff (CI deste repo). |
 
-Preferir flags CLI quando possível: `--dry-run`, `--quiet`, `--stack`, `--score-min`, `--engine`, `--model`.
+Preferir flags CLI quando possível: `--dry-run`, `--quiet`, `--stack`, `--score-min`, `--engine`, `--model`, `--variant`.
 
 ### Configuração avançada
 
@@ -228,6 +229,7 @@ npm run review -- [argumentos]
 *   `--custom-prompt <VAL>` : Caminho do arquivo ou string de prompt quando a stack é `Custom` (requerido para `--stack=Custom`).
 *   `--include-patterns <VAL>` : Lista separada por vírgulas de padrões glob de inclusão (ex.: `**/*.py,**/*.go`). Sobrescreve o padrão de arquivos a incluir no diff.
 *   `--model <id>` : Modelo LLM — ID Cursor no engine `cursor-sdk` (`composer-2.5`) ou `provider/model` no `opencode` (`opencode-go/deepseek-v4-flash`). Sobrescreve `AGENTIC_CODE_REVIEWERS_MODEL`.
+*   `--variant <NAME>` ou `--variant=<NAME>` : Variante do modelo / reasoning effort no OpenCode (ex: `none`, `low`, `medium`, `high`, `max`). Sobrescreve `AGENTIC_CODE_REVIEWERS_VARIANT`.
 *   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `AGENTIC_CODE_REVIEWERS_ENGINE`.
 *   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
 *   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6. Injetado no prompt e aplicado pelo gate TypeScript + Safe Outputs (mesmo valor em `cursor-sdk` e `opencode`).

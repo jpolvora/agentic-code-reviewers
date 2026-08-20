@@ -38,6 +38,7 @@ Opções do runner:
 
 Demais argumentos são repassados ao reviewer, por exemplo:
   --dry-run
+  --variant high
   --stack typescript
   --target-branch refs/heads/main
   --gh --pr-id 42
@@ -45,13 +46,14 @@ Demais argumentos são repassados ao reviewer, por exemplo:
 Variáveis de ambiente:
   AGENTIC_CODE_REVIEWERS_LOCAL=1       Mesmo que --local
   AGENTIC_CODE_REVIEWERS_ENGINE        Mesmo que --engine
+  AGENTIC_CODE_REVIEWERS_VARIANT       Mesmo que --variant
   AGENTIC_CODE_REVIEWERS_USE_TSX=true  Força npx tsx src/index.ts (default em --local)
   AGENTIC_CODE_REVIEWERS_REPO_URL      URL git do reviewer (modo remoto)
   AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH Branch dos artefatos (default: release)
   OPENCODE_API_KEY                      Credencial OpenCode Go
 
 Modo remoto em outro projeto (CI):
-  curl -fsSL https://raw.githubusercontent.com/OWNER/agentic-code-reviewers/release/run.sh | bash -s -- \\
+  curl -fsSL https://raw.githubusercontent.com/OWNER/agentic-code-reviewers/release/run.sh | bash -s -- \
     --gh --pr-id 42 --source-branch feat/x --target-branch main
 
 Ou use o reusable workflow:
@@ -59,9 +61,9 @@ Ou use o reusable workflow:
 
 Exemplos:
   bash run.sh --local --gh --pr-id 42
-  bash run.sh --local --engine opencode --dry-run
+  bash run.sh --local --engine opencode --variant high --dry-run
   curl -fsSL .../release/run.sh | bash -s -- --dry-run
-  curl -fsSL .../release/run.sh | bash -s -- --engine opencode --dry-run
+  curl -fsSL .../release/run.sh | bash -s -- --engine opencode --variant high --dry-run
 EOF
 }
 

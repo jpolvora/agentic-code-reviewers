@@ -24,9 +24,21 @@ export function resolveServerLogLevel(): OpencodeLogLevel | undefined {
 export function buildOpencodeServerConfig(model: string, config?: ReviewerConfig): Config {
   const logLevel = resolveServerLogLevel();
   const mcpInstructions = config ? buildOpencodeMcpInstructions(config) : [];
+  const variant = config?.variant?.trim() || env.variant()?.trim() || undefined;
+  const agentName = env.opencodeAgent()?.trim() || 'explore';
   return {
     model,
     ...(logLevel ? { logLevel } : {}),
+    ...(variant
+      ? {
+          agent: {
+            [agentName]: {
+              model,
+              variant,
+            },
+          },
+        }
+      : {}),
     instructions: [...resolveOpencodeHarnessInstructions(), ...mcpInstructions],
     permission: {
       edit: 'deny' as const,
