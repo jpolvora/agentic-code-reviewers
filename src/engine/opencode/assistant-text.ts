@@ -51,3 +51,48 @@ export function formatIncompleteAssistantDiagnostics(
     : 'n/a';
   return `finish=${finish}; error=${errorName}; parts=[${summarizePartTypes(parts)}]; tokens={${tokens}}`;
 }
+
+export type IncompleteAssistantTurn = {
+  info: AssistantMessage;
+  parts: Part[];
+};
+
+export type IncompleteAssistantRetryResult = {
+  turn: IncompleteAssistantTurn;
+  fullText: string;
+  retried: boolean;
+};
+
+/**
+ * If the first turn has no usable text (or length/abort error), call `followUp` once.
+ * Used by runOpencodeStream so the orchestration path is unit-testable.
+ */
+export async function resolveIncompleteAssistantTurn(
+  first: IncompleteAssistantTurn,
+  followUp: () => Promise<IncompleteAssistantTurn>,
+  onRetry?: () => void,
+): Promise<IncompleteAssistantRetryResult> {
+  const firstText = extractTextFromParts(first.parts);
+  if (!isRetryableIncompleteAssistant(first.info, firstText)) {
+    return { turn: first, fullText: firstText, retried: false };
+  }
+  onRetry?.();
+  const second = await followUp();
+  return {
+    turn: second,
+    fullText: extractTextFromParts(second.parts),
+    retried: true,
+  };
+}
+
+export function mergeAssistantMetrics(
+  first: Record<string, number>,
+  second: Record<string, number>,
+): Record<string, number> {
+  const keys = new Set([...Object.keys(first), ...Object.keys(second)]);
+  const merged: Record<string, number> = {};
+  for (const key of keys) {
+    merged[key] = (first[key] ?? 0) + (second[key] ?? 0);
+  }
+  return merged;
+}

@@ -21,7 +21,8 @@ import {
   EMPTY_ASSISTANT_TEXT_CONTINUATION,
   extractTextFromParts,
   formatIncompleteAssistantDiagnostics,
-  isRetryableIncompleteAssistant,
+  mergeAssistantMetrics,
+  resolveIncompleteAssistantTurn,
 } from './assistant-text.js';
 import {
   closeAllOpencodeAgents,
@@ -288,7 +289,7 @@ export async function runOpencodeStream(
   logAgentPromptBeforeSend(logger, options.prompt);
 
   const abortController = new AbortController();
-  const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+  let timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
   let runtime: OpencodeRuntime | undefined;
   let sessionId: string | undefined;
 
@@ -297,10 +298,11 @@ export async function runOpencodeStream(
     const { client } = runtime;
 
     sessionId = await resolveSessionId(client, options, directory, logger, abortController.signal);
+    const activeSessionId = sessionId;
 
     const eventStream = startOpencodeEventStream({
       client,
-      sessionId,
+      sessionId: activeSessionId,
       directory,
       logger,
       verbose: config.verbose,
@@ -316,7 +318,7 @@ export async function runOpencodeStream(
         abortController.signal,
         sendSessionPrompt(
           client,
-          sessionId,
+          activeSessionId,
           directory,
           agentName,
           options.prompt,
@@ -327,35 +329,46 @@ export async function runOpencodeStream(
         ),
       );
 
-      let fullText = extractTextFromParts(response.parts);
       logToolParts(response.parts, logger);
+      const firstMetrics = assistantMessageToMetrics(response.info);
 
-      if (isRetryableIncompleteAssistant(response.info, fullText)) {
-        const diagnostics = formatIncompleteAssistantDiagnostics(response.info, response.parts);
-        logger.warn(
-          `OpenCode: resposta incompleta sem textPart utilizável (${diagnostics}). ` +
-            'Enviando um follow-up para obter o JSON final.',
-        );
-
-        response = await withAbortSignal(
-          abortController.signal,
-          sendSessionPrompt(
-            client,
-            sessionId,
-            directory,
-            agentName,
-            EMPTY_ASSISTANT_TEXT_CONTINUATION,
-            modelSelection,
-            logger,
+      const resolved = await resolveIncompleteAssistantTurn(
+        { info: response.info, parts: response.parts },
+        async () => {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+          const followUp = await withAbortSignal(
             abortController.signal,
-            config.variant,
-          ),
-        );
-        fullText = extractTextFromParts(response.parts);
-        logToolParts(response.parts, logger);
-      }
+            sendSessionPrompt(
+              client,
+              activeSessionId,
+              directory,
+              agentName,
+              EMPTY_ASSISTANT_TEXT_CONTINUATION,
+              modelSelection,
+              logger,
+              abortController.signal,
+              config.variant,
+            ),
+          );
+          logToolParts(followUp.parts, logger);
+          return { info: followUp.info, parts: followUp.parts };
+        },
+        () => {
+          const diagnostics = formatIncompleteAssistantDiagnostics(response.info, response.parts);
+          logger.warn(
+            `OpenCode: resposta incompleta sem textPart utilizável (${diagnostics}). ` +
+              'Enviando um follow-up para obter o JSON final.',
+          );
+        },
+      );
 
+      response = { info: resolved.turn.info, parts: resolved.turn.parts };
+      const fullText = resolved.fullText;
       const info = response.info;
+      const metrics = resolved.retried
+        ? mergeAssistantMetrics(firstMetrics, assistantMessageToMetrics(info))
+        : firstMetrics;
 
       if (info.error) {
         throw new Error(
@@ -379,7 +392,7 @@ export async function runOpencodeStream(
         runId: info.id,
         status: info.finish ?? 'completed',
         fullText,
-        metrics: assistantMessageToMetrics(info),
+        metrics,
       };
     } finally {
       eventStream.stop();
