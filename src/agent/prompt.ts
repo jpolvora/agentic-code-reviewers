@@ -112,7 +112,7 @@ export function buildExecutionContext(config: ReviewerConfig, context: PromptCon
     `- **Minimum score for threads (\`AGENTIC_CODE_REVIEWERS_SCORE_MIN\`):** **${config.scoreMin}** — include in \`reviews\` **only** findings with \`score ≥ ${config.scoreMin}\`; the runner discards the rest before creating threads (pipeline default: 6; CLI \`--score-min\` and env take precedence).`,
     `- **Eligible files:** ${context.diffStats.fileCount}`,
     context.diffStats.files.length > 0
-      ? `- **List:** ${context.diffStats.files.slice(0, 30).join(', ')}${context.diffStats.files.length > 30 ? '...' : ''}`
+      ? `- **List:** ${context.diffStats.files.join(', ')}`
       : '',
     `- **Include:** ${config.includePatterns.join(', ')}`,
     `- **Exclude:** ${config.excludePatterns.join(', ')}`,

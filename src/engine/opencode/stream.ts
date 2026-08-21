@@ -18,6 +18,13 @@ import {
 import { buildOpencodeServerConfig, resolveServerLogEnabled } from './server-config.js';
 import { createEmbeddedOpencodeServer } from './server.js';
 import {
+  EMPTY_ASSISTANT_TEXT_CONTINUATION,
+  extractTextFromParts,
+  formatIncompleteAssistantDiagnostics,
+  mergeAssistantMetrics,
+  resolveIncompleteAssistantTurn,
+} from './assistant-text.js';
+import {
   closeAllOpencodeAgents,
   createOpencodeFetch,
   isHeadersTimeoutError,
@@ -86,13 +93,6 @@ function assertResponseData<T>(result: { data?: T; error?: unknown }, context: s
     throw new Error(`${context}: resposta vazia do servidor OpenCode`);
   }
   return result.data;
-}
-
-function extractTextFromParts(parts: Part[]): string {
-  return parts
-    .filter((part): part is Extract<Part, { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('');
 }
 
 function logToolParts(parts: Part[], logger: Logger): void {
@@ -289,7 +289,7 @@ export async function runOpencodeStream(
   logAgentPromptBeforeSend(logger, options.prompt);
 
   const abortController = new AbortController();
-  const timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+  let timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
   let runtime: OpencodeRuntime | undefined;
   let sessionId: string | undefined;
 
@@ -298,10 +298,11 @@ export async function runOpencodeStream(
     const { client } = runtime;
 
     sessionId = await resolveSessionId(client, options, directory, logger, abortController.signal);
+    const activeSessionId = sessionId;
 
     const eventStream = startOpencodeEventStream({
       client,
-      sessionId,
+      sessionId: activeSessionId,
       directory,
       logger,
       verbose: config.verbose,
@@ -317,7 +318,7 @@ export async function runOpencodeStream(
         abortController.signal,
         sendSessionPrompt(
           client,
-          sessionId,
+          activeSessionId,
           directory,
           agentName,
           options.prompt,
@@ -327,32 +328,75 @@ export async function runOpencodeStream(
           config.variant,
         ),
       );
+
+      logToolParts(response.parts, logger);
+      const firstMetrics = assistantMessageToMetrics(response.info);
+
+      const resolved = await resolveIncompleteAssistantTurn(
+        { info: response.info, parts: response.parts },
+        async () => {
+          clearTimeout(timeoutHandle);
+          timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);
+          const followUp = await withAbortSignal(
+            abortController.signal,
+            sendSessionPrompt(
+              client,
+              activeSessionId,
+              directory,
+              agentName,
+              EMPTY_ASSISTANT_TEXT_CONTINUATION,
+              modelSelection,
+              logger,
+              abortController.signal,
+              config.variant,
+            ),
+          );
+          logToolParts(followUp.parts, logger);
+          return { info: followUp.info, parts: followUp.parts };
+        },
+        () => {
+          const diagnostics = formatIncompleteAssistantDiagnostics(response.info, response.parts);
+          logger.warn(
+            `OpenCode: resposta incompleta sem textPart utilizável (${diagnostics}). ` +
+              'Enviando um follow-up para obter o JSON final.',
+          );
+        },
+      );
+
+      response = { info: resolved.turn.info, parts: resolved.turn.parts };
+      const fullText = resolved.fullText;
+      const info = response.info;
+      const metrics = resolved.retried
+        ? mergeAssistantMetrics(firstMetrics, assistantMessageToMetrics(info))
+        : firstMetrics;
+
+      if (info.error) {
+        throw new Error(
+          `OpenCode assistant error: ${info.error.name} — ${JSON.stringify(info.error.data)} ` +
+            `(${formatIncompleteAssistantDiagnostics(info, response.parts)})`,
+        );
+      }
+
+      if (!fullText.trim()) {
+        throw new Error(
+          'OpenCode retornou resposta vazia (nenhum textPart na mensagem). ' +
+            formatIncompleteAssistantDiagnostics(info, response.parts),
+        );
+      }
+
+      logger.info('');
+      logger.info(`Mensagem concluída: ${info.finish ?? 'completed'}`);
+
+      return {
+        sessionId,
+        runId: info.id,
+        status: info.finish ?? 'completed',
+        fullText,
+        metrics,
+      };
     } finally {
       eventStream.stop();
     }
-    const info = response.info;
-    const fullText = extractTextFromParts(response.parts);
-
-    logToolParts(response.parts, logger);
-
-    if (info.error) {
-      throw new Error(`OpenCode assistant error: ${info.error.name} — ${JSON.stringify(info.error.data)}`);
-    }
-
-    if (!fullText.trim()) {
-      throw new Error('OpenCode retornou resposta vazia (nenhum TextPart na mensagem).');
-    }
-
-    logger.info('');
-    logger.info(`Mensagem concluída: ${info.finish ?? 'completed'}`);
-
-    return {
-      sessionId,
-      runId: info.id,
-      status: info.finish ?? 'completed',
-      fullText,
-      metrics: assistantMessageToMetrics(info),
-    };
   } catch (error) {
     if (error instanceof OpencodeStreamInactivityError) {
       process.exitCode = 1;

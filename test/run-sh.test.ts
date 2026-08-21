@@ -50,20 +50,16 @@ describe('run.sh', () => {
     let mockBinDir: string;
     let mockHome: string;
 
-    function toWslPath(winPath: string): string {
-      try {
-        const winPathSafe = winPath.replace(/\\/g, '/');
-        return execFileSync('wsl', ['wslpath', '-u', winPathSafe], {
-          env: { ...process.env, MSYS_NO_PATHCONV: '1' },
-          encoding: 'utf8'
-        }).trim();
-      } catch {
-        const drive = winPath.match(/^([a-zA-Z]):/);
-        if (drive) {
-          return `/${drive[1].toLowerCase()}${winPath.slice(2).replace(/\\/g, '/')}`;
-        }
+    /** Path for Git Bash `HOME=…` on win32 (`/c/…`). Avoid `/mnt/c/…` from `wslpath` — that breaks when `bash` is Git Bash, not WSL. */
+    function toBashHomePath(winPath: string): string {
+      if (process.platform !== 'win32') {
         return winPath.replace(/\\/g, '/');
       }
+      const drive = winPath.match(/^([a-zA-Z]):/);
+      if (drive) {
+        return `/${drive[1].toLowerCase()}${winPath.slice(2).replace(/\\/g, '/')}`;
+      }
+      return winPath.replace(/\\/g, '/');
     }
 
     before(() => {
@@ -99,7 +95,7 @@ describe('run.sh', () => {
 
     it('trims OPENCODE_API_KEY with surrounding spaces and writes it to auth.json', () => {
       const mockBinDirSafe = mockBinDir.replace(/\\/g, '/');
-      const mockHomeUnix = toWslPath(mockHome);
+      const mockHomeUnix = toBashHomePath(mockHome);
       const originalPath = process.env.PATH || '';
 
       const customEnv = {
@@ -107,7 +103,6 @@ describe('run.sh', () => {
         AGENTIC_CODE_REVIEWERS_LOCAL: 'true',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
         OPENCODE_API_KEY: '  my-clean-key  ',
-        WSLENV: 'AGENTIC_CODE_REVIEWERS_LOCAL/u:AGENTIC_CODE_REVIEWERS_ENGINE/u:OPENCODE_API_KEY/u:OPENCODE_API_KEY/w:HOME/p',
       };
 
       const authJsonPath = path.join(mockHome, '.local/share/opencode/auth.json');
@@ -128,7 +123,7 @@ describe('run.sh', () => {
 
     it('does not write or overwrite auth.json if OPENCODE_API_KEY is whitespace-only', () => {
       const mockBinDirSafe = mockBinDir.replace(/\\/g, '/');
-      const mockHomeUnix = toWslPath(mockHome);
+      const mockHomeUnix = toBashHomePath(mockHome);
       const originalPath = process.env.PATH || '';
 
       const customEnv = {
@@ -136,7 +131,6 @@ describe('run.sh', () => {
         AGENTIC_CODE_REVIEWERS_LOCAL: 'true',
         AGENTIC_CODE_REVIEWERS_ENGINE: 'opencode',
         OPENCODE_API_KEY: '    ',
-        WSLENV: 'AGENTIC_CODE_REVIEWERS_LOCAL/u:AGENTIC_CODE_REVIEWERS_ENGINE/u:OPENCODE_API_KEY/u:OPENCODE_API_KEY/w:HOME/p',
       };
 
       const authJsonPath = path.join(mockHome, '.local/share/opencode/auth.json');

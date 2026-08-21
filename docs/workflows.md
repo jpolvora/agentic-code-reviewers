@@ -441,7 +441,7 @@ Client for an [OpenCode](https://opencode.ai/docs/sdk/) server via `@opencode-ai
 
 To reuse an existing `opencode serve` / TUI, point at it with `AGENTIC_CODE_REVIEWERS_OPENCODE_URL=http://127.0.0.1:43147` — this skips the embedded config injection.
 
-SSE stream surfaces `[status]`, `[tool]`, `[reasoning]` (when the model emits reasoning parts; `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING`, default ON) and `[assistant]` (`--verbose`, default ON). HTTP timeout aligned to `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` via `undici.fetch` + `AbortSignal` (`src/engine/opencode/fetch.ts`); timed-out sessions are cleaned up with `cleanupClient` without inheriting the aborted signal.
+SSE stream surfaces `[status]`, `[tool]`, `[reasoning]` (when the model emits reasoning parts; `AGENTIC_CODE_REVIEWERS_OPENCODE_STREAM_REASONING`, default ON) and `[assistant]` (`--verbose`, default ON). HTTP timeout aligned to `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` via `undici.fetch` + `AbortSignal` (`src/engine/opencode/fetch.ts`); timed-out sessions are cleaned up with `cleanupClient` without inheriting the aborted signal. If the first turn returns no usable `text` part (reasoning-only / output length / abort), the runner sends **one** JSON-only follow-up in the same session before failing (see [`faq.md`](faq.md) § OpenCode empty textPart).
 
 Both engines feed the same `config.scoreMin` into the prompt, gate and Safe Outputs.
 
@@ -495,5 +495,6 @@ You must pass `--org`, `--project`, `--repo`, `--pr-id` to use ADO outside a pip
 | Auto-fix stops after first correction | GitHub | `github.token` doesn't re-trigger workflows; use PAT |
 | OpenCode hangs after `Session created` | opencode | CLI in PATH, `auth.json`/`OPENCODE_API_KEY` set, free port (or `_PORT=0`) |
 | `HeadersTimeoutError` (opencode) | opencode | bump `AGENTIC_CODE_REVIEWERS_TIMEOUT_MS` |
+| `resposta vazia (nenhum textPart…)` (opencode) | opencode | runner already retries once; check diagnostics / model / diff size — [`faq.md`](faq.md) |
 
 More: [`faq.md`](faq.md) § Troubleshooting.
