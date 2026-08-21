@@ -591,6 +591,12 @@ AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_T
 AGENTIC_CODE_REVIEWERS_TIMEOUT_MS=1200000 npm run review -- --dry-run --engine opencode ...
 ```
 
+### OpenCode: `resposta vazia (nenhum textPart na mensagem)`
+
+Some models (especially with large diffs) finish a turn with **reasoning-only** parts, hit an output length limit, or abort before emitting a final `text` part. The runner detects that incomplete assistant message and sends **one** short follow-up in the same session asking for the JSON review object only. If the follow-up is still empty, the job fails with diagnostics (`finish`, `error`, part-type counts, token totals).
+
+*Evidence:* `src/engine/opencode/assistant-text.ts`; `runOpencodeStream` in `src/engine/opencode/stream.ts`.
+
 ---
 
 ## 18. Auto-fix and self-healing
