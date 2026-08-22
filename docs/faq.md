@@ -433,9 +433,9 @@ If none of the heuristics identify a stack, the runner assumes `ABP/Angular` as 
 
 ### How is the JSON extracted from the agent output?
 
-**Answer:** `extractJsonFromAgentOutput`: (1) preference — last valid ```` ```json ```` fence; (2) fallback — last balanced `{...}` object with `"reviews"`; (3) sanitization if `JSON.parse` fails. Then `parseCodeReviewResponse` applies `filterPublishableReviews`.
+**Answer:** `extractJsonFromAgentOutput`: (1) preference — last ```` ``` ```` / ```` ```json ```` fence, taking the first **brace-balanced** `{...}` after the opener (so nested fences inside `suggestedFix` do not truncate); (2) fallback — last balanced `{...}` object with `"reviews"`; (3) sanitization if `JSON.parse` fails, including stripping invalid escapes such as `\`` / `\.` / `\:` that LLMs emit in code samples. Then `parseCodeReviewResponse` applies `filterPublishableReviews`.
 
-*Evidence:* `src/parser/review-response.ts` — `extractJsonFromAgentOutput`.
+*Evidence:* `src/parser/review-response.ts` — `extractJsonFromAgentOutput`, `fixInvalidJsonEscapes`.
 
 ---
 

@@ -234,9 +234,9 @@ Reviews outside this contract are **discarded** before posting. The authoritativ
 
 `parser/review-response.ts`:
 
-- Extracts the **last** valid ```` ```json ```` fence (ignores non-JSON fences, e.g. ```` ```ts ````).
+- Extracts the **last** ```` ``` ```` / ```` ```json ```` fence by taking the first **brace-balanced** `{...}` after the opener (nested ```` ``` ```` inside `suggestedFix` must not truncate the payload). Non-JSON language fences without a following `{` are skipped.
 - Fallback: scans top-level `{...}` objects (balanced braces, O(n)) and uses the **last valid JSON**, preferring those with `"reviews"` (stdout with duplicated logs).
-- Sanitizes quotes/line breaks if `JSON.parse` fails; non-array `reviews` throws a descriptive error.
+- Sanitizes quotes/line breaks and **invalid JSON escapes** (`\``, `\.`, `\:`, incomplete `\u`) if `JSON.parse` fails; non-array `reviews` throws a descriptive error.
 - **Flatten:** expands `relatedOccurrences` groupings into multiple separate `CodeReviewItem` objects, preserving `analysis` but distributing threads across the correct files (anti whack-a-mole).
 - Defensive normalization of `fileName`, `lineNumber`, `impactPaths`, severity.
 - `parseCodeReviewResponse` discards reviews that fail `isPublishableReview` (score ≥ `AGENTIC_CODE_REVIEWERS_SCORE_MIN`, default 6, + required fields).

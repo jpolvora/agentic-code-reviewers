@@ -1,6 +1,7 @@
 import type { CodeReviewResponse, DeveloperAction, ResolvedThreadItem, ReviewSeverity } from '../ado/types.js';
 
-const JSON_BLOCK_PATTERN = /```(?:json)?\s*([\s\S]*?)```/i;
+const JSON_FENCE_OPEN = /```(?:json)?\s*/gi;
+const JSON_STRING_ESCAPES = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
 
 /** Tenta parsear como JSON, com fallback de sanitização de aspas/quebras. */
 function tryParseJson(candidate: string): unknown | undefined {
@@ -13,6 +14,18 @@ function tryParseJson(candidate: string): unknown | undefined {
       return undefined;
     }
   }
+}
+
+/**
+ * After an opening ``` / ```json fence, take the first balanced `{...}` object.
+ * Nested ``` inside suggestedFix strings must not truncate the candidate.
+ */
+function extractBalancedJsonAfterFence(text: string, contentStart: number): string | null {
+  let i = contentStart;
+  while (i < text.length && /\s/.test(text[i]!)) i++;
+  if (text[i] !== '{') return null;
+  const objects = extractTopLevelJsonObjects(text.slice(i));
+  return objects[0] ?? null;
 }
 
 /**
@@ -59,10 +72,17 @@ function extractTopLevelJsonObjects(text: string): string[] {
 }
 
 export function extractJsonFromAgentOutput(text: string): string | null {
-  // 1. Preferir o último bloco fenced ```json válido.
-  const matches = Array.from(text.matchAll(new RegExp(JSON_BLOCK_PATTERN, 'gi')));
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const candidate = matches[i][1].trim();
+  // 1. Prefer the last fenced ``` / ```json block whose first balanced `{...}` parses.
+  //    Brace-balanced (not non-greedy ```) so nested fences in suggestedFix survive.
+  const fenceCandidates: string[] = [];
+  JSON_FENCE_OPEN.lastIndex = 0;
+  let fenceMatch: RegExpExecArray | null;
+  while ((fenceMatch = JSON_FENCE_OPEN.exec(text)) !== null) {
+    const candidate = extractBalancedJsonAfterFence(text, fenceMatch.index + fenceMatch[0].length);
+    if (candidate) fenceCandidates.push(candidate);
+  }
+  for (let i = fenceCandidates.length - 1; i >= 0; i--) {
+    const candidate = fenceCandidates[i]!;
     if (tryParseJson(candidate) !== undefined) {
       return candidate;
     }
@@ -169,8 +189,65 @@ export function sanitizeJsonString(str: string): string {
   return result;
 }
 
+/**
+ * LLMs often emit invalid JSON escapes inside suggestedFix (e.g. \` \. \: \' ).
+ * Drop the backslash and keep the following character so JSON.parse can succeed.
+ * Incomplete \uXXXX sequences are treated the same way.
+ */
+export function fixInvalidJsonEscapes(str: string): string {
+  let result = '';
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i]!;
+
+    if (!inString) {
+      result += char;
+      if (char === '"') inString = true;
+      continue;
+    }
+
+    if (escaped) {
+      escaped = false;
+      if (char === 'u') {
+        const hex = str.slice(i + 1, i + 5);
+        if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+          result += `\\u${hex}`;
+          i += 4;
+        } else {
+          result += char;
+        }
+        continue;
+      }
+      if (JSON_STRING_ESCAPES.has(char)) {
+        result += `\\${char}`;
+      } else {
+        result += char;
+      }
+      continue;
+    }
+
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = false;
+    }
+    result += char;
+  }
+
+  if (escaped) {
+    result += '\\';
+  }
+
+  return result;
+}
+
 export function cleanJsonString(str: string): string {
-  const escaped = escapeQuotesInJson(str);
+  const fixedEscapes = fixInvalidJsonEscapes(str);
+  const escaped = escapeQuotesInJson(fixedEscapes);
   const sanitized = sanitizeJsonString(escaped);
   return sanitized.replace(/,(\s*[\]}])/g, '$1');
 }
