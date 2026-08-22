@@ -59,9 +59,9 @@ export SECRETS_SCAN_MAX_HITS="${SECRETS_SCAN_MAX_HITS:-30}"
 SCAN_STATUS=0
 SCAN_OUTPUT=$(bash "$SCANNER" 2>&1) || SCAN_STATUS=$?
 if [ "$SCAN_STATUS" -ne 0 ]; then
-  echo -e "${YELLOW}[secrets-leak] Scanner failed (exit $SCAN_STATUS) — commit NOT scanned:${NC}"
-  echo "$SCAN_OUTPUT"
-  exit 0
+  echo -e "${RED}[secrets-leak] Scanner failed (exit $SCAN_STATUS) — commit blocked:${NC}" >&2
+  echo "$SCAN_OUTPUT" >&2
+  exit 1
 fi
 
 # Check for HIGH findings

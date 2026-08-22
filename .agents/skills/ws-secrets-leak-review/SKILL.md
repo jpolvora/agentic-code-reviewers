@@ -95,7 +95,7 @@ bash {skillsRoot}/ws-secrets-leak-review/scripts/install-hook.sh
 
 Installs a small runtime shim — never a direct skill-path symlink or frozen script copy. The shim resolves the skill **at run time**: project-local skills root first, then `WORKFLOW_SKILLS_GLOBAL_DIR` / `$HOME/.agents/skills`. This keeps global-only and hybrid installs working if the local skill is removed or updated. Re-running the installer is idempotent; it recognizes current and legacy hooks from this skill, and backs up every foreign hook (including symlinks) before replacement.
 
-Hook runs `bash {skillsRoot}/ws-secrets-leak-review/scripts/pre-commit.sh` on staged files (which calls `bash {skillsRoot}/ws-secrets-leak-review/scripts/secrets_scanner.sh`). It **skips loudly** — printing why — when the skill or `rg` is missing, or when the scanner exits non-zero; a skipped scan never silently passes as clean. Override: `git commit --no-verify`.
+Hook runs `bash {skillsRoot}/ws-secrets-leak-review/scripts/pre-commit.sh` on staged files (which calls `bash {skillsRoot}/ws-secrets-leak-review/scripts/secrets_scanner.sh`). It **skips loudly** — printing why — when the skill or `rg` is missing. If the scanner is resolved and then exits non-zero (crash or unexpected error), the hook **blocks the commit**. Override: `git commit --no-verify`.
 
 ## Rules
 
