@@ -1,5 +1,5 @@
 import type { ReviewerEngineName } from './engine/types.js';
-import { ROUND_STATE_MARKER } from './ado/round-state.js';
+import { ROUND_STATE_MARKER } from './git/markers.js';
 
 /** npm package name and stable comment prefix (no version). */
 export const PRODUCT_NAME = 'agentic-code-reviewers';
@@ -11,42 +11,41 @@ export const BOT_TAG_PREFIX = PRODUCT_NAME;
 export const LEGACY_BOT_TAG_PREFIX = '[Cursor Reviewer]';
 export const LEGACY_AGENTIC_BOT_TAG_PREFIX = 'Agentic Code Reviewer';
 
-const AGENTIC_REVIEWER_TAG_PREFIXES = [
-  BOT_TAG_PREFIX,
-  LEGACY_AGENTIC_BOT_TAG_PREFIX,
-  LEGACY_BOT_TAG_PREFIX,
-] as const;
-
 /** Tag publicada: `agentic-code-reviewers v{version} ({engine})`. */
 export function buildBotTag(engine: ReviewerEngineName, version?: string): string {
   const ver = version?.trim();
   return ver ? `${BOT_TAG_PREFIX} v${ver} (${engine})` : `${BOT_TAG_PREFIX} (${engine})`;
 }
 
+function firstLineLooksLikeRunnerTag(firstLine: string): boolean {
+  return (
+    /^agentic-code-reviewers(?:\s+v\S+)?(?:\s+\([^)]+\))?$/.test(firstLine) ||
+    /^Agentic Code Reviewer(?: \S+)?$/.test(firstLine) ||
+    firstLine === LEGACY_BOT_TAG_PREFIX
+  );
+}
+
 function firstLineTagMatch(firstLine: string): string | null {
-  const current = firstLine.match(/^agentic-code-reviewers(?:\s+v\S+)?(?:\s+\([^)]+\))?/);
+  const current = firstLine.match(/^agentic-code-reviewers(?:\s+v\S+)?(?:\s+\([^)]+\))?$/);
   if (current) return current[0];
-  const previous = firstLine.match(/^Agentic Code Reviewer(?: \S+)?/);
+  const previous = firstLine.match(/^Agentic Code Reviewer(?: \S+)?$/);
   if (previous) return previous[0];
-  if (firstLine.startsWith(LEGACY_BOT_TAG_PREFIX)) return LEGACY_BOT_TAG_PREFIX;
+  if (firstLine === LEGACY_BOT_TAG_PREFIX) return LEGACY_BOT_TAG_PREFIX;
   return null;
 }
 
-/** Comentário postado por qualquer engine deste runner (prefixo comum ou legado). */
+/** Comentário postado por qualquer engine deste runner (tag na primeira linha). */
 export function isAgenticReviewerComment(content: string): boolean {
   if (!content) return false;
-  return AGENTIC_REVIEWER_TAG_PREFIXES.some((prefix) => content.includes(prefix));
+  const firstLine = content.split(/\r?\n/)[0]?.trim() ?? '';
+  return firstLineLooksLikeRunnerTag(firstLine);
 }
 
 /** Primeira linha da tag quando presente (atual, `Agentic Code Reviewer {engine}`, ou `[Cursor Reviewer]`). */
 export function extractAgenticBotTagLine(content: string): string | null {
   if (!isAgenticReviewerComment(content)) return null;
   const firstLine = content.split(/\r?\n/)[0]?.trim() ?? '';
-  const matched = firstLineTagMatch(firstLine);
-  if (matched) return matched;
-  if (content.includes(BOT_TAG_PREFIX)) return BOT_TAG_PREFIX;
-  if (content.includes(LEGACY_AGENTIC_BOT_TAG_PREFIX)) return LEGACY_AGENTIC_BOT_TAG_PREFIX;
-  return LEGACY_BOT_TAG_PREFIX;
+  return firstLineTagMatch(firstLine);
 }
 
 /** Remove tags do runner (atual e legadas) para comparação/dedup de conteúdo. */

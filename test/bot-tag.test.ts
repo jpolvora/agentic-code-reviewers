@@ -27,6 +27,10 @@ describe('bot-tag', () => {
     assert.equal(isAgenticReviewerComment('[Cursor Reviewer]\nissue'), true);
     assert.equal(isAgenticReviewerComment('unrelated comment'), false);
     assert.equal(
+      isAgenticReviewerComment('Please rerun agentic-code-reviewers after the rebrand.\nthanks'),
+      false,
+    );
+    assert.equal(
       extractAgenticBotTagLine('agentic-code-reviewers v0.4.0 (opencode)\nbody'),
       'agentic-code-reviewers v0.4.0 (opencode)',
     );

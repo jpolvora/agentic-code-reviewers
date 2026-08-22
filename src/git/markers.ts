@@ -1,3 +1,4 @@
+export const ROUND_STATE_MARKER = '<!-- reviewer-round-state -->';
 export const RESOLUTION_MARKER = '<!-- resolution-reply -->';
 /** Marcador legado usado em versões anteriores do provider GitHub. */
 export const LEGACY_RESOLUTION_MARKER = '<!-- reviewer-resolved -->';
