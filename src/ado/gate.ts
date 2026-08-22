@@ -15,7 +15,7 @@ export function countSeverities(reviews: CodeReviewItem[]): Record<ReviewSeverit
   return counts;
 }
 
-/** pendingThreads: threads do runner (`Agentic Code Reviewer`) active/pending (filtradas upstream). */
+/** pendingThreads: threads do runner (`agentic-code-reviewers`) active/pending (filtradas upstream). */
 export function evaluateGate(params: {
   newReviews: CodeReviewItem[];
   resolvedCount: number;
@@ -74,7 +74,7 @@ export function formatGateSummary(
   const lines = [
     '',
     '┌───────────────────────────────────────────────',
-    `│ ${statusIcon}  Resumo do Cursor Reviewer`,
+    `│ ${statusIcon}  Resumo do agentic-code-reviewers`,
     '├───────────────────────────────────────────────',
     `│ Modo:                ${modeLabel}`,
     `│ Agent ID:            ${agentId}`,

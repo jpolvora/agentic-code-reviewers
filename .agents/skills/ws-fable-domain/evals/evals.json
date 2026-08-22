@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-fable-domain",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Generate a DevOps domain adapter for CI/CD verification.",
+      "expected_output": "Domain schema with binding evidence sets and fraud definitions.",
+      "assertions": [
+        "Agent loads fable-domain",
+        "Produces adapter artifacts under references/ or disclosed paths",
+        "Harness-neutral vocabulary"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Create a Research domain adapter with no evidence requirements",
+      "expected_output": "Agent requires minimum evidence sets per fable-domain schemas.",
+      "assertions": [
+        "Does not ship adapter without binding evidence sets",
+        "Documents domain authority and observation rules",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

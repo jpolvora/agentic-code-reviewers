@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-azure-devops-provider",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Fetch ADO work item 1234 to spec for slug ado-feature.",
+      "expected_output": "ado-workitem-to-spec.py writes {specsDir}/us-{id}.spec.md, then register_local_spec.cjs copies to step-00 under {plansDir}.",
+      "assertions": [
+        "Agent loads ws-azure-devops-provider",
+        "Reads org/project from config.json issueTrackers.azureDevOps",
+        "Uses python launcher on scripts/ado-workitem-to-spec.py"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "resolve thread 99 on ADO PR 50",
+      "expected_output": "fix_pr_azure_context.py resolve-thread with PAT from env.",
+      "assertions": [
+        "Does not hardcode organization or project",
+        "UTF-8 handling noted for context.json on Windows",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

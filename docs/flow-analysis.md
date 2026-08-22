@@ -107,7 +107,7 @@ Related variables: `AGENTIC_CODE_REVIEWERS_STACK`, `AGENTIC_CODE_REVIEWERS_REVIE
 | **Prompt LLM (intra-PR memory)** | Summaries of **all** threads (active and resolved) consolidated into `Risk Patterns Detected in This PR` to actively steer Phase 1/2 searches |
 | **Prompt LLM (active)** | Detailed "Active threads (open)" table (~160 chars each) |
 | **Prompt LLM (closed memory)** | "Already resolved threads" table with instruction to **not re-raise without new evidence** (anti-re-litigation loop) |
-| **Gate** | Bot threads **active/pending** (`Agentic Code Reviewer`) |
+| **Gate** | Bot threads **active/pending** (`agentic-code-reviewers`) |
 
 Human threads do **not** enter the prompt and do **not** count as the bot's pending threads. Resolved threads do **not** enter `existingKeys` (deterministic dedup) — they become memory for the LLM only.
 
@@ -293,7 +293,7 @@ This complements the recall of round 1 (completeness mandate in `SYSTEM_PROMPT.m
 `ado/gate.ts` reports **WITH ISSUES** when:
 
 1. Any **new** review would be/was published (after filters), **or**
-2. Any **active/pending** thread from the runner (`Agentic Code Reviewer`) remains on the PR
+2. Any **active/pending** thread from the runner (`agentic-code-reviewers`) remains on the PR
 
 **Does not block:** human threads, other bots, or the pipeline (always exit **0** on successful execution).
 
@@ -340,7 +340,7 @@ CLI flags `--org`, `--project`, etc. remain available for local use.
 ## Published thread format
 
 ```
-[Agentic Code Reviewer cursor-sdk]
+[agentic-code-reviewers v{version} (cursor-sdk)]
 
 🛑 **CRITICAL:** Objective description...
 
@@ -365,7 +365,7 @@ CLI flags `--org`, `--project`, etc. remain available for local use.
 Positive summary (clean PR):
 
 ```
-[Agentic Code Reviewer cursor-sdk]
+[agentic-code-reviewers v{version} (cursor-sdk)]
 <!-- review-summary -->
 
 All pending issues have been successfully resolved! The PR is ready to be merged. 🚀

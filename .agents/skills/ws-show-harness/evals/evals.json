@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-show-harness",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/show-harness — what skills are active this session?",
+      "expected_output": "Snapshot of loaded skills, rules, and harness paths.",
+      "assertions": [
+        "Agent loads show-harness",
+        "Lists discoverable skills under {skillsRoot}",
+        "Does not invent skills not on disk"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "show harness after partial install (only spec-to-pr)",
+      "expected_output": "Reports missing deps and install guidance, not a false full snapshot.",
+      "assertions": [
+        "Distinguishes installed vs missing pipeline skills",
+        "References ws-shared hub or installed-skills.json when present",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

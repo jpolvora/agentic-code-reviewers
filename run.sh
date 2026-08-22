@@ -188,7 +188,7 @@ run_reviewer() {
 
   local version
   version="$(node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); console.log(pkg.version);")"
-  echo "=== [Runner] Executando Agentic Code Reviewers v$version (engine: $AGENTIC_CODE_REVIEWERS_ENGINE) ==="
+  echo "=== [Runner] Executando agentic-code-reviewers v$version ($AGENTIC_CODE_REVIEWERS_ENGINE) ==="
 
   prepare_opencode
 
@@ -251,7 +251,7 @@ fi
 AGENTIC_CODE_REVIEWERS_ENGINE="$(normalize_engine "$ENGINE_RAW")"
 export AGENTIC_CODE_REVIEWERS_ENGINE
 
-echo "=== [Runner] Iniciando Agentic Code Reviewers ==="
+echo "=== [Runner] Iniciando agentic-code-reviewers ==="
 echo "Modo: $([[ "$LOCAL_MODE" == "true" ]] && echo local || echo remoto)"
 echo "Diretório alvo da análise: $CALLER_DIR"
 echo "Engine: $AGENTIC_CODE_REVIEWERS_ENGINE"

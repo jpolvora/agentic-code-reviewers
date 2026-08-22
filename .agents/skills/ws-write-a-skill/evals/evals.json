@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-write-a-skill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a skill for PDF form filling.",
+      "expected_output": "SKILL.md with frontmatter, steps, Done when criteria; scripts only if earned.",
+      "assertions": [
+        "Agent loads write-a-skill",
+        "Description uses Use when triggers for model-invoked skills",
+        "Consults MEMORY before drafting scripts"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "optimize my 300-line SKILL.md",
+      "expected_output": "Prune + progressive disclosure; target ≤100 lines or split.",
+      "assertions": [
+        "Recommends GLOSSARY/REFERENCE split when over limit",
+        "Does not duplicate hub routing prose",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

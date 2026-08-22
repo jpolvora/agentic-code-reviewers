@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-update-plan-implementation",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Capture QA findings and update the oauth-login plan after ship.",
+      "expected_output": "Plan deltas recorded in post-workflow update artifact.",
+      "assertions": [
+        "Agent loads ws-update-plan-implementation",
+        "Updates plan with findings, not a changelog dump",
+        "References {plansDir} artifacts for the slug"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "No QA gaps found for billing-refactor — still run post-workflow update?",
+      "expected_output": "Documents N/A or minimal delta when no findings; does not invent issues.",
+      "assertions": [
+        "Does not fabricate plan deltas without evidence",
+        "Distinguishes changelog skill from plan implementation update",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

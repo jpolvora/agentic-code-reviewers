@@ -13,9 +13,7 @@ describe('matchesGlob', () => {
 
 describe('buildRulesMap', () => {
   it('mapeia rules alwaysApply e por glob para arquivos alterados', () => {
-    const repoRoot = process.cwd().includes('cursor-reviewer')
-      ? `${process.cwd()}/../..`
-      : process.cwd();
+    const repoRoot = process.cwd();
 
     const rules = loadProjectRules(repoRoot);
     if (rules.length === 0) {

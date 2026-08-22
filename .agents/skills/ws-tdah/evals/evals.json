@@ -1,0 +1,35 @@
+{
+  "skill_name": "ws-tdah",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/ws-tdah explain why JWT refresh fails intermittently",
+      "expected_output": "Leads with next action; unverbose; ends with one concrete next step.",
+      "assertions": [
+        "Leads with next action; no preamble",
+        "Technical terms and code remain exact",
+        "Ends with one concrete next step"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Is this architecture good? (vague praise wanted)",
+      "expected_output": "Direct accountable answer; challenges weak framing; no empty praise.",
+      "assertions": [
+        "Does not output sycophantic flattery",
+        "States assumptions or asks one critical question if blocked",
+        "Keeps action-first shape"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "stop ws-gabarito — give full sentences for an onboarding doc",
+      "expected_output": "Normal mode; retired gabarito opt-out honored.",
+      "assertions": [
+        "Recognizes stop ws-gabarito / stop ws-tdah / stop verbosity / normal mode",
+        "Uses full sentences after stop",
+        "Does not offer intensity or level switches"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-sync-spec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Sync the oauth-login spec after its callback API changed from GET to POST.",
+      "expected_output": "A drift analysis and surgical spec update proposal, with a Revision History entry, before any file is written.",
+      "assertions": [
+        "Agent loads ws-sync-spec and identifies modified implementation scope",
+        "Compares actual code behavior against existing spec requirements and acceptance criteria",
+        "Proposes updates and requests user approval before writing the spec"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Check whether recent billing controller changes have a matching feature spec to sync.",
+      "expected_output": "Candidate specs are searched under configured spec locations, or the agent reports that no existing spec was found.",
+      "assertions": [
+        "Searches {plansDir}/specs and existing specs without inventing a spec path",
+        "Reports the exact no-existing-spec outcome when no matching spec exists",
+        "Does not create a new spec as part of drift synchronization"
+      ]
+    }
+  ]
+}

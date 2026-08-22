@@ -1,0 +1,111 @@
+---
+stackFingerprint: <generated-sha256>
+stackFingerprintVersion: 1
+---
+# Stack Definition
+
+Human-readable companion to `config.json`. Agents read `config.json` for machine-readable values; this doc explains structure and conventions.
+
+> **Source of truth:** `.agents/skills/ws-shared/config.json` — project identity, stack, verification, invariants. `tools.md` — tool aliases. This `STACK.md` is the human-readable guide.
+>
+> Fresh installs seed this file from `STACK.md.example`. Run [`ws-configure-project`](../ws-configure-project/SKILL.md) to replace placeholders with your project’s real stack.
+
+## Project Stack (from config.json)
+
+Stack is defined in `config.json.stack`:
+- **Backend:** `backend.framework` (`backend.language`) — layers in `backend.layers[]` (`name`, `path`, `role`)
+- **Frontend:** `frontend.framework` — source in `frontend.sourceDir`, i18n in `frontend.i18n`
+- **Database:** `database.type` via `database.orm` — migrations at `database.migrationsProject`
+- **Domain:** `domain.model` with `domain.tenancyField` (omit or leave empty when not applicable)
+- **Orchestration:** dev/start/stop in `orchestration`
+
+API host: `backend.apiHost` · Dev server: `frontend.devHost`
+
+## Code Paths (mutating steps)
+
+Layers from `config.json.stack.backend.layers[]`, frontend from `frontend.sourceDir`, tests from `backend.testProject`.
+
+| Layer | Path | Role |
+|-------|------|------|
+| **Backend / Skill Layers** | Configured paths | See `config.json.stack.backend.layers[]` |
+| **Frontend** | `{frontend.sourceDir}` | Pages, components, routes, i18n |
+| **Tests** | `{backend.testProject}` | Unit + integration |
+| **Scripts** | `scripts/` | Dev helpers, seed |
+
+**Dry-run / isolation:** Steps **4**, **6-fix**, and **7-fix** mutate source paths only when implementing code. Step **7** Testing is validation (read/execute checks; no feature implementation unless fix loop).
+
+## Validation Commands (from config.json)
+
+Used by orchestrator and subagents for build/test validation (Steps **4**, **6-fix**, **7**).
+
+Tool aliases in `tools.md`. Commands in `config.json.verification`:
+
+| Layer | Tool alias | Config key | Notes |
+|-------|-----------|------------|-------|
+| **Backend** | `build-backend` | `verification.backendBuild` | Compile |
+| **Backend** | `test-backend` | `verification.backendTest` | Unit + integration |
+| **Backend** | `lint-backend` | `verification.backendFormat` | Style check |
+| **Frontend** | `build-frontend` | `verification.frontendBuild` | Compile |
+| **Frontend** | `test-frontend` | `verification.frontendTest` | When UI logic touched |
+| **Migrations** | `migrations-add` | `verification.migrationsAdd` | Prefer CLI-generated migrations |
+| **Migrations** | `migrations-apply` | `verification.migrationsApply` | Before API/UI integration tests |
+| **Seed** | `seed-db` | `database.seedScript` | Local demo dataset |
+| **Full stack** | `compose-up` | `orchestration.composeCommand` | Docker full stack |
+
+Leave unused rows empty in `config.json`. **When frontend not modified:** skip frontend build/test. **When `skipTests: true`:** skip test rows; build still runs.
+
+> **Script launchers:** managed skill scripts use explicit `python` / `node` / `bash` (see [`tools.md`](tools.md) § Script launchers). Run `verification.*` strings unchanged; do not rewrite managed `.sh`/`.py`/`.cjs` for host shell quirks.
+
+> **Running dev stack:** if build/test fails with **address already in use**, the stack may already be running. **Ask the user** before stopping.
+
+## Project Rules & Skills (from config.json)
+
+Paths from `config.json.rules` and domain keys:
+
+| Area | Config key | Notes |
+|------|-----------|-------|
+| **Harness routing** | `rules.harness` | Consumer hub (usually `.agents/skills/ws-shared/AGENTS.md` or root pointer) |
+| **Engineering guardrails** | `rules.seniorDeveloper` | Code review proof source (default `.agents/skills/ws-senior-developer/SKILL.md`) |
+| **Karpathy guidelines** | `rules.karpathyGuidelines` | Surgical changes, simplicity |
+| **UI patterns** | `rules.viewPatterns` | Optional |
+| **Architecture spec** | `domain.architectureSpec` | Optional |
+| **Glossary** | `domain.glossaryFile` | Optional |
+| **Design tokens** | `domain.designTokens` | Optional |
+| **Changelog** | `rules.changelogFile` | Default `.agents/skills/ws-shared/CHANGELOG.md` |
+
+Delegated workflow skills (pipeline `ws-*` folders: `ws-write-spec`…`ws-fix-pr`, `ws-goal-fix-pr`, `ws-update-plan-implementation`) live under `.agents/skills/` — see [AGENTS.md](AGENTS.md) and orchestrator `SKILL.md` § Allowed deps.
+
+## Project Invariants (from config.json)
+
+Enforced by code review and validation when present. Read from `config.json.invariants`.
+
+Seeded example keys are **placeholders** (often from a sample stack). Keep only invariants that apply to this repo; delete or set false for the rest. Run `ws-configure-project` to refresh.
+
+| Key | Intent (example) |
+|-----|------------------|
+| `commitPlanFilesOnlyAtStep8` | Plan artifacts committed at delivery (Step 8), not earlier |
+| *(project-specific)* | Add real invariants for your stack (ORM, tenancy, layering, etc.) |
+
+## Code Review Diff Scope (Step 6)
+
+Scoped diff vs base branch — exclude generated/cache paths. Adjust globs to match `config.json.stack` paths:
+
+```bash
+git diff {base_branch}...HEAD -- \
+  'src/**' 'web/src/**' 'tests/**' \
+  ':!**/bin/**' \
+  ':!**/obj/**' \
+  ':!**/node_modules/**' \
+  ':!**/dist/**'
+```
+
+## Dynamic Environment Detection
+
+| Setting | Detection |
+|---------|-----------|
+| **Base branch** | `config.json.project.baseBranch` (`main` or `master`) |
+| **Git remote** | `config.json.project.gitRemote` (default: `origin`) |
+| **Working branch** | `config.json.project.workingBranch` (default: `develop`) |
+| **Frontend changed** | Any path under `frontend.sourceDir` in `files_touched` or `git diff` |
+| **API running** | Port `backend.apiPort` listen → ask user before stopping |
+| **Dev server running** | Port `frontend.devPort` listen → required for Step 7 browser |

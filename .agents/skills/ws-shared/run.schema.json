@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run.schema.json",
+  "title": "Current workflow run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "workflowId", "slug", "pipeline", "status", "currentStep", "pendingGate", "nextAction", "acTotal", "acImplemented", "score", "estimatedRemainingSec", "steps", "statePath", "stateSha256"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "workflowId": { "type": "string", "minLength": 1 },
+    "slug": { "type": "string", "minLength": 1 },
+    "pipeline": { "enum": ["standard", "lite"] },
+    "status": { "type": "string", "minLength": 1 },
+    "currentStep": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "pendingGate": { "type": ["object", "null"] },
+    "nextAction": { "type": "string", "minLength": 1 },
+    "acTotal": { "type": "integer", "minimum": 0 },
+    "acImplemented": { "type": "integer", "minimum": 0 },
+    "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+    "estimatedRemainingSec": { "type": "number", "minimum": 0 },
+    "statePath": { "type": "string", "pattern": "^(?![A-Za-z]:|/)(?!.*\\\\).+" },
+    "stateSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "status", "skipReason", "estimatedRemainingSec"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "status": { "enum": ["pending", "active", "completed", "skipped"] },
+          "skipReason": { "type": ["string", "null"] },
+          "estimatedRemainingSec": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

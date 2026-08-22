@@ -130,7 +130,7 @@ function buildSeedTestSection(): string[] {
   return [
     '## Seed Test Mode (mandatory in this run)',
     '',
-    '1. Read `scripts/cursor-reviewer/SEED-ISSUES.md` and `fixtures/seed/expected-scenarios.json`.',
+    '1. Read `SEED-ISSUES.md` and `fixtures/seed/expected-scenarios.json`.',
     '2. Report each intentional defect in files `CursorReviewerSeed*` / `cursor-reviewer-seed*`.',
     '3. Do not discard findings just because of `Compile Remove` or missing Angular route.',
     '4. Each review: `suggestedFix`, score ≥ 5, scenario keywords.',

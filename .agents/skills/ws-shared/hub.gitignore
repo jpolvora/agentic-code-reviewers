@@ -1,0 +1,17 @@
+# Do not commit project-specific / consumer-owned hub data.
+# Copy *.example / MEMORY.md.template, fill in locally; never pack these into the npm tarball.
+# Shipped as hub.gitignore (npm cannot pack files named .gitignore); installer writes consumer .gitignore.
+
+config.json
+config.local.json
+STACK.md
+stack.md
+MEMORY.md
+CHANGELOG.md
+installed-skills.json
+skill-integrity-local.json
+memory/**
+!MEMORY.md.template
+!CHANGELOG.md.template
+!STACK.md.example
+!config.json.example

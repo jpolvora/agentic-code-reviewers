@@ -1,0 +1,26 @@
+{
+  "skill_name": "ws-classify-complexity",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-classify-complexity for a typical classify-complexity task in this project.",
+      "expected_output": "Agent loads ws-classify-complexity and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-classify-complexity before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/classify-complexity — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-classify-complexity trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    }
+  ]
+}

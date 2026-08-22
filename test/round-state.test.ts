@@ -91,6 +91,30 @@ describe('parseRoundStateFromThreads', () => {
     };
     assert.equal(parseRoundStateFromThreads(threads, BOT).round, 5);
   });
+
+  it('lê round-state publicado com a tag legada mesmo quando botTag é a atual', () => {
+    const threads: AdoThreadsResponse = {
+      value: [
+        {
+          id: 3,
+          status: 'closed',
+          comments: [
+            {
+              id: 8,
+              parentCommentId: 0,
+              content: `Agentic Code Reviewer cursor-sdk\n${ROUND_STATE_MARKER}\n\n**Automatic review state** — Round: 4 / 10`,
+              commentType: 1,
+            },
+          ],
+        },
+      ],
+    };
+    assert.deepEqual(parseRoundStateFromThreads(threads, buildBotTag('cursor-sdk', '0.4.0')), {
+      round: 4,
+      threadId: 3,
+      commentId: 8,
+    });
+  });
 });
 
 describe('decideRoundEscalation', () => {

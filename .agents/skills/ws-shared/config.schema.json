@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jpolvora/workflow-skills/ws-spec-to-pr/config.schema.json",
+  "title": "ws-spec-to-pr project config",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["project", "verification", "plans"],
+  "properties": {
+    "toolsFile": { "type": "string", "default": "tools.md" },
+    "pathTokens": {
+      "type": "object",
+      "description": "Fixed install-layout hints for brace tokens {skillsRoot} / {sharedDir}. Not relocatable; defaults match the installer. Agents expand before tool calls. See tools.md § Path tokens.",
+      "additionalProperties": true,
+      "properties": {
+        "skillsRoot": {
+          "type": "string",
+          "default": ".agents/skills",
+          "description": "Expand {skillsRoot}. Install contract; do not relocate."
+        },
+        "sharedDir": {
+          "type": "string",
+          "default": ".agents/skills/ws-shared",
+          "description": "Expand {sharedDir}. Usually {skillsRoot}/shared."
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "baseBranch"],
+      "properties": {
+        "name": { "type": "string" },
+        "org": { "type": "string" },
+        "repoUrl": { "type": "string" },
+        "baseBranch": { "type": "string", "description": "PR target branch (main or master)" },
+        "workingBranch": {
+          "type": "string",
+          "default": "develop",
+          "description": "Active delivery branch used by ship-pr / Step 8–9"
+        },
+        "gitRemote": { "type": "string", "default": "origin" }
+      }
+    },
+    "stack": { "type": "object" },
+    "domain": { "type": "object" },
+    "providers": {
+      "type": "object",
+      "description": "Work-item/spec source and SCM host. Optional: when omitted, infer active from issueTrackers.*.enabled (GitHub if enabled, else Azure DevOps, else local); scm defaults to active when active is github|azure-devops, or from project.repoUrl host when active is local.",
+      "additionalProperties": true,
+      "properties": {
+        "active": {
+          "type": "string",
+          "enum": ["github", "azure-devops", "local"],
+          "description": "Provider skill for fetch-to-spec / entry registration. When set, overrides bare-number tracker preference from issueTrackers.*.enabled."
+        },
+        "scm": {
+          "type": "string",
+          "enum": ["github", "azure-devops"],
+          "description": "Provider skill for create-pr, list-threads, resolve-thread, merge-pr, and remote validate-auth. Never local. Hybrid allowed: active=local with scm=github|azure-devops."
+        }
+      }
+    },
+    "issueTrackers": { "type": "object" },
+    "verification": {
+      "type": "object",
+      "properties": {
+        "backendBuild": { "type": "string" },
+        "backendTest": { "type": "string" },
+        "backendFormat": { "type": "string" },
+        "frontendBuild": { "type": "string" },
+        "frontendTest": { "type": "string" },
+        "migrationsAdd": { "type": "string" },
+        "migrationsApply": { "type": "string" },
+        "mutationTest": {
+          "type": "string",
+          "description": "Optional mutation-testing command (Stryker, PIT, mutmut, etc.). Empty/unset skips the ws-testing mutation substep."
+        },
+        "mutationThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 80,
+          "description": "Minimum mutation score percent (killed/(killed+survived)*100) required to pass Step 7 when mutation runs."
+        },
+        "testGlobs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": ["test/**/*.js", "tests/**/*", "**/*.test.*", "**/*.spec.*"],
+          "description": "Machine test-surface patterns. Testing auto-skip requires no non-empty test alias and no matching file."
+        }
+      }
+    },
+    "dagThresholds": {
+      "type": "object",
+      "properties": {
+        "maxImplementationSteps": { "type": "integer", "minimum": 1 },
+        "maxExpectedFiles": { "type": "integer", "minimum": 1 },
+        "maxLayers": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "autoMode": { "type": "boolean" },
+        "dryRun": { "type": "boolean" },
+        "skipTesting": {
+          "type": "boolean",
+          "description": "Skip Step 7 Testing (standard orch)."
+        },
+        "skipMutationTesting": {
+          "type": "boolean",
+          "default": true,
+          "description": "Skip the Step 7 mutation substep inside ws-testing (opt-in when false and verification.mutationTest is set)."
+        },
+        "skipTests": { "type": "boolean" },
+        "fullMode": { "type": "boolean" },
+        "scoreAndRefine": {
+          "type": "boolean",
+          "description": "Optional extra Pass 1 scoring and 2nd pass polish when Step 5 score is already >= 9. A score below 9 always runs scoreAndRefine until >= 9, even when this flag is false."
+        },
+        "autoload": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, consumer intends repo-root AGENTS.md to autoload Always-applied skills from {sharedDir}/autoload.md. Omitted or missing config → effective false."
+        },
+        "enableAuditing": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, ws-spec-to-pr* orchestrators activate ws-audit runtime observer to log execution anomalies, diagnose performance/correctness, detect disposable scripts, and propose upstream GitHub issues/reusable tooling at run end. Omitted or missing config → effective false."
+        },
+        "enableDag": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, break execution plans into multiple parallel tasks executed concurrently by subagents. When false (default), execute tasks sequentially one by one in serial order."
+        },
+        "contextBudget": {
+          "type": "integer",
+          "minimum": 18000,
+          "default": 32000,
+          "description": "Maximum UTF-8 bytes in one complete standard subagent dispatch."
+        },
+        "parallelVerifyReview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow standard Steps 5 and 6 to run concurrently as read-only reviewers after an immutable product commit."
+        },
+        "gateGranularity": {
+          "type": "string",
+          "enum": ["step", "phase"],
+          "default": "step"
+        },
+        "convergence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "initialDelaySec": { "type": "integer", "minimum": 0, "default": 0 },
+            "minPollSec": { "type": "integer", "minimum": 0, "default": 30 },
+            "maxPollSec": { "type": "integer", "minimum": 0, "default": 300 },
+            "backoff": { "type": "number", "minimum": 1, "default": 1.5 },
+            "maxIterations": { "type": "integer", "minimum": 1, "default": 20 }
+          }
+        },
+        "patternsBackend": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, ws-patterns-backend is enabled in autoload.md and consulted during backend implementations."
+        },
+        "patternsFrontend": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, ws-patterns-frontend is enabled in autoload.md and consulted during frontend implementations."
+        },
+        "deliveryCommitArtifacts": {
+          "type": "object",
+          "description": "Which {us-dir} artifacts to stage in the Step 8 delivery commit. Missing object or omitted keys merge to AC1 defaults at read time (includeRefinedPlan true; includeDeliveryResult and all opt-ins false). Never silently fall back to legacy always plan+result.",
+          "additionalProperties": false,
+          "properties": {
+            "includeRefinedPlan": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, stage step-02-{slug}.plan.refined.md if present, else step-01-{slug}.plan.md (fail closed if neither exists)."
+            },
+            "includeDeliveryResult": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, stage step-08-{slug}.result.md. Default false (result may still be written for orch evidence)."
+            },
+            "includeSpec": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true and file exists, stage step-00-{slug}.spec.md."
+            },
+            "includeCheckReport": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true and file exists, stage step-05-{slug}.plan.report.md."
+            },
+            "includeCodeReview": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true and file exists, stage step-06-{slug}.review.md."
+            },
+            "includeTestingReport": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true and file exists, stage step-07-{slug}.testing.report.md."
+            }
+          }
+        },
+        "plannerModel": {
+          "type": "string",
+          "description": "Preferred LLM model name for planning phase (Steps 0-3) in autoMode."
+        },
+        "executionModel": {
+          "type": "string",
+          "description": "Preferred LLM model name for execution phase (Step 4) in autoMode."
+        },
+        "reviewerModel": {
+          "type": "string",
+          "description": "Preferred LLM model name for check-implementation and code-review (standard Steps 5-6) in autoMode."
+        },
+        "testingModel": {
+          "type": "string",
+          "description": "Preferred LLM model name for the test executor (standard Step 7) in autoMode. Empty or omitted resolves to executionModel at dispatch time."
+        }
+      }
+    },
+    "plans": {
+      "type": "object",
+      "required": ["dir"],
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".agents/plans",
+          "description": "Root for {us-dir} = {dir}/{slug}/"
+        },
+        "specsDir": {
+          "type": "string",
+          "default": ".agents/specs",
+          "description": "Repo-relative directory for human-facing local specs. Skill token {specsDir} ← plans.specsDir (default: .agents/specs). Prefer existing repo-root specs/ when already present. ws-write-spec writes here only; used by ws-local-spec-provider, ws-spec-index, ws-spec-list, ws-multi-spec, ws-sync-spec; workflow step-00 copies under plans.dir come from providers or register"
+        },
+        "diagnosticsDir": {
+          "type": "string",
+          "default": ".agents/plans/diagnostics",
+          "description": "Configured root for explicitly persisted dated doctor and harness reports."
+        },
+        "worktreesDir": {
+          "type": "string",
+          "default": ".agents/plans/{slug}/worktrees",
+          "description": "Worktree root template; {slug} substituted at runtime. Prefer nesting under plans.dir (e.g. .agents/plans/{slug}/worktrees)."
+        },
+        "useWorktrees": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, prefer git worktree isolation for Step 4 implement (non-win32, path length ≤180, git worktree add succeeds)."
+        }
+      }
+    },
+    "reviews": {
+      "type": "object",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".agents/codereviews",
+          "description": "Root for local PR review round reports (fix-pr / ws-goal-fix-pr)"
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "description": "Optional ws-preview pipeline review dry-run settings.",
+      "additionalProperties": true,
+      "properties": {
+        "stack": {
+          "type": "string",
+          "description": "Stack id override for external review dry-run (defaults to stack.id when unset)."
+        },
+        "backend": {
+          "type": "string",
+          "enum": ["cursor-reviewer", "agentic-code-reviewers"],
+          "default": "cursor-reviewer",
+          "description": "External review backend. v1 uses cursor-reviewer only; agentic-code-reviewers reserved for future."
+        }
+      }
+    },
+    "rules": { "type": "object" },
+    "invariants": {
+      "type": "object",
+      "description": "Project invariants and workflow bypass toggles.",
+      "additionalProperties": true,
+      "properties": {
+        "skipQualityGates": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, same effect as the --skip-gates CLI flag: bypass quality gates (classifier enforcement, fable quality visibility except auditVerdictsBlockShip + REFUTED, pre-advance CI, telemetry soft gates). Does not skip build, test, security, SCM, or HS-1..HS-4."
+        }
+      }
+    },
+    "fable": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "autoAudit": { "type": "boolean" },
+        "autoDetectDomain": { "type": "boolean" },
+        "auditVerdictsBlockShip": {
+          "enum": [false, "refuted", "caveats"],
+          "default": "refuted",
+          "description": "REFUTED always blocks. caveats additionally blocks VERIFIED WITH CAVEATS."
+        }
+      }
+    }
+  }
+}

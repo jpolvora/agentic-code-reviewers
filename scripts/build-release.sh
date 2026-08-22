@@ -21,8 +21,8 @@ fi
 
 echo "=== [1.5] Incrementando versão (patch) ==="
 if [ -z "$(git config user.name || true)" ]; then
-  git config user.name "Cursor Reviewer Release Bot"
-  git config user.email "bot@cursor-reviewer.local"
+  git config user.name "agentic-code-reviewers release bot"
+  git config user.email "bot@agentic-code-reviewers.local"
 fi
 
 npm version patch --no-git-tag-version
@@ -80,8 +80,8 @@ echo ".release-tmp/" >> .release-tmp/.gitignore
 echo "=== [4/5] Inicializando repositório temporário de release ==="
 cd .release-tmp
 git init -b release
-git config user.name "Cursor Reviewer Release Bot"
-git config user.email "bot@cursor-reviewer.local"
+git config user.name "agentic-code-reviewers release bot"
+git config user.email "bot@agentic-code-reviewers.local"
 
 git add -A
 git commit -m "chore: release build $NEW_VERSION ($(date '+%Y-%m-%d %H:%M:%S'))"

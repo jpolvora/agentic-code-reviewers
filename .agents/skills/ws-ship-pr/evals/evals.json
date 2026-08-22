@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-ship-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/ship-pr for oauth-login — create PR to main.",
+      "expected_output": "Delivery commit, push, PR creation per config SCM; step-08 result artifact.",
+      "assertions": [
+        "Agent loads ws-ship-pr",
+        "Resolves branches from config.json, not hardcoded names",
+        "Uses explicit script launchers for verify/detect-base when referenced"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "ship it but do not push yet",
+      "expected_output": "Agent respects stopBeforeFixPr or dry-run style constraints when stated.",
+      "assertions": [
+        "Does not push when user requests hold",
+        "Documents ship action taken vs deferred",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

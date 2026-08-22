@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow-state.schema.json",
+  "title": "Workflow state",
+  "type": "object",
+  "required": ["stateVersion", "revision", "workflowId", "slug", "workflowType", "status", "currentStep", "completedSteps", "skippedSteps"],
+  "properties": {
+    "stateVersion": { "const": 2 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "workflowId": { "type": "string", "minLength": 1 },
+    "slug": { "type": "string", "minLength": 1 },
+    "workflowType": { "enum": ["standard", "lite"] },
+    "status": { "enum": ["active", "blocked", "completed", "cancelled", "failed"] },
+    "currentStep": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "completedSteps": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 9 },
+      "uniqueItems": true
+    },
+    "skippedSteps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "reason", "evidence"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "reason": {
+            "enum": [
+              "interview-not-required",
+              "dag-disabled",
+              "testing-disabled",
+              "no-test-surface",
+              "fix-pr-not-applicable"
+            ]
+          },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "gateDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gate", "choice", "reason", "round"],
+      "properties": {
+        "gate": { "type": "string", "minLength": 1 },
+        "choice": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "round": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "stepStatus": { "type": "object" },
+    "stepDispatches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "dispatchedAt"],
+        "properties": {
+          "step": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "dispatchedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "workflowManifest": { "type": "object" },
+    "telemetry": { "type": "object" },
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sha", "step"],
+        "properties": {
+          "sha": { "type": "string", "minLength": 7 },
+          "step": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "currentModel": { "type": "string" },
+    "nextAction": { "type": "string" },
+    "pendingGate": { "type": ["object", "null"] },
+    "acTotal": { "type": "integer", "minimum": 0 },
+    "acImplemented": { "type": "integer", "minimum": 0 },
+    "verificationScore": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+    "fableVerdict": { "type": ["string", "null"], "enum": ["VERIFIED", "VERIFIED WITH CAVEATS", null] },
+    "statePath": { "type": "string", "pattern": "^(?![A-Za-z]:|/)(?!.*\\\\).+" }
+  },
+  "additionalProperties": true
+}

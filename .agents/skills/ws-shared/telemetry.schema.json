@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "telemetry.schema.json",
+  "title": "Workflow telemetry event",
+  "type": "object",
+  "required": ["schemaVersion", "type", "timestamp", "workflowId", "pipeline", "packageVersion", "step", "model", "retries", "reviewRounds", "refineRounds", "skipReason", "acTotal", "acImplemented"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "type": { "enum": ["dispatch", "finish", "gate-bypass", "audit-finalize", "index-rebuilt"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "workflowId": { "type": "string" },
+    "pipeline": { "enum": ["standard", "lite"] },
+    "packageVersion": { "type": "string" },
+    "step": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "model": { "type": "string" },
+    "retries": { "type": "integer", "minimum": 0 },
+    "reviewRounds": { "type": "integer", "minimum": 0 },
+    "refineRounds": { "type": "integer", "minimum": 0 },
+    "skipReason": { "type": ["string", "null"] },
+    "acTotal": { "type": "integer", "minimum": 0 },
+    "acImplemented": { "type": "integer", "minimum": 0 },
+    "dispatchedAt": { "type": ["string", "null"], "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" },
+    "elapsedSec": { "type": "integer", "minimum": 0 },
+    "estimated": { "type": "boolean" },
+    "promptTokens": { "type": "integer", "minimum": 0 },
+    "completionTokens": { "type": "integer", "minimum": 0 },
+    "filesTouched": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created", "modified", "deleted"],
+      "properties": {
+        "created": { "type": "array", "items": { "$ref": "#/$defs/path" } },
+        "modified": { "type": "array", "items": { "$ref": "#/$defs/path" } },
+        "deleted": { "type": "array", "items": { "$ref": "#/$defs/path" } }
+      }
+    },
+    "gateDecision": { "type": ["object", "null"] },
+    "gate": { "type": "string" },
+    "reason": { "type": "string" },
+    "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 10 },
+    "verdict": { "type": ["string", "null"] },
+    "errors": { "type": "array", "items": { "type": "string" } },
+    "auditCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["errors", "unusual", "suggestions"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "unusual": { "type": "integer", "minimum": 0 },
+        "suggestions": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "path": { "type": "string", "pattern": "^(?![A-Za-z]:|/)(?!.*\\\\).+" }
+  }
+}

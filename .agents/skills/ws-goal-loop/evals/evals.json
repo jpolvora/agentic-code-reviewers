@@ -1,0 +1,69 @@
+{
+  "skill_name": "ws-goal-loop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-goal-loop for a typical goal-loop task in this project.",
+      "expected_output": "Agent loads ws-goal-loop and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-goal-loop before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/goal-loop — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-goal-loop trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Update the running goal but the caller supplies a stale revision.",
+      "expected_output": "Revision-guarded: the stale revision conflicts loudly and is never silently overwritten.",
+      "assertions": [
+        "Checks the supplied revision against the current goal revision before applying",
+        "A stale revision conflicts loudly (stops / surfaces) instead of overwriting",
+        "Never takes last-wins on a conflicting revision",
+        "en-us and harness-neutral wording"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Convergence loop has repeated the same concrete failure reason for 2 rounds; decide the verdict.",
+      "expected_output": "Not blocked yet: a blocked verdict is only allowed after >= 3 consecutive rounds with the same concrete reason.",
+      "assertions": [
+        "Tracks the concrete reason across consecutive rounds",
+        "Does NOT mark blocked before 3 consecutive identical reasons",
+        "Resets the round counter when the concrete reason changes",
+        "Keeps re-arming/evaluating while below the 3-round threshold"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Resume a previously paused goal loop at round N.",
+      "expected_output": "Resume re-arms the objective (re-stated) and re-initializes the blocked-round counter.",
+      "assertions": [
+        "Re-arms (re-states) the objective on resume",
+        "Re-initializes the blocked-round counter on resume",
+        "Continues the loop from the current state"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Convergence loop has repeated the same concrete failure reason for 3 consecutive rounds; decide the verdict.",
+      "expected_output": "Blocked (escalated): after >= 3 consecutive rounds with the same concrete reason, the loop is blocked and escalated.",
+      "assertions": [
+        "Tracks the concrete reason across consecutive rounds",
+        "Marks blocked (escalated) at 3 consecutive identical reasons",
+        "Does not continue iterating once the blocked threshold is met",
+        "en-us and harness-neutral wording"
+      ]
+    }
+  ]
+}

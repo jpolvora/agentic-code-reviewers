@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-testing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run pre-PR testing for oauth-login per project config.",
+      "expected_output": "Testing plan/report artifacts; commands from config.json verification.",
+      "assertions": [
+        "Agent loads ws-testing",
+        "Uses verification.backendTest or frontendTest from config when present",
+        "Documents pass/fail with command output evidence"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/ws-testing skip coverage if tests pass",
+      "expected_output": "Agent follows testing skill gates; skip only when skill allows.",
+      "assertions": [
+        "Does not skip required gates without explicit skill-compliant reason",
+        "Records testing report artifact when orchestrated",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

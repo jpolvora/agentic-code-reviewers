@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-secrets-leak-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Scan repo for secrets before public push.",
+      "expected_output": "Leak scan using secrets-leak-review skill and scanner scripts.",
+      "assertions": [
+        "Agent loads secrets-leak-review",
+        "Checks for API keys, tokens, PII patterns",
+        "Uses bash/python launchers on scripts/ when running hooks"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "is it safe to commit .env with fake values?",
+      "expected_output": "Risk assessment; recommends gitignore and pre-commit hook.",
+      "assertions": [
+        "Warns about committing env files even with fake values",
+        "References install-hook.sh only as optional helper",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

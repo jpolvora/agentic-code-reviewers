@@ -463,7 +463,7 @@ If none of the heuristics identify a stack, the runner assumes `ABP/Angular` as 
 
 ### What's the format of the posted thread?
 
-**Answer:** `Agentic Code Reviewer {engine}` + emoji/severity + comment + suggested fix (optional) + `<details>` with score, analysis and paths. The tag is derived from `AGENTIC_CODE_REVIEWERS_ENGINE` (e.g. `Agentic Code Reviewer cursor-sdk`). **Does not** use ```` ```suggestion ```` — ADO doesn't apply inline suggestions like GitHub.
+**Answer:** `agentic-code-reviewers v{version} ({engine})` + emoji/severity + comment + suggested fix (optional) + `<details>` with score, analysis and paths. The tag is derived from package version and `AGENTIC_CODE_REVIEWERS_ENGINE` (e.g. `agentic-code-reviewers v0.4.0 (cursor-sdk)`). **Does not** use ```` ```suggestion ```` — ADO doesn't apply inline suggestions like GitHub.
 
 *Evidence:* `formatCommentForPosting` in `src/ado/format-thread.ts`.
 

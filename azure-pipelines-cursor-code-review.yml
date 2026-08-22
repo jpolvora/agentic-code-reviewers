@@ -35,18 +35,18 @@ variables:
 # Crie em Pipelines → Library → + Variable group.
 - group: vg-agentic-code-reviewers              # ← CONFIGURE: nome do seu variable group
 
-# ── Path do cursor-reviewer no repositório ─────────────────────────
+# ── Path do agentic-code-reviewers no repositório ──────────────────
 # Ajuste se o subprojeto estiver em outro diretório.
 - name: REVIEWER_DIR
-  value: scripts/cursor-reviewer               # ← CONFIGURE: caminho relativo ao repo
+  value: scripts/agentic-code-reviewers        # ← CONFIGURE: caminho relativo ao repo
 
 # ── Cache npm (não alterar) ────────────────────────────────────────
 - name: npm_config_cache
   value: $(Pipeline.Workspace)/.npm
 
 jobs:
-- job: CursorCodeReview
-  displayName: 'Cursor Agent Code Review'
+- job: AgenticCodeReview
+  displayName: 'agentic-code-reviewers'
   steps:
   # ── Checkout com histórico completo ──────────────────────────────
   # fetchDepth: 0 garante merge-base correto no diff three-dot.
@@ -82,9 +82,9 @@ jobs:
       set -euo pipefail
       cd $(REVIEWER_DIR)
       npm ci
-    displayName: 'npm ci (cursor-reviewer)'
+    displayName: 'npm ci (agentic-code-reviewers)'
 
-  # ── Run Cursor Reviewer ─────────────────────────────────────────
+  # ── Run agentic-code-reviewers ───────────────────────────────────
   # O runner detecta automaticamente as variáveis ADO da pipeline:
   #   SYSTEM_PULLREQUEST_SOURCEBRANCH, SYSTEM_PULLREQUEST_TARGETBRANCH,
   #   SYSTEM_PULLREQUEST_PULLREQUESTID, SYSTEM_COLLECTIONURI,
@@ -93,7 +93,7 @@ jobs:
       set -euo pipefail
       cd $(REVIEWER_DIR)
       npm run review
-    displayName: 'Run Cursor Reviewer Agent'
+    displayName: 'Run agentic-code-reviewers'
     env:
       CURSOR_API_KEY: $(CURSOR_API_KEY)
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)

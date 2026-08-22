@@ -58,7 +58,7 @@ describe('formatLogIssueCommand', () => {
 describe('buildReviewSummaryMarkdown', () => {
   it('inclui status, severidades e linha de tabela por review', () => {
     const md = buildReviewSummaryMarkdown(gate, [review()], false);
-    assert.match(md, /# Agentic Code Reviewer/);
+    assert.match(md, /# agentic-code-reviewers/);
     assert.match(md, /Com issues/);
     assert.match(md, /\| warning \| 7 \| `src\/Foo\.cs:42`/);
   });

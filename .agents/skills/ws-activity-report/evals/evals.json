@@ -1,0 +1,29 @@
+{
+  "skill_name": "ws-activity-report",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "activity-report 2026-08-05 — build timesheet for that day",
+      "expected_output": "Agent loads ws-activity-report, resolves plans under {plansDir}, uses bootstrap_start.py for start, max(thread, commit) for end, emits entries + technical table with Short title.",
+      "assertions": [
+        "Agent loads ws-activity-report before acting",
+        "Uses path tokens ({plansDir}) not hardcoded .agents/plans",
+        "Runs python …/bootstrap_start.py for start clock",
+        "End is max of PR thread comment and delivery commit (or gap)",
+        "Technical table includes Short title column",
+        "Does not invent times or titles",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/ws-activity-report — missing config.json",
+      "expected_output": "Agent stops or gates to ws-configure-project; no invented project metadata.",
+      "assertions": [
+        "Recognizes activity-report / ws-activity-report trigger",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent org/repo or PAT paths"
+      ]
+    }
+  ]
+}

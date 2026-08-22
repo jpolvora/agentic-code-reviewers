@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-fable-method",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/fable-method — production login failures spiked after deploy.",
+      "expected_output": "7-step loop with triviality/fit gates; evidence before action.",
+      "assertions": [
+        "Agent loads fable-method",
+        "Gathers primary-source evidence before deciding",
+        "Reports outcome-first"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "trivial ask: rename variable x to y — use fable-method?",
+      "expected_output": "Triviality gate routes away from full 7-step ceremony.",
+      "assertions": [
+        "Recognizes trivial task vs full method fit",
+        "Does not over-process simple rename",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}
