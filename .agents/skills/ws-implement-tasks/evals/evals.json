@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-implement-tasks",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Implement the next ready task from {plansDir}/oauth-login/step-03-oauth-login.exec.dag.json",
+      "expected_output": "Surgical code changes per plan/DAG; no drive-by refactors.",
+      "assertions": [
+        "Agent loads ws-implement-tasks",
+        "Changes align with the DAG task scope",
+        "Consults MEMORY or stack file before inventing patterns"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Fix review findings for oauth-login per step-06 fix report.",
+      "expected_output": "Targeted fixes in mode=fix without expanding scope.",
+      "assertions": [
+        "Agent treats this as fix substep when fix report is referenced",
+        "Does not rewrite unrelated modules",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

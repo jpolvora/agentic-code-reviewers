@@ -1,0 +1,50 @@
+{
+  "prNumber": 23,
+  "owner": "jpolvora",
+  "repo": "agentic-code-reviewers",
+  "cooperativeContract": ".agents/skills/ws-fix-pr/scripts/COOPERATIVE_FIX.md",
+  "activeThreads": [
+    {
+      "index": 1,
+      "threadId": "PRRT_kwDOTGZdV86bNk6a",
+      "filePath": "/src/engine/opencode/stream.ts",
+      "lineNumber": 0,
+      "summary": "Agentic Code Reviewer cursor-sdk ⚠️ **WARNING:** The JSON follow-up reuses the same AbortController that was armed at the start of runOpencodeStream, so the recovery turn only gets whatever time remains after the first (often tool-heavy)...",
+      "comments": [
+        {
+          "author": "jpolvora",
+          "createdAt": "2026-08-21T15:52:28Z",
+          "body": "Agentic Code Reviewer cursor-sdk\n\n⚠️ **WARNING:** The JSON follow-up reuses the same AbortController that was armed at the start of runOpencodeStream, so the recovery turn only gets whatever time remains after the first (often tool-heavy) prompt completes. When the first turn finishes near TIMEOUT_MS with no usable text — the exact scenario this PR targets — the follow-up is aborted almost immediately and the job surfaces a timeout instead of recovering or returning the empty-text diagnostics.\n\n**Correção sugerida:**\n\n```ts\nif (isRetryableIncompleteAssistant(response.info, fullText)) {\n  clearTimeout(timeoutHandle);\n  timeoutHandle = setTimeout(() => abortController.abort(), timeoutMs);\n  // ... existing follow-up sendSessionPrompt ...\n}\n```\nAlternatively arm a nested AbortController for the follow-up so the initial long turn cannot consume the recovery budget.\n\n<details>\n<summary>🔍 Detalhes da Análise IA</summary>\n\n**Score:** 7/10 | **Ação dev:** fix-code\n\n**Análise:**\n1. Evidence: Read src/engine/opencode/stream.ts (lines 290–291 setTimeout on abortController; lines 333–355 retry via sendSessionPrompt with the same abortController.signal). docs/faq.md § OpenCode empty textPart documents one follow-up for reasoning-only / output-length failures after long runs. 2. Scenario: A review with many tool calls runs for ~TIMEOUT_MS−5s, returns reasoning-only parts (fullText empty, isRetryableIncompleteAssistant true). The follow-up starts with ~5s left on the shared timer and aborts before the model can emit JSON, producing the generic timeout error path (lines 393–407) instead of JSON recovery. 3. Protection: test/opencode-assistant-text.test.ts covers helper predicates only; no test exercises runOpencodeStream timeout budget across two prompts. 4. Discards: Considered event-stream inactivity as root cause — that aborts during the first prompt and never reaches the retry branch; considered unbounded retries — code intentionally allows only one follow-up, which is fine once the follow-up has its own time budget.\n\n**Caminhos analisados:** src/engine/opencode/stream.ts, src/engine/opencode/assistant-text.ts, test/opencode-assistant-text.test.ts, docs/faq.md\n</details>"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "threadId": "PRRT_kwDOTGZdV86bNk7L",
+      "filePath": "/src/engine/opencode/stream.ts",
+      "lineNumber": 0,
+      "summary": "Agentic Code Reviewer cursor-sdk 💡 **SUGGESTION:** After a successful follow-up, returned metrics are taken only from the second AssistantMessage. The first turn — often the expensive one when reasoning/tool parts dominated — is omitted...",
+      "comments": [
+        {
+          "author": "jpolvora",
+          "createdAt": "2026-08-21T15:52:28Z",
+          "body": "Agentic Code Reviewer cursor-sdk\n\n💡 **SUGGESTION:** After a successful follow-up, returned metrics are taken only from the second AssistantMessage. The first turn — often the expensive one when reasoning/tool parts dominated — is omitted from pipeline token summaries even though its usage is logged in the retry warning.\n\n**Correção sugerida:**\n\n```ts\nlet metrics = assistantMessageToMetrics(response.info);\nif (isRetryableIncompleteAssistant(firstInfo, firstFullText)) {\n  // ... follow-up ...\n  metrics = mergeAssistantMetrics(firstInfo, response.info);\n}\nreturn { /* ... */, metrics };\n```\n\n<details>\n<summary>🔍 Detalhes da Análise IA</summary>\n\n**Score:** 6/10 | **Ação dev:** fix-code\n\n**Análise:**\n1. Evidence: src/engine/opencode/stream.ts lines 333–355 replace `response` on retry; line 382 returns `assistantMessageToMetrics(info)` using only the final message. formatIncompleteAssistantDiagnostics (assistant-text.ts) logs first-turn tokens in the warn path but they are not merged into the returned metrics consumed by src/index.ts → provider.emitPipelineReviewOutput. 2. Scenario: First turn consumes 80k input + 40k reasoning tokens with empty text; follow-up emits JSON with 2k tokens. GitHub/ADO pipeline summaries report ~2k total, underreporting cost and making regressions in reasoning-heavy models invisible. 3. Protection: No test asserts metric aggregation across retry; opencode-assistant-text tests do not cover metrics. 4. Discards: Treating metrics as best-effort empty for OpenCode — non-retry path unchanged and SDK always exposes tokens on AssistantMessage when retry occurs, so aggregation is feasible.\n\n**Caminhos analisados:** src/engine/opencode/stream.ts, src/engine/opencode/assistant-text.ts, src/index.ts, src/agent/metrics-display.ts\n</details>"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "threadId": "PRRT_kwDOTGZdV86bNk7-",
+      "filePath": "/src/engine/opencode/stream.ts",
+      "lineNumber": 0,
+      "summary": "Agentic Code Reviewer cursor-sdk 💡 **SUGGESTION:** The new in-session retry orchestration in runOpencodeStream (detect incomplete assistant → send follow-up → validate) has no automated test. Only the extracted helpers in assistant-text...",
+      "comments": [
+        {
+          "author": "jpolvora",
+          "createdAt": "2026-08-21T15:52:29Z",
+          "body": "Agentic Code Reviewer cursor-sdk\n\n💡 **SUGGESTION:** The new in-session retry orchestration in runOpencodeStream (detect incomplete assistant → send follow-up → validate) has no automated test. Only the extracted helpers in assistant-text.ts are covered, leaving the happy path and post-retry failure branches unguarded against regressions.\n\n**Correção sugerida:**\n\n```ts\n// test/opencode-stream-retry.test.ts — mock sendSessionPrompt/module or stub OpencodeClient\nit('retries once when first turn is reasoning-only then returns follow-up JSON', async () => {\n  // first call: parts=[reasoning], fullText=''\n  // second call: parts=[text:'{\"reviews\":[]}']\n  // assert EMPTY_ASSISTANT_TEXT_CONTINUATION sent exactly once\n});\n```\n\n<details>\n<summary>🔍 Detalhes da Análise IA</summary>\n\n**Score:** 6/10 | **Ação dev:** fix-code\n\n**Análise:**\n1. Evidence: Diff adds retry block at stream.ts lines 333–372; test/opencode-assistant-text.test.ts tests extractTextFromParts/isRetryableIncompleteAssistant/formatIncompleteAssistantDiagnostics in isolation. Grep shows no runOpencodeStream or stream.ts tests under test/. 2. Scenario: A future edit removes the second extractTextFromParts call, skips error checking after retry, or stops replacing `response` — helpers still pass while CI silently loses JSON recovery. 3. Protection: Helper unit tests do not invoke sendSessionPrompt or assert follow-up prompt text/count; AGENTS.md requires happy-path tests for behavior changes. 4. Discards: Relying on E2E seed tests — seed path does not mock OpenCode incomplete-assistant responses; cursor-sdk stream.ts is also untested but that is pre-existing and out of this diff's scope.\n\n**Caminhos analisados:** src/engine/opencode/stream.ts, test/opencode-assistant-text.test.ts, src/engine/opencode/assistant-text.ts\n</details>"
+        }
+      ]
+    }
+  ]
+}

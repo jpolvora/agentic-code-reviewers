@@ -1,0 +1,47 @@
+{
+  "skill_name": "ws-check-harness",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-check-harness for a typical check-harness task in this project.",
+      "expected_output": "Agent loads ws-check-harness and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-check-harness before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/check-harness — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-check-harness trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Dry-run ws-check-harness at this upstream package root and report Install mode + Skills scan root.",
+      "expected_output": "Install mode: upstream; Skills scan root: .agents/skills; Mode reported separately from Install mode.",
+      "assertions": [
+        "Detects package markers (bin/skill-dependencies.json + bin/cli.js) and SoT under .agents/skills/ws-*/SKILL.md",
+        "Reports Install mode upstream with Skills scan root .agents/skills",
+        "Does not select src/skills as the upstream skills scan root",
+        "Does not conflate execution Mode (normal|dry-run) with Install mode"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Dry-run ws-check-harness in a consumer tree that has only .agents/skills (no bin/skill-dependencies.json package markers).",
+      "expected_output": "Install mode: consumer; Skills scan root under {skillsRoot} (default .agents/skills) and/or {globalSkillsRoot}; missing root AGENTS.md is OK.",
+      "assertions": [
+        "Reports Install mode consumer when upstream markers/SoT evidence is incomplete",
+        "Scans {skillsRoot} (and optional global) rather than inventing inventory from stray src/skills",
+        "Treats missing root AGENTS.md as OK; audits ws-shared/AGENTS.md as the consumer hub"
+      ]
+    }
+  ]
+}

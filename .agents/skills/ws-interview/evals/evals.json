@@ -1,0 +1,47 @@
+{
+  "skill_name": "ws-interview",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit the plan at {plansDir}/oauth-login/step-01-oauth-login.plan.md before we implement.",
+      "expected_output": "Interview-style audit with questions or gaps; refined plan or confirmed shared understanding.",
+      "assertions": [
+        "Agent loads ws-interview",
+        "Does not jump straight to implementation without plan review",
+        "Surfaces ambiguities or missing decisions from the plan",
+        "Runs project-context sweep (specs, MEMORY, codebase, architecture, rules) before asking the user"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "The plan looks fine, skip interview and start coding.",
+      "expected_output": "Agent follows interview skill gates or documents assumed-default per orchestrator rules.",
+      "assertions": [
+        "Agent does not silently skip interview obligations when orchestrated at Step 2",
+        "If proceeding, documents assumption or uses user-gate when available",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "autoMode interview: a blocking gap remains after searching the repo; no project source answers it.",
+      "expected_output": "Agent applies model-inferred default with rationale; does not block on user-gate for that gap.",
+      "assertions": [
+        "Agent attempts project-context sweep before falling back",
+        "In autoMode, marks resolutionSource model-inferred (or equivalent) instead of needs_user",
+        "Registry records evidence path(s) when project-sourced, or model-inferred rationale when not"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "softSkipEligible interview: Audit found only non-blocking gaps; no blocking_open. Apply defaults and confirm shared understanding.",
+      "expected_output": "Refined plan with shared_understanding confirmed; non-blocking gaps resolved after project-context sweep (project-sourced when found, else assumed-default).",
+      "assertions": [
+        "Agent still runs project-context sweep for registered non-blocking gaps before defaults",
+        "Does not escalate non-blocking gaps to user-gate",
+        "Does not skip Resolve solely because softSkipEligible and blocking_open == 0",
+        "Marks resolutionSource project or assumed-default for each closed non-blocking gap"
+      ]
+    }
+  ]
+}

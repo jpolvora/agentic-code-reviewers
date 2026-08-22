@@ -1,0 +1,50 @@
+{
+  "skill_name": "ws-senior-developer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add audit logging across the API, worker, and admin UI from this free-text request.",
+      "expected_output": "The delivery gate reads applicable project context and MEMORY, then requires a confirmed multi-file plan before implementation.",
+      "assertions": [
+        "Classifies the free-text request as non-trivial multi-file work",
+        "Reads configured project context, applicable rules, and {sharedDir}/MEMORY.md",
+        "Requires a confirmed plan with scope and verification before implementation",
+        "Uses {plansDir} or installed workflow/specification capabilities for the plan handoff"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Rename one typo in src/constants.ts.",
+      "expected_output": "A focused single-file change with risk-proportionate checks, without plan ceremony.",
+      "assertions": [
+        "Classifies the request as trivial or single-file work",
+        "Does not require a multi-file plan or user-gate confirmation",
+        "Limits verification to focused checks appropriate to the small change",
+        "Avoids unrelated refactors or unconfigured commands"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/ws-spec-to-pr implement the approved billing export plan.",
+      "expected_output": "The named workflow and explicit implementation route take precedence without a competing delivery gate.",
+      "assertions": [
+        "Routes the named workflow command through ws-spec-to-pr",
+        "Identifies the explicit implementation request before adding planning or review gates",
+        "Does not impose a conflicting duplicate workflow or plan gate",
+        "Applies senior-developer constraints only when explicitly requested or configured"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "The multi-file change is ready for a branch and PR handoff.",
+      "expected_output": "Pre-ship proof covers review, configured verification, secrets, docs/spec-index assessment, and evidence or blockers.",
+      "assertions": [
+        "Performs focused review of changed scope for correctness, regressions, and policy compliance",
+        "Runs applicable non-empty configured build, test, and format aliases",
+        "Runs configured secrets checking and resolves or reports findings",
+        "Assesses relevant documentation and specification-index updates",
+        "Reports command evidence, outcomes, remaining risks, and explicit blockers"
+      ]
+    }
+  ]
+}

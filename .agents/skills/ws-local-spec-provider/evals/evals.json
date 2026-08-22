@@ -1,0 +1,26 @@
+{
+  "skill_name": "ws-local-spec-provider",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-local-spec-provider for a typical local-spec-provider task in this project.",
+      "expected_output": "Agent loads ws-local-spec-provider and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-local-spec-provider before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/local-spec-provider — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-local-spec-provider trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    }
+  ]
+}

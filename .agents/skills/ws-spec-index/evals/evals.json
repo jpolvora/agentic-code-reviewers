@@ -1,0 +1,26 @@
+{
+  "skill_name": "ws-spec-index",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-spec-index for a typical spec-index task in this project.",
+      "expected_output": "Agent loads ws-spec-index and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-spec-index before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/spec-index — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-spec-index trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    }
+  ]
+}

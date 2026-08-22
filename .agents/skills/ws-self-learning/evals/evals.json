@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-self-learning",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "After fixing CRLF launcher bug, record the trap.",
+      "expected_output": "memory entry + compile via scripts/self_learning.cjs.",
+      "assertions": [
+        "Agent loads self-learning",
+        "Writes to {sharedDir}/memory/ not changelog",
+        "Uses node {skillsRoot}/ws-self-learning/scripts/self_learning.cjs --compile"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Pure Q&A: what is spec-to-pr?",
+      "expected_output": "Learning: N/A when no durable trap to record.",
+      "assertions": [
+        "Consults MEMORY before planning when task would mutate repo",
+        "Proof line includes Learning: N/A for pure Q&A",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

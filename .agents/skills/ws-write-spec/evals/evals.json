@@ -1,0 +1,37 @@
+{
+  "skill_name": "ws-write-spec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Draft a spec for adding OAuth login with Google and GitHub. Feature slug: oauth-login.",
+      "expected_output": "A local oauth-login.spec.md under {specsDir}/ with acceptance criteria per spec-format. No {plansDir} folder or step-00 file created.",
+      "assertions": [
+        "Agent loads ws-write-spec or write-spec before drafting",
+        "Output path uses {specsDir} or plans.specsDir token, not {plansDir}",
+        "Agent does not create {plansDir}/{slug}/ or step-00-*.spec.md unless --register",
+        "Spec includes testable acceptance criteria",
+        "Spec follows spec-format structure (not a freeform essay)"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "hey can you write a spec for dark mode toggle in settings",
+      "expected_output": "Casual prompt still yields a structured spec under {specsDir} with slug, scope, and acceptance criteria.",
+      "assertions": [
+        "Agent loads the write-spec skill despite informal phrasing",
+        "Spec sets source: local and id: null per spec-format",
+        "Slug is derived and used in the artifact filename under {specsDir}"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write a spec with no acceptance criteria, just a paragraph of ideas.",
+      "expected_output": "Agent pushes back or adds acceptance criteria per spec-format rather than shipping a vague paragraph-only spec.",
+      "assertions": [
+        "Response does not treat paragraph-only text as a complete local spec",
+        "Agent references spec-format or acceptance criteria requirements",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {specsDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-spec-format",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review specs/oauth-login/step-00-oauth-login.spec.md for format compliance.",
+      "expected_output": "Format review against spec-format protocol; concrete fixes listed.",
+      "assertions": [
+        "Agent loads spec-format",
+        "Checks acceptance criteria, source, id fields",
+        "Does not treat issue.json as downstream read target"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "fix this spec — it has no slug or acceptance criteria",
+      "expected_output": "Normalized spec shape per protocol.",
+      "assertions": [
+        "Adds or requests missing required sections",
+        "Uses en-us skill content",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

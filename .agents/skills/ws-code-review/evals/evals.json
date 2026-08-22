@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-code-review",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run local code review for oauth-login branch changes before PR.",
+      "expected_output": "Two-phase triage + investigation review per skill; step-06 review artifact.",
+      "assertions": [
+        "Agent loads ws-code-review",
+        "Review is diff-grounded, not generic praise",
+        "Separates blocking vs non-blocking findings"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "quick lgtm on my changes",
+      "expected_output": "Agent still follows review skill structure rather than empty approval.",
+      "assertions": [
+        "Does not output performative LGTM without reading changes",
+        "References concrete files or findings",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plans-index.schema.json",
+  "title": "Workflow plans index",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "revision", "generatedAt", "workflows"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "integer", "minimum": 0 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workflowId", "slug", "pipeline", "statePath", "stateSha256", "status", "currentStep", "updatedAt", "runPath"],
+        "properties": {
+          "workflowId": { "type": "string", "minLength": 1 },
+          "slug": { "type": "string", "minLength": 1 },
+          "pipeline": { "enum": ["standard", "lite"] },
+          "statePath": { "$ref": "#/$defs/relativePath" },
+          "stateSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "status": { "type": "string", "minLength": 1 },
+          "currentStep": { "type": "integer", "minimum": 0, "maximum": 9 },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "runPath": { "$ref": "#/$defs/relativePath" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "pattern": "^(?![A-Za-z]:|/)(?!.*\\\\).+"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "skill_name": "ws-spec-to-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/spec-to-pr dry-run for feature: export users to CSV",
+      "expected_output": "FSM orchestration with gates; dry-run logs without destructive git ops.",
+      "assertions": [
+        "Agent loads spec-to-pr orchestrator",
+        "Respects dry-run flag (no push/PR create)",
+        "Uses dispatch-agent or documented step dispatch for steps"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Run full spec-to-pr from GitHub issue #99",
+      "expected_output": "Provider fetch-to-spec then steps 0–9 per STEP-DISPATCH.",
+      "assertions": [
+        "Routes issue entry through github-provider fetch-to-spec",
+        "Does not read live issue API after step-00 spec exists",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/spec-to-pr auto skip-tests",
+      "expected_output": "Flags combine; skip-tests honored per gates without skipping mandatory hygiene.",
+      "assertions": [
+        "Documents skip-tests in state or proof",
+        "Still runs integrity/harness obligations when required by step",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

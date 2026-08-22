@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-spec-to-pr-lite",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/spec-to-pr-lite for local specs/oauth-login/step-00-oauth-login.spec.md",
+      "expected_output": "Fast sequential steps 0–5 without full FSM subagent dispatch.",
+      "assertions": [
+        "Agent loads spec-to-pr-lite",
+        "Uses lite step numbers, not STEP-DISPATCH standard-only table",
+        "Shares config and gates with standard orch"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "lite delivery auto dry-run on billing-refactor spec",
+      "expected_output": "Combined flags; inline execution in main session.",
+      "assertions": [
+        "Does not require dispatch-agent for every lite step",
+        "Sets workflowType lite in state isolation",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

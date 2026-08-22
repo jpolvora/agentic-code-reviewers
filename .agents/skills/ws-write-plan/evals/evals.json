@@ -1,0 +1,26 @@
+{
+  "skill_name": "ws-write-plan",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create an implementation plan from specs/oauth-login/step-00-oauth-login.spec.md",
+      "expected_output": "step-01-oauth-login.plan.md with phased implementation aligned to the spec.",
+      "assertions": [
+        "Agent loads ws-write-plan before planning",
+        "Plan references the spec file, not live tracker APIs",
+        "Output artifact name follows step-01-{slug}.plan.md pattern",
+        "Plan includes verifiable implementation steps"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/ws-write-plan for slug billing-refactor — spec is already in {plansDir}/billing-refactor/",
+      "expected_output": "Plan scoped to spec; no scope creep beyond the spec.",
+      "assertions": [
+        "Agent reads the existing step-00 spec under {plansDir}",
+        "Plan does not invent unrelated features",
+        "Uses path tokens or config-resolved plans.dir"
+      ]
+    }
+  ]
+}

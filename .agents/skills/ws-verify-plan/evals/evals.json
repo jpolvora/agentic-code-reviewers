@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-verify-plan",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Verify implementation against {plansDir}/oauth-login/step-00-oauth-login.spec.md",
+      "expected_output": "step-05 plan report with score 0–10 and gap list vs spec.",
+      "assertions": [
+        "Agent loads ws-verify-plan",
+        "Compares implementation to spec, not to assumptions",
+        "Produces a scored report artifact or structured verification output"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "check if oauth login is done",
+      "expected_output": "Structured verification against acceptance criteria, not a vague yes.",
+      "assertions": [
+        "Response cites spec acceptance criteria or plan report",
+        "Does not claim complete without evidence",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

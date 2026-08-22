@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-changelog",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Record task completion for oauth-login feature.",
+      "expected_output": "Append summarized entry to rules.changelogFile default CHANGELOG.md.",
+      "assertions": [
+        "Agent loads changelog skill",
+        "Uses config rules.changelogFile path",
+        "Summary not a dump of entire conversation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Write every chat message into CHANGELOG",
+      "expected_output": "Agent refuses verbose dump; summarized historical record only.",
+      "assertions": [
+        "Entry is concise summary, not transcript",
+        "Writes to configured changelog path only",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "skill_name": "ws-goal-fix-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Keep fixing PR #42 until zero open review threads.",
+      "expected_output": "Convergence loop via ws-goal-fix-pr until thread count is zero or blocked.",
+      "assertions": [
+        "Agent loads ws-goal-fix-pr or goal-fix-pr",
+        "Uses goal-loop convergence pattern",
+        "Reports remaining thread count each iteration"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "one pass fix-pr on PR 42 then stop",
+      "expected_output": "Single ws-fix-pr pass, not unbounded goal loop.",
+      "assertions": [
+        "Does not run infinite loop when user caps iterations",
+        "Distinguishes ws-goal-fix-pr from single fix-pr",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Update the running fix-pr loop but the caller supplies a stale revision.",
+      "expected_output": "Revision-guarded: the stale revision conflicts loudly and is never silently overwritten.",
+      "assertions": [
+        "Checks the supplied revision against the current fix-round revision before applying",
+        "A stale revision conflicts loudly (stops / surfaces) instead of overwriting thread/round state",
+        "Never takes last-wins on a conflicting revision",
+        "en-us and harness-neutral wording"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Fix-pr loop has repeated the same concrete failure reason for 2 rounds; decide the verdict.",
+      "expected_output": "Not blocked yet: a blocked (escalated) verdict is only allowed after >= 3 consecutive rounds with the same concrete reason.",
+      "assertions": [
+        "Tracks the concrete reason across consecutive fix-pr rounds",
+        "Does NOT mark blocked before 3 consecutive identical reasons",
+        "Resets the blocked-round counter when the concrete reason changes",
+        "Keeps iterating/evaluating while below the 3-round threshold"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Resume a previously paused fix-pr loop at round N.",
+      "expected_output": "Resume re-arms the objective (re-states PR number + success criterion) and re-initializes the blocked/counter round state.",
+      "assertions": [
+        "Re-arms (re-states) the PR number and success criterion on resume",
+        "Re-initializes the blocked/counter round state on resume",
+        "Continues the loop from the current PR state"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Fix-pr loop has repeated the same concrete failure reason for 3 consecutive rounds; decide the verdict.",
+      "expected_output": "Blocked (escalated): after >= 3 consecutive rounds with the same concrete reason, the loop is blocked and escalated.",
+      "assertions": [
+        "Tracks the concrete reason across consecutive fix-pr rounds",
+        "Marks blocked (escalated) at 3 consecutive identical reasons",
+        "Does not continue iterating once the blocked threshold is met",
+        "en-us and harness-neutral wording"
+      ]
+    }
+  ]
+}

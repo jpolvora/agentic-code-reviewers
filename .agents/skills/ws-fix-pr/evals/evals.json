@@ -1,0 +1,35 @@
+{
+  "skill_name": "ws-fix-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Fix open review threads on PR #42 for oauth-login.",
+      "expected_output": "Threads addressed with evidence; uses provider scripts via shims.",
+      "assertions": [
+        "Agent loads ws-fix-pr",
+        "Uses fetch_threads/resolve_thread via documented script paths",
+        "Does not claim threads resolved without checking remote state"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "resolve all PR comments automatically",
+      "expected_output": "Cooperative fix flow per skill; no blind auto-resolve without reading threads.",
+      "assertions": [
+        "Agent reads thread content before resolving",
+        "Uses provider-appropriate SCM from config",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "A review thread on validate-evals.cjs says the gate claims schema validation but never reads the schema, and notes the same pattern in a copied helper.",
+      "expected_output": "Defect class named; sibling grep; both occurrences fixed or skipped with path+reason before resolve.",
+      "assertions": [
+        "Agent names a defect class, not only the anchored file:line",
+        "Agent searches for sibling occurrences before resolving the thread",
+        "Agent does not close the thread while named sibling paths remain unfixed without an exemption"
+      ]
+    }
+  ]
+}

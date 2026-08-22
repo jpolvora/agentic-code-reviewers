@@ -1,0 +1,5 @@
+interface:
+  display_name: "Write a Skill"
+  short_description: "Create and optimize predictable agent skills"
+policy:
+  allow_implicit_invocation: true

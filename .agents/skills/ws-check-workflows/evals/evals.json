@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-check-workflows",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Validate spec-to-pr and lite workflow paths.",
+      "expected_output": "check_workflows.py simulation; FSM/step continuity results.",
+      "assertions": [
+        "Agent loads check-workflows",
+        "Invokes python on scripts/check_workflows.py",
+        "Covers dual-mode config sharing"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "check-workflows after editing STEP-DISPATCH — lite must not use standard-only table",
+      "expected_output": "Validator flags cross-mode dispatch mistakes.",
+      "assertions": [
+        "Distinguishes spec-to-pr standard steps from lite steps 0–5",
+        "Reports critical findings with file paths",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

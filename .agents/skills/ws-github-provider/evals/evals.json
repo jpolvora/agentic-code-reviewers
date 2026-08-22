@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-github-provider",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Convert GitHub issue #42 to a local spec for oauth-login.",
+      "expected_output": "fetch-to-spec via github-issue-to-spec.py writes {specsDir}/us-{n}.spec.md, then register_local_spec.cjs copies to step-00 under {plansDir}.",
+      "assertions": [
+        "Agent loads ws-github-provider",
+        "Uses scripts/github-issue-to-spec.py with python launcher",
+        "Does not hardcode org/repo names"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "list open review threads on PR 15",
+      "expected_output": "Structured thread list via fetch_threads.cjs.",
+      "assertions": [
+        "Uses github-provider scripts path",
+        "Auth resolved from config or gh CLI, not embedded tokens",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

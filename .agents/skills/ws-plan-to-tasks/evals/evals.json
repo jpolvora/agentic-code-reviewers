@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-plan-to-tasks",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Break {plansDir}/oauth-login/step-02-oauth-login.plan.refined.md into a DAG.",
+      "expected_output": "step-03-oauth-login.exec.dag.json with atomic tasks and dependencies.",
+      "assertions": [
+        "Agent loads ws-plan-to-tasks",
+        "Produces exec.dag.json or step-03 plan.exec artifact",
+        "Tasks are atomic and ordered with explicit dependencies"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "turn plan into tasks for oauth-login",
+      "expected_output": "DAG tasks derived from the refined plan for the slug.",
+      "assertions": [
+        "Resolves slug and reads refined plan from {plansDir}",
+        "Does not create tasks unrelated to the plan scope",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

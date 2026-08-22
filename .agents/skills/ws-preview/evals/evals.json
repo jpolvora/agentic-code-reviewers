@@ -1,0 +1,26 @@
+{
+  "skill_name": "ws-preview",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Use @ws-preview for a typical preview task in this project.",
+      "expected_output": "Agent loads ws-preview and follows its skill contract.",
+      "assertions": [
+        "Agent loads ws-preview before acting",
+        "Follows skill steps and Done when criteria",
+        "Uses path tokens from tools.md instead of hardcoded consumer paths",
+        "Output is en-us and harness-neutral"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/preview — edge case: missing or incomplete config.json",
+      "expected_output": "Agent stops or bootstraps via configure-project/setup, not silent guessing.",
+      "assertions": [
+        "Recognizes ws-preview trigger from slash or @ invocation",
+        "References ws-shared/config.json or configure-project when config missing",
+        "Does not invent project-specific metadata"
+      ]
+    }
+  ]
+}

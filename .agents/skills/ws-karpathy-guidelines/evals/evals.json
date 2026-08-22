@@ -1,0 +1,25 @@
+{
+  "skill_name": "ws-karpathy-guidelines",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Refactor entire auth module while fixing one bug.",
+      "expected_output": "Surgical fix only; pushback on scope creep.",
+      "assertions": [
+        "Touches only code required for the bug",
+        "Consults MEMORY before inventing approach",
+        "States assumptions explicitly"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add error handling for impossible edge case we will never hit",
+      "expected_output": "Pushback on speculative error handling per simplicity first.",
+      "assertions": [
+        "Does not add handling for impossible scenarios",
+        "Explains tradeoff when declining scope",
+        "Uses path tokens ({skillsRoot}, {sharedDir}, {plansDir}) instead of hardcoded consumer paths"
+      ]
+    }
+  ]
+}

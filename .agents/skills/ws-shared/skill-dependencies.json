@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "packageVersion": "0.3.30",
+  "upstream": {
+    "repo": "jpolvora/workflow-skills",
+    "url": "https://github.com/jpolvora/workflow-skills",
+    "note": "Managed skills ship from this upstream. Lasting improvements must be submitted as PRs there; consumer copies are overwritten on update."
+  },
+  "hub": {
+    "dir": "ws-shared",
+    "ensureWhen": [
+      "full",
+      "workflows",
+      "workflow-skill-selected"
+    ]
+  },
+  "packages": {
+    "full": {
+      "select": "all-skills",
+      "ensureHub": true,
+      "shortcut": "f",
+      "label": "Full package"
+    },
+    "workflows": {
+      "skills": [
+        "ws-spec-to-pr",
+        "ws-spec-to-pr-lite",
+        "ws-write-spec",
+        "ws-classify-complexity",
+        "ws-write-plan",
+        "ws-interview",
+        "ws-plan-to-tasks",
+        "ws-implement-tasks",
+        "ws-verify-plan",
+        "ws-code-review",
+        "ws-testing",
+        "ws-ship-pr",
+        "ws-fix-pr",
+        "ws-goal-fix-pr",
+        "ws-update-plan-implementation",
+        "ws-github-provider",
+        "ws-azure-devops-provider",
+        "ws-local-spec-provider",
+        "ws-check-harness",
+        "ws-check-workflows",
+        "ws-doctor",
+        "ws-audit",
+        "ws-tdah",
+        "ws-karpathy-guidelines",
+        "ws-spec-format",
+        "ws-goal-loop",
+        "ws-self-learning",
+        "ws-changelog",
+        "ws-secrets-leak-review",
+        "ws-configure-project",
+        "ws-fable-method",
+        "ws-fable-judge",
+        "ws-fable-domain",
+        "ws-multi-spec",
+        "ws-spec-index",
+        "ws-spec-list",
+        "ws-sync-spec",
+        "ws-senior-developer",
+        "ws-activity-report",
+        "ws-pre-daily",
+        "ws-spec-explain",
+        "ws-cleanup",
+        "ws-spec-archive",
+        "ws-patterns-backend",
+        "ws-patterns-frontend"
+      ],
+      "ensureHub": true,
+      "shortcut": "w",
+      "label": "Workflows package"
+    },
+    "extra": {
+      "skills": [
+        "ws-write-a-skill",
+        "ws-show-harness",
+        "ws-preview"
+      ],
+      "ensureHub": false,
+      "shortcut": "e",
+      "label": "Extra package"
+    }
+  },
+  "dependencies": {
+    "ws-spec-to-pr": [
+      "ws-write-spec",
+      "ws-classify-complexity",
+      "ws-write-plan",
+      "ws-interview",
+      "ws-plan-to-tasks",
+      "ws-implement-tasks",
+      "ws-verify-plan",
+      "ws-code-review",
+      "ws-testing",
+      "ws-ship-pr",
+      "ws-fix-pr",
+      "ws-goal-fix-pr",
+      "ws-update-plan-implementation",
+      "ws-github-provider",
+      "ws-azure-devops-provider",
+      "ws-local-spec-provider",
+      "ws-check-harness",
+      "ws-check-workflows",
+      "ws-tdah",
+      "ws-karpathy-guidelines",
+      "ws-spec-format",
+      "ws-goal-loop",
+      "ws-self-learning",
+      "ws-changelog",
+      "ws-audit",
+      "ws-configure-project",
+      "ws-spec-index",
+      "ws-senior-developer",
+      "ws-patterns-backend",
+      "ws-patterns-frontend"
+    ],
+    "ws-spec-to-pr-lite": [
+      "ws-write-spec",
+      "ws-classify-complexity",
+      "ws-write-plan",
+      "ws-implement-tasks",
+      "ws-code-review",
+      "ws-ship-pr",
+      "ws-fix-pr",
+      "ws-goal-fix-pr",
+      "ws-github-provider",
+      "ws-azure-devops-provider",
+      "ws-local-spec-provider",
+      "ws-tdah",
+      "ws-karpathy-guidelines",
+      "ws-spec-format",
+      "ws-self-learning",
+      "ws-changelog",
+      "ws-audit",
+      "ws-configure-project",
+      "ws-spec-index",
+      "ws-senior-developer",
+      "ws-patterns-backend",
+      "ws-patterns-frontend"
+    ],
+    "ws-write-spec": [
+      "ws-spec-format",
+      "ws-local-spec-provider"
+    ],
+    "ws-github-provider": [
+      "ws-spec-format",
+      "ws-write-spec",
+      "ws-local-spec-provider"
+    ],
+    "ws-azure-devops-provider": [
+      "ws-spec-format",
+      "ws-write-spec",
+      "ws-local-spec-provider"
+    ],
+    "ws-local-spec-provider": [
+      "ws-spec-format"
+    ],
+    "ws-fix-pr": [
+      "ws-audit"
+    ],
+    "ws-goal-fix-pr": [
+      "ws-fix-pr",
+      "ws-goal-loop",
+      "ws-audit"
+    ],
+    "ws-write-plan": [
+      "ws-fable-domain"
+    ],
+    "ws-verify-plan": [
+      "ws-fable-judge"
+    ],
+    "ws-ship-pr": [
+      "ws-secrets-leak-review",
+      "ws-fable-judge",
+      "ws-spec-index",
+      "ws-audit"
+    ],
+    "ws-code-review": [
+      "ws-karpathy-guidelines",
+      "ws-tdah",
+      "ws-self-learning",
+      "ws-fable-judge"
+    ],
+    "ws-fable-method": [
+      "ws-fable-judge",
+      "ws-fable-domain",
+      "ws-tdah",
+      "ws-karpathy-guidelines",
+      "ws-self-learning"
+    ],
+    "ws-fable-judge": [
+      "ws-tdah",
+      "ws-karpathy-guidelines"
+    ],
+    "ws-multi-spec": [
+      "ws-spec-to-pr",
+      "ws-spec-to-pr-lite",
+      "ws-classify-complexity",
+      "ws-ship-pr",
+      "ws-goal-fix-pr",
+      "ws-tdah",
+      "ws-karpathy-guidelines",
+      "ws-audit"
+    ],
+    "ws-spec-list": [
+      "ws-spec-to-pr",
+      "ws-spec-to-pr-lite",
+      "ws-configure-project"
+    ],
+    "ws-activity-report": [
+      "ws-github-provider",
+      "ws-azure-devops-provider",
+      "ws-configure-project"
+    ],
+    "ws-pre-daily": [
+      "ws-activity-report",
+      "ws-configure-project"
+    ],
+    "ws-spec-explain": [
+      "ws-configure-project",
+      "ws-github-provider",
+      "ws-azure-devops-provider"
+    ],
+    "ws-cleanup": [
+      "ws-configure-project"
+    ],
+    "ws-spec-archive": [
+      "ws-configure-project",
+      "ws-spec-index",
+      "ws-github-provider",
+      "ws-azure-devops-provider"
+    ],
+    "ws-audit": [],
+    "ws-doctor": []
+  },
+  "autoloadOnly": [],
+  "selectOffRule": "no-cascade-deselect"
+}
