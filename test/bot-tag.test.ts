@@ -37,5 +37,13 @@ describe('bot-tag', () => {
     assert.equal(extractAgenticBotTagLine('Agentic Code Reviewer cursor-sdk\nbody'), 'Agentic Code Reviewer cursor-sdk');
     assert.equal(stripAgenticBotTags('agentic-code-reviewers v0.4.0 (cursor-sdk)\nhello'), 'hello');
     assert.equal(stripAgenticBotTags('Agentic Code Reviewer cursor-sdk\nhello'), 'hello');
+    assert.equal(
+      stripAgenticBotTags('agentic-code-reviewers v0.4.0 (cursor-sdk)\nTune agentic-code-reviewers TIMEOUT_MS.'),
+      'Tune agentic-code-reviewers TIMEOUT_MS.',
+    );
+    assert.equal(
+      stripAgenticBotTags('Increase agentic-code-reviewers TIMEOUT_MS.'),
+      'Increase agentic-code-reviewers TIMEOUT_MS.',
+    );
   });
 });

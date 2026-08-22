@@ -9,7 +9,6 @@ export const BOT_TAG_PREFIX = PRODUCT_NAME;
 
 /** Tags publicadas antes do rename (retrocompatibilidade). */
 export const LEGACY_BOT_TAG_PREFIX = '[Cursor Reviewer]';
-export const LEGACY_AGENTIC_BOT_TAG_PREFIX = 'Agentic Code Reviewer';
 
 /** Tag publicada: `agentic-code-reviewers v{version} ({engine})`. */
 export function buildBotTag(engine: ReviewerEngineName, version?: string): string {
@@ -51,11 +50,11 @@ export function extractAgenticBotTagLine(content: string): string | null {
 /** Remove tags do runner (atual e legadas) para comparação/dedup de conteúdo. */
 export function stripAgenticBotTags(content: string): string {
   let text = content;
-  text = text.replace(/^agentic-code-reviewers(?:\s+v\S+)?(?:\s+\([^)]+\))?\s*/m, '');
-  text = text.replace(/^Agentic Code Reviewer(?: \S+)?\s*/m, '');
-  text = text.replaceAll(LEGACY_BOT_TAG_PREFIX, '');
-  text = text.replaceAll(LEGACY_AGENTIC_BOT_TAG_PREFIX, '');
-  text = text.replaceAll(BOT_TAG_PREFIX, '');
+  text = text.replace(/^agentic-code-reviewers(?:\s+v\S+)?(?:\s+\([^)]+\))?\s*\r?\n?/, '');
+  text = text.replace(/^Agentic Code Reviewer(?: \S+)?\s*\r?\n?/, '');
+  if (text.startsWith(LEGACY_BOT_TAG_PREFIX)) {
+    text = text.slice(LEGACY_BOT_TAG_PREFIX.length).replace(/^\s*\r?\n?/, '');
+  }
   return text.trim();
 }
 
