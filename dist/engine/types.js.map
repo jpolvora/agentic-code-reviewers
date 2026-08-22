@@ -1,0 +1,1 @@
+{"version":3,"file":"types.js","sourceRoot":"","sources":["../../src/engine/types.ts"],"names":[],"mappings":"AAKA,sDAAsD;AACtD,MAAM,CAAC,MAAM,kBAAkB,GAAG;IAChC,WAAW,EAAE,cAAc;IAC3B,YAAY,EAAE,eAAe;IAC7B,eAAe,EAAE,mBAAmB;IACpC,gBAAgB,EAAE,oBAAoB;IACtC,WAAW,EAAE,cAAc;IAC3B,SAAS,EAAE,YAAY;CACf,CAAC;AAEX,MAAM,CAAC,MAAM,aAAa,GAA2B,EAAE,CAAC"}
