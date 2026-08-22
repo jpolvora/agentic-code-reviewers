@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.verbose);
 
-  logger.section(`${config.projectName} Cursor Reviewer v${config.version}`);
+  logger.section(`${config.botTag}`);
   logger.info(`Modo: ${config.dryRun ? 'DRY-RUN' : 'PIPELINE'}`);
   logger.info(`Model: ${config.model}`);
   if (config.variant) {
@@ -484,7 +484,7 @@ main()
     process.exit(process.exitCode ?? 0);
   })
   .catch((error) => {
-    console.error('\n❌ [cursor-reviewer] ERRO FATAL');
+    console.error('\n❌ [agentic-code-reviewers] ERRO FATAL');
     if (error instanceof ProjectValidationError || error instanceof Error) {
       console.error(error.message);
       if (error.cause) {

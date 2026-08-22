@@ -94,7 +94,7 @@ Findings that violate any rule below are automatically discarded:
 
 ### PR Summary Comment (`shouldPostReviewSummary` in `src/ado/post-comments.ts`)
 
-The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending runner threads** remain on the PR (`Agentic Code Reviewer` prefix). `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`. Comment tag is `buildBotTag(engine)` from `src/bot-tag.ts`.
+The bot posts a **general PR summary comment** only at the **end** of a review run, after resolving threads and posting new ones, when **no active/pending runner threads** remain on the PR (`agentic-code-reviewers` prefix). `score_min` controls which findings become threads; the summary is independent of the agent's `reviewSummary` field. When posted, the runner uses `CLEAN_PR_SUMMARY_MESSAGE` in `src/git/markers.ts`. Comment tag is `buildBotTag(engine, version)` from `src/bot-tag.ts` (`agentic-code-reviewers v{version} ({engine})`). Legacy prefixes `Agentic Code Reviewer` and `[Cursor Reviewer]` remain recognized.
 
 Additionally, the **auto-fix flow** posts its own **detailed summary comment** after a successful commit/build/resolve/push cycle, listing changed files, resolved threads with links, and using the `AUTO_FIX_SUMMARY_MARKER` (`<!-- auto-fix-summary -->`). This gives developers visibility into what was fixed and triggers the next code review round.
 

@@ -115,7 +115,7 @@ export function emitPipelineReviewOutput(
 
   try {
     const markdown = buildReviewSummaryMarkdown(gate, reviews, dryRun, metrics);
-    const summaryPath = join(tmpdir(), `cursor-reviewer-summary-${process.pid}.md`);
+    const summaryPath = join(tmpdir(), `agentic-code-reviewers-summary-${process.pid}.md`);
     writeFileSync(summaryPath, markdown, 'utf8');
     log(`##vso[task.uploadsummary]${summaryPath}`);
   } catch {

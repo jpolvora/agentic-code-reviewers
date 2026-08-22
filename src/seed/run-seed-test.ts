@@ -92,7 +92,7 @@ async function main(): Promise<void> {
         );
       }
 
-      console.log('[test:seed] executando dry-run do cursor-reviewer...');
+      console.log('[test:seed] executando dry-run do agentic-code-reviewers...');
       runDryRunCapture(outputPath);
       evaluationSource = readFileSync(outputPath, 'utf8');
     }

@@ -24,7 +24,7 @@ export async function runCodeReviewAgent(
   return engine.run(
     config,
     {
-      name: `${config.projectName} Cursor Reviewer`,
+      name: config.botTag,
       prompt,
     },
     logger,

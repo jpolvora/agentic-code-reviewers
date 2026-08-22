@@ -104,8 +104,8 @@ With `TF_BUILD=true` the runner emits `##vso[task.logissue]` per finding and `##
 
 | Check on PR | Engine | Model | Comment tag |
 |-------------|--------|-------|-------------|
-| Review (cursor-sdk) | `@cursor/sdk` | `composer-2.5` | `Agentic Code Reviewer cursor-sdk` |
-| Review (opencode) | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `Agentic Code Reviewer opencode` |
+| Review (cursor-sdk) | `@cursor/sdk` | `composer-2.5` | `agentic-code-reviewers v{version} (cursor-sdk)` |
+| Review (opencode) | `@opencode-ai/sdk` | `opencode-go/deepseek-v4-flash` | `agentic-code-reviewers v{version} (opencode)` |
 
 **Execution mode:** `parallel` by default; `sequential` via `workflow_dispatch` input or repo variable `AGENTIC_CODE_REVIEWERS_EXECUTION_MODE` (`max-parallel: 1`). Each job has its own `concurrency` group (`review-<engine>-#N`) so re-runs of one engine don't cancel the other. All jobs use `continue-on-error: true` — agent failures don't block the merge.
 

@@ -29,7 +29,7 @@ export function failFast(message: string): never {
   throw new ProjectValidationError(message);
 }
 
-/** Localiza a raiz do pacote cursor-reviewer (scripts/cursor-reviewer). */
+/** Localiza a raiz do pacote agentic-code-reviewers. */
 export function resolveRunnerRoot(fromModuleUrl: string): string {
   let current = dirname(fileURLToPath(fromModuleUrl));
 
@@ -55,8 +55,8 @@ export function resolveRunnerRoot(fromModuleUrl: string): string {
     const parent = dirname(current);
     if (parent === current) {
       failFast(
-        'Não foi possível localizar scripts/cursor-reviewer. ' +
-          'Copie o subprojeto completo para scripts/cursor-reviewer na raiz do repositório alvo.',
+        'Não foi possível localizar o pacote agentic-code-reviewers. ' +
+          'Copie o subprojeto completo para scripts/agentic-code-reviewers na raiz do repositório alvo.',
       );
     }
     current = parent;

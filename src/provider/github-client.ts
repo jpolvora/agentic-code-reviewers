@@ -81,7 +81,7 @@ export class GithubClient {
   private headers(apiType: 'rest' | 'graphql'): Record<string, string> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.token}`,
-      'User-Agent': 'cursor-reviewer-bot',
+      'User-Agent': 'agentic-code-reviewers',
     };
     if (apiType === 'rest') {
       headers['Accept'] = 'application/vnd.github.v3+json';

@@ -792,7 +792,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
     customPromptContent = undefined; // descarta o prompt customizado com problema
     includePatternsResetByFallback = Boolean(includePatternsVal);
 
-    console.warn('\x1b[33m%s\x1b[0m', `\n⚠️  [Cursor Reviewer] AVISO DE CONFIGURAÇÃO DE STACK/PROMPT:`);
+    console.warn('\x1b[33m%s\x1b[0m', `\n⚠️  [agentic-code-reviewers] AVISO DE CONFIGURAÇÃO DE STACK/PROMPT:`);
     console.warn('\x1b[33m%s\x1b[0m', `   ${customStackError.message}`);
     console.warn('\x1b[33m%s\x1b[0m', `   Fallback ativado: utilizando stack "${stackName}" (${detected ? 'auto-detectada' : 'fallback padrão'}).\n`);
   }
@@ -809,7 +809,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
   if (includePatternsVal && !includePatternsResetByFallback) {
     const parsed = parseCsvPatterns(includePatternsVal);
     if (parsed.length === 0) {
-      console.warn('\x1b[33m%s\x1b[0m', `\n⚠️  [Cursor Reviewer] AVISO: --include-patterns parseou para lista vazia. Usando os padrões padrão da stack: "${stackConfig.name}".\n`);
+      console.warn('\x1b[33m%s\x1b[0m', `\n⚠️  [agentic-code-reviewers] AVISO: --include-patterns parseou para lista vazia. Usando os padrões padrão da stack: "${stackConfig.name}".\n`);
       includePatterns = stackConfig.name === 'Custom' ? ['**/*'] : stackConfig.includePatterns;
     } else {
       includePatterns = parsed;
@@ -850,7 +850,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
       const raw = cli.variant ?? env.variant();
       return raw && !isUnexpandedPipelineMacro(raw) ? raw.trim() : undefined;
     })(),
-    botTag: buildBotTag(engine),
+    botTag: buildBotTag(engine, resolvedProject.version),
     verbose: cli.verbose ?? parseBool(env.verbose(), true),
     dryRun,
     includeUncommitted,
@@ -906,7 +906,7 @@ export { ProjectValidationError };
 
 function printHelp(): void {
   console.log(`
-Cursor Reviewer — code review agêntico portável via @cursor/sdk
+agentic-code-reviewers — portable agentic code review
 
 Uso:
   npm run review -- [opções]

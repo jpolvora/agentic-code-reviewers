@@ -1,9 +1,18 @@
 import { AdoClient } from './client.js';
-import { commentHasBotTag } from './utils.js';
 import type { AdoThreadsResponse, CodeReviewItem } from './types.js';
 
 /** Marcador HTML da thread (geral) que persiste o contador de rodadas de review. */
 export const ROUND_STATE_MARKER = '<!-- reviewer-round-state -->';
+
+function commentLooksLikeRunner(content: string, botTag: string): boolean {
+  if (!content) return false;
+  if (botTag && content.includes(botTag)) return true;
+  return (
+    content.includes('agentic-code-reviewers') ||
+    content.includes('Agentic Code Reviewer') ||
+    content.includes('[Cursor Reviewer]')
+  );
+}
 
 export interface RoundStateLocation {
   /** Número de rodadas já registradas (0 se ainda não houver estado). */
@@ -46,7 +55,7 @@ export function parseRoundStateFromThreads(
     const botComment = thread.comments.find(
       (comment) =>
         !comment.isDeleted &&
-        commentHasBotTag(comment.content, botTag, 'contains') &&
+        commentLooksLikeRunner(comment.content, botTag) &&
         comment.content.includes(ROUND_STATE_MARKER),
     );
     if (!botComment) {
