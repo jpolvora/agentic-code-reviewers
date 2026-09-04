@@ -1,48 +1,76 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  assertSupportedCursorReviewerModelId,
   CANONICAL_COMPOSER_25_MODEL_ID,
-  CursorReviewerModelId,
   DEFAULT_CURSOR_REVIEWER_MODEL,
-  isSupportedCursorReviewerModelId,
-  listSupportedCursorReviewerModelIds,
   resolveAgentModelSelection,
+  resolveCursorModelShape,
+  validateCursorModelId,
 } from '../src/engine/cursor-sdk/model.js';
+import { ModelCatalogError, UnsupportedModelError } from '../src/engine/types.js';
 
-describe('CursorReviewerModelId', () => {
+const catalog = [
+  { id: 'composer-2.5' },
+  { id: 'gpt-5.6-luna-high' },
+  { id: 'claude-sonnet-4-6', aliases: ['sonnet'] },
+];
+
+describe('cursor model shape', () => {
   it('usa composer-2.5 como default canônico', () => {
     assert.equal(CANONICAL_COMPOSER_25_MODEL_ID, 'composer-2.5');
-    assert.equal(DEFAULT_CURSOR_REVIEWER_MODEL, CursorReviewerModelId.Composer25);
+    assert.equal(DEFAULT_CURSOR_REVIEWER_MODEL, 'composer-2.5');
+    assert.equal(resolveCursorModelShape(''), 'composer-2.5');
+    assert.equal(resolveCursorModelShape('  '), 'composer-2.5');
   });
 
-  it('lista todos os IDs suportados', () => {
-    assert.equal(listSupportedCursorReviewerModelIds().length, Object.values(CursorReviewerModelId).length);
-    assert.ok(isSupportedCursorReviewerModelId('gpt-5.4'));
-    assert.ok(!isSupportedCursorReviewerModelId('gpt-5.4-medium'));
-  });
-
-  it('rejeita modelo desconhecido na validação', () => {
-    assert.throws(
-      () => assertSupportedCursorReviewerModelId('$(CURSOR_REVIEWER_MODEL)'),
-      /Modelo inválido/,
-    );
-    assert.throws(() => assertSupportedCursorReviewerModelId('gpt-5.4-medium'), /Modelo inválido/);
-  });
-
-  it('aceita todos os valores do enum', () => {
-    for (const modelId of Object.values(CursorReviewerModelId)) {
-      assert.equal(assertSupportedCursorReviewerModelId(modelId), modelId);
-    }
+  it('resolveAgentModelSelection preserva o id (shape-only, sem catálogo)', () => {
+    assert.deepEqual(resolveAgentModelSelection(''), { id: 'composer-2.5' });
+    assert.deepEqual(resolveAgentModelSelection('gpt-5.6-luna-high'), { id: 'gpt-5.6-luna-high' });
   });
 });
 
-describe('resolveAgentModelSelection', () => {
-  it('usa composer-2.5 quando id vazio', () => {
-    assert.deepEqual(resolveAgentModelSelection(''), { id: 'composer-2.5' });
+describe('validateCursorModelId (catálogo live)', () => {
+  it('aceita modelo disponível e preserva o id exato', async () => {
+    const id = await validateCursorModelId('gpt-5.6-luna-high', async () => catalog);
+    assert.equal(id, 'gpt-5.6-luna-high');
   });
 
-  it('repassa override explícito válido', () => {
-    assert.deepEqual(resolveAgentModelSelection('gpt-5.4'), { id: 'gpt-5.4' });
+  it('resolve alias para o id canônico do catálogo', async () => {
+    const id = await validateCursorModelId('sonnet', async () => catalog);
+    assert.equal(id, 'claude-sonnet-4-6');
+  });
+
+  it('rejeita modelo ausente com UnsupportedModelError e ids descobertos', async () => {
+    await assert.rejects(
+      validateCursorModelId('gpt-5.4-medium', async () => catalog),
+      (error: unknown) => {
+        assert.ok(error instanceof UnsupportedModelError);
+        assert.equal(error.requested, 'gpt-5.4-medium');
+        assert.ok(error.available.includes('gpt-5.6-luna-high'));
+        assert.match(error.message, /Modelo inválido/);
+        assert.match(error.message, /gpt-5\.4-medium/);
+        return true;
+      },
+    );
+  });
+
+  it('falha de catálogo vira ModelCatalogError sem fallback (distinto de modelo inválido)', async () => {
+    await assert.rejects(
+      validateCursorModelId('gpt-5.6-luna-high', async () => {
+        throw new Error('auth 401');
+      }),
+      (error: unknown) => {
+        assert.ok(error instanceof ModelCatalogError);
+        assert.ok(!(error instanceof UnsupportedModelError));
+        assert.match(error.message, /catálogo/);
+        assert.match(error.message, /CURSOR_API_KEY/);
+        return true;
+      },
+    );
+  });
+
+  it('usa default quando id vazio e o default está no catálogo', async () => {
+    const id = await validateCursorModelId('', async () => catalog);
+    assert.equal(id, 'composer-2.5');
   });
 });

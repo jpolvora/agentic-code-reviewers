@@ -27,3 +27,12 @@ export function assertOpencodeModel(model: string): string {
   resolveOpencodeModelSelection(model);
   return model.trim();
 }
+
+/**
+ * Model capability behind the shared engine contract: `provider/model`
+ * shape validation. Async for parity with `cursor-sdk` (which hits the
+ * live catalog); never touches the Cursor catalog.
+ */
+export async function validateOpencodeModel(model: string): Promise<string> {
+  return assertOpencodeModel(model);
+}

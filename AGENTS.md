@@ -161,7 +161,7 @@ Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/inde
 | `src/index.ts` | Entry point: prepares workspace, collects PR context, triggers agent, posts comments. |
 | `src/config.ts` | CLI arguments and environment variables. |
 | `src/env.ts` | `AGENTIC_CODE_REVIEWERS_*` prefix, unprefixed credentials, `env.*` readers. |
-| `src/engine/` | `ExecutionEngine` interface + `getEngine()` factory. Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensible via PR. |
+| `src/engine/` | `ExecutionEngine` interface (incl. `validateModel` capability) + registry-based `getEngine()`/`parseEngineName()` factory (`src/engine/index.ts`). Engines: `cursor-sdk` (default), `opencode` (`@opencode-ai/sdk`); extensible via PR (register implementation + aliases). |
 | `src/engine/opencode/stream.ts` | OpenCode session, prompt, SSE event stream, timeout/abort. |
 | `src/engine/opencode/fetch.ts` | `undici` fetch with `headersTimeout` aligned to `TIMEOUT_MS` + `AbortSignal`. |
 | `src/engine/opencode/server.ts` | `createEmbeddedOpencodeServer` — spawns `opencode serve`; does not reuse an external server without a harness. |
@@ -301,7 +301,7 @@ Before marking any runner change complete:
 1. **Behavior proved by tests** — `npm test` passes; new logic has unit/integration coverage for happy path and material edge cases.
 2. **Documentation updated** — every user- or agent-visible change reflected in the doc checklist under *Invariant Behavior* (README, AGENTS.md, docs/, skills/, `.env.example`, workflow examples as applicable).
 3. **No stale references** — remove or update mentions of removed flags, env vars, or workflows; do not document features that no longer exist.
-4. **Cross-engine parity** — `cursor-sdk` and `opencode` share the same prompt, gate, and `config.scoreMin`; verify both paths when changing orchestration or validation.
+4. **Cross-engine parity** — `cursor-sdk` and `opencode` share the same prompt, gate, `config.scoreMin`, and `ExecutionEngine` model capability (`validateModel`); engine names/aliases derive from the registry (`src/engine/index.ts`). `cursor-sdk` models validate against the live account catalog (`Cursor.models.list()`, no hardcoded allow-list); verify both paths when changing orchestration or validation.
 
 ### Local Skills — Quick Reference
 

@@ -88,7 +88,7 @@ AGENTIC_CODE_REVIEWERS_MODEL=composer-2.5
 CURSOR_API_KEY=cursor_...
 ```
 
-Modelos: IDs do Cursor (`composer-2.5`, `claude-sonnet-4-6`, etc.). Validação em `src/engine/cursor-sdk/model.ts`.
+Modelos: qualquer ID do catálogo live da conta autenticada (ex.: `composer-2.5`, `gpt-5.6-luna-high`). Validação em runtime via `Cursor.models.list()` em `src/engine/cursor-sdk/model.ts` — sem allow-list hardcoded. Erros distinguem modelo não suportado (com IDs descobertos) de falha de catálogo (auth/rede/API, sem fallback silencioso). Disponibilidade depende do catálogo da conta (`CURSOR_API_KEY`).
 
 ### `opencode`
 
@@ -150,7 +150,7 @@ cp .env.example .env
 | `CURSOR_API_KEY` | — | Chave do Cursor (obrigatória com engine `cursor-sdk`). |
 | `OPENCODE_API_KEY` | — | Chave OpenCode Go (CI; `run.sh` instala CLI + `auth.json`). |
 | `AGENTIC_CODE_REVIEWERS_ENGINE` | `cursor-sdk` | Engine LLM: `cursor-sdk` ou `opencode`. |
-| `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID Cursor. **`opencode`:** `provider/model`. |
+| `AGENTIC_CODE_REVIEWERS_MODEL` | por engine | **`cursor-sdk`:** ID do catálogo live da conta (`Cursor.models.list()`, validado em runtime). **`opencode`:** `provider/model`. |
 | `AGENTIC_CODE_REVIEWERS_VARIANT` | — | Variante do modelo / reasoning effort (`none`, `low`, `medium`, `high`, `max` no OpenCode). |
 | `AGENTIC_CODE_REVIEWERS_OPENCODE_URL` | — | Servidor OpenCode **externo**. Omitir = embutido (padrão). |
 | `AGENTIC_CODE_REVIEWERS_AZURE_DEVOPS_PAT` | — | PAT ADO para testes locais. |

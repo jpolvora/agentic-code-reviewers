@@ -318,17 +318,15 @@ describe('loadConfig', () => {
     );
   });
 
-  it('falha na inicialização com modelo inválido', () => {
+  it('difere a validação do catálogo: modelo desconhecido passa no parse (rejeição é no runtime)', () => {
     withEnv(
       {
         CURSOR_API_KEY: 'cursor_test',
         AGENTIC_CODE_REVIEWERS_MODEL: 'gpt-5.4-medium',
       },
       () => {
-        assert.throws(
-          () => loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']),
-          /Modelo inválido/,
-        );
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.equal(config.model, 'gpt-5.4-medium');
       },
     );
   });
