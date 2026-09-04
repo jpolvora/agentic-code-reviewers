@@ -131,7 +131,7 @@ flowchart TD
 
 ### How do I configure the LLM model?
 
-**Answer:** Precedence: (1) CLI `--model <id>`; (2) env `AGENTIC_CODE_REVIEWERS_MODEL`; (3) engine default (`composer-2.5` in `cursor-sdk`, `anthropic/claude-sonnet-4-6` in `opencode`). Validation: `cursor-sdk` → enum in `src/engine/cursor-sdk/model.ts`; `opencode` → `provider/model` format in `src/engine/opencode/model.ts`. Unexpanded ADO macro → default.
+**Answer:** Precedence: (1) CLI `--model <id>`; (2) env `AGENTIC_CODE_REVIEWERS_MODEL`; (3) engine default (`composer-2.5` in `cursor-sdk`, `anthropic/claude-sonnet-4-6` in `opencode`). Validation: `cursor-sdk` → runtime live catalog (`Cursor.models.list()`, `src/engine/cursor-sdk/model.ts`) at engine execution time — config parse is shape-only; `opencode` → `provider/model` format in `src/engine/opencode/model.ts`. Errors distinguish unsupported model (with discovered IDs) from catalog failure (auth/network/API, no silent fallback). Unexpanded ADO macro → default. Model availability depends on the authenticated account catalog.
 
 *Evidence:* `src/config.ts` (`AGENTIC_CODE_REVIEWERS_ENGINE`, `resolveReviewerModel`); `src/engine/`.
 
@@ -697,8 +697,8 @@ Use `--dry-run` on the review runner to validate threads without publishing; aut
 | IDE skills vs runtime? | Runtime: `skills/` (CI); IDE: `.agents/skills/` — see [`../AGENTS.md`](../AGENTS.md) § Skills and [`workflows.md`](workflows.md). |
 | Work items in the review? | If linked to the PR + ADO token — step [§7](#7-user-story-task-and-ado-context); **not** in `SYSTEM_PROMPT.md`. |
 | Is US/Task part of the system prompt? | **No** — dynamic ADO API content appended to the composed prompt ([§8](#8-prompt-assembly-system_prompt-vs-runtime)). |
-| How to configure the model? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; IDs in `model.ts`. |
-| Invalid model in the pipeline? | Empty ADO macro falls back to default; nonexistent enum ID → exit 1 on startup. |
+| How to configure the model? | `--model` > `AGENTIC_CODE_REVIEWERS_MODEL` > default `composer-2.5`; `cursor-sdk` validated against the live account catalog (`Cursor.models.list()`). |
+| Invalid model in the pipeline? | Empty ADO macro falls back to default; unknown `cursor-sdk` ID → runtime error with discovered IDs; catalog (auth/network/API) failure → actionable error, no silent fallback. |
 | Do I need a local PAT? | Only for ADO (threads/work items/publication); basic dry-run: engine credential (`CURSOR_API_KEY` or `OPENCODE_API_KEY`). |
 
 ---

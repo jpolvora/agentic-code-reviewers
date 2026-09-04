@@ -2,11 +2,13 @@ import type { ReviewerConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import {
   ENGINE_METRIC_KEYS,
+  type EngineModelValidationOptions,
   type EngineRunOptions,
   type EngineRunResult,
   type ExecutionEngine,
 } from '../types.js';
 import { runAgentStream } from './stream.js';
+import { validateCursorModelId, type CursorModelLister } from './model.js';
 import type { TokenUsageTotals } from './token-usage.js';
 
 function tokenUsageToMetrics(usage: TokenUsageTotals): Record<string, number> {
@@ -35,6 +37,12 @@ function tokenUsageToMetrics(usage: TokenUsageTotals): Record<string, number> {
 
 export class CursorSdkEngine implements ExecutionEngine {
   readonly engineName = 'cursor-sdk' as const;
+
+  constructor(private readonly modelLister?: CursorModelLister) {}
+
+  validateModel(model: string, options?: EngineModelValidationOptions): Promise<string> {
+    return validateCursorModelId(model, this.modelLister, options);
+  }
 
   async run(config: ReviewerConfig, options: EngineRunOptions, logger: Logger): Promise<EngineRunResult> {
     const result = await runAgentStream(

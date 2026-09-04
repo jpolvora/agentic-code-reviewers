@@ -4,7 +4,7 @@ import { logAgentPromptBeforeSend } from '../../agent/log-prompt.js';
 import type { ReviewerConfig } from '../../config.js';
 import { ENV, env } from '../../env.js';
 import type { Logger } from '../../logger.js';
-import { resolveAgentModelSelection } from './model.js';
+import { resolveAgentModelSelection, validateCursorModelId } from './model.js';
 import {
   formatTokenUsageSummary,
   TokenUsageAccumulator,
@@ -73,7 +73,13 @@ export async function runAgentStream(
   logger.info(`CWD: ${config.repoRoot}`);
   logger.debug('Prompt length (chars):', options.prompt.length);
 
-  const modelSelection = resolveAgentModelSelection(config.model);
+  // Runtime model validation against the live account catalog
+  // (`Cursor.models.list()`). Catalog failures and unsupported ids fail here
+  // with actionable errors; never a silent fallback to another model.
+  const validatedModelId = await validateCursorModelId(config.model, undefined, {
+    apiKey: config.cursorApiKey,
+  });
+  const modelSelection = resolveAgentModelSelection(validatedModelId);
   const timeoutMs = resolveTimeoutMs();
   logger.info(`Timeout: ${(timeoutMs / 1000).toFixed(0)}s`);
 

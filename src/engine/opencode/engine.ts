@@ -1,10 +1,15 @@
 import type { ReviewerConfig } from '../../config.js';
 import type { Logger } from '../../logger.js';
 import { type EngineRunOptions, type EngineRunResult, type ExecutionEngine } from '../types.js';
+import { validateOpencodeModel } from './model.js';
 import { runOpencodeStream } from './stream.js';
 
 export class OpencodeEngine implements ExecutionEngine {
   readonly engineName = 'opencode' as const;
+
+  validateModel(model: string): Promise<string> {
+    return validateOpencodeModel(model);
+  }
 
   async run(config: ReviewerConfig, options: EngineRunOptions, logger: Logger): Promise<EngineRunResult> {
     const result = await runOpencodeStream(

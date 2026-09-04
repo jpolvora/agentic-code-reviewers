@@ -1,10 +1,11 @@
 import { resolve, relative, isAbsolute } from 'node:path';
 import { existsSync, readFileSync, realpathSync, readdirSync } from 'node:fs';
 import {
-  assertSupportedCursorReviewerModelId,
   DEFAULT_CURSOR_REVIEWER_MODEL,
+  resolveCursorModelShape,
 } from './engine/cursor-sdk/model.js';
 import { assertOpencodeModel, DEFAULT_OPENCODE_MODEL } from './engine/opencode/model.js';
+import { parseEngineName } from './engine/index.js';
 import type { ReviewerEngineName } from './engine/types.js';
 import { buildBotTag } from './bot-tag.js';
 import { detectSourceBranchRef } from './git/diff.js';
@@ -283,14 +284,7 @@ const DEFAULT_SCORE_MIN = 6;
 const MAX_SCORE_MIN = 10;
 
 function parseEngine(value: string | undefined): ReviewerEngineName {
-  const trimmed = value?.trim().toLowerCase() ?? '';
-  if (!trimmed || trimmed === 'cursor-sdk' || trimmed === 'cursor') {
-    return 'cursor-sdk';
-  }
-  if (trimmed === 'opencode') {
-    return 'opencode';
-  }
-  throw new Error(`Engine inválido: "${value}". Valores aceitos: cursor-sdk, opencode`);
+  return parseEngineName(value);
 }
 
 function resolveReviewerModel(engine: ReviewerEngineName, cliModel?: string): string {
@@ -298,7 +292,9 @@ function resolveReviewerModel(engine: ReviewerEngineName, cliModel?: string): st
     cliModel ?? env.model(),
     engine === 'opencode' ? DEFAULT_OPENCODE_MODEL : DEFAULT_MODEL,
   );
-  return engine === 'opencode' ? assertOpencodeModel(raw) : assertSupportedCursorReviewerModelId(raw);
+  // Shape-only at parse time. Cursor catalog validation (`Cursor.models.list()`)
+  // is async and runs at engine execution time via the engine model capability.
+  return engine === 'opencode' ? assertOpencodeModel(raw) : resolveCursorModelShape(raw);
 }
 
 /** Lê um inteiro 0–10 de env/CLI; usa fallback se ausente, inválido ou macro ADO. */
