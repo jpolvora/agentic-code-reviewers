@@ -1,0 +1,1 @@
+{"version":3,"file":"diff-lines.d.ts","sourceRoot":"","sources":["../../src/git/diff-lines.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,eAAe,GAAG,GAAG,CAAC,MAAM,EAAE,GAAG,CAAC,MAAM,CAAC,CAAC,CAAC;AAEvD;;;GAGG;AACH,wBAAgB,yBAAyB,CAAC,QAAQ,EAAE,MAAM,GAAG,eAAe,CA6E3E;AAED,4EAA4E;AAC5E,wBAAgB,mBAAmB,CACjC,YAAY,EAAE,eAAe,EAC7B,QAAQ,EAAE,MAAM,EAChB,UAAU,EAAE,MAAM,GACjB,OAAO,CAYT"}
