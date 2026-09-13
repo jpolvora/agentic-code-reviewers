@@ -228,9 +228,9 @@ If none of the heuristics identify a stack, the runner assumes `ABP/Angular` as 
 
 ### How does the diff enter the prompt?
 
-**Answer:** `buildDiffPromptSection` — up to **100 KB** embedded (`full` or `per-file`); above that the agent completes it via tools.
+**Answer:** `buildDiffPromptSection` — up to **100 KB** embedded by default (`full` or `per-file`); configurable via `AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES` or `--diff-max-bytes`. Above that threshold, omitted files are inspected by the agent via tools.
 
-*Evidence:* `src/git/diff-prompt.ts` — `MAX_DIFF_PROMPT_BYTES = 100_000`.
+*Evidence:* `src/git/diff-prompt.ts` — `MAX_DIFF_PROMPT_BYTES = 100_000`; `src/config.ts` — `diffMaxBytes`.
 
 ### What's the difference between local and CI mode?
 

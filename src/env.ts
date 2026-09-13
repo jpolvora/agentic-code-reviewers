@@ -68,6 +68,7 @@ export const ENV = {
   PROMPT_COLOR: primaryKey('PROMPT_COLOR'),
   AUTO_FIX: primaryKey('AUTO_FIX'),
   AUTO_FIX_BUILD_COMMAND: primaryKey('AUTO_FIX_BUILD_COMMAND'),
+  DIFF_MAX_BYTES: primaryKey('DIFF_MAX_BYTES'),
 } as const;
 
 /** Leitores tipados — preferir estes em vez de `process.env` direto. */
@@ -123,4 +124,5 @@ export const env = {
   promptColor: () => readEnv('PROMPT_COLOR'),
   autoFix: () => readEnv('AUTO_FIX'),
   autoFixBuildCommand: () => readEnv('AUTO_FIX_BUILD_COMMAND'),
+  diffMaxBytes: () => readEnv('DIFF_MAX_BYTES') ?? readEnv('MAX_DIFF_BYTES'),
 } as const;

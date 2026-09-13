@@ -32,6 +32,10 @@ on:
         required: false
         default: main
         type: string
+      diff_max_bytes:
+        description: Diff cap size limit in bytes (empty = default 100000)
+        required: false
+        type: string
 
 permissions:
   pull-requests: write
@@ -42,6 +46,7 @@ env:
   PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   SOURCE_BRANCH: ${{ github.head_ref || github.event.inputs.source_branch }}
   TARGET_BRANCH: ${{ github.event.pull_request.base.ref || github.event.inputs.target_branch || 'main' }}
+  DIFF_MAX_BYTES: ${{ github.event.inputs.diff_max_bytes || '' }}
 
 jobs:
   review:
@@ -96,6 +101,7 @@ jobs:
           AGENTIC_CODE_REVIEWERS_MODEL: ${{ matrix.model }}
           AGENTIC_CODE_REVIEWERS_REVIEW_SELF: 'true'
           AGENTIC_CODE_REVIEWERS_SCORE_MIN: '1'
+          AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: ${{ env.DIFF_MAX_BYTES }}
           CURSOR_API_KEY: ${{ matrix.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}
           OPENCODE_API_KEY: ${{ matrix.engine == 'opencode' && secrets.OPENCODE_API_KEY || '' }}
         run: |

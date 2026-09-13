@@ -39,6 +39,7 @@ export async function runParallelReview(
         options.diffRange,
         files,
         options.diffOptions,
+        config.diffMaxBytes,
       );
       const chunkContext: PromptContext = {
         ...baseContext,

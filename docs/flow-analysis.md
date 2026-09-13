@@ -58,7 +58,7 @@ Exact order in `src/index.ts`:
 
 - **Range:** `target...HEAD` (local) or `origin/target...origin/source` (CI).
 - **In the prompt:** source/target branch, `diffRange`, count and list of eligible paths (up to 30).
-- **Embedded diff:** `buildDiffPromptSection` injects a unified diff (small PRs) or per-file content up to ~100 KB; the agent uses it in Phase 1 without depending solely on `git diff` via tools.
+- **Embedded diff:** `buildDiffPromptSection` injects a unified diff (small PRs) or per-file content up to the configured byte limit (default ~100 KB / `AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES`, CLI `--diff-max-bytes`); the agent uses it in Phase 1 without depending solely on `git diff` via tools.
 - **Pre-mapped rules:** `buildRulesMap` resolves `.cursor/rules/*.mdc` by glob of changed files + `alwaysApply`.
 - **Patch summary log:** per eligible file (name + size in KB via `getDiffFileSummaries`).
 - **Path filter:** `getDiffFileSummaries` / `getDiffPatch` limit scope to post-include/exclude files (`buildPathArgs` + `filterFilesByScope`).

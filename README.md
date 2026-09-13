@@ -233,6 +233,7 @@ npm run review -- [argumentos]
 *   `--engine <name>` : Engine LLM: `cursor-sdk`, `cursor` ou `opencode`. Sobrescreve `AGENTIC_CODE_REVIEWERS_ENGINE`.
 *   `--verbose` / `--quiet` : Controle de logs (`AGENTIC_CODE_REVIEWERS_VERBOSE`). Com `opencode`, `--quiet` desativa stream `[assistant]`.
 *   `--score-min <N>` ou `--score-min=<N>` : Score mínimo (inclusive) para publicar issue como thread (default: `6`). Equivalente à variável `AGENTIC_CODE_REVIEWERS_SCORE_MIN`. **Opcional** — pipelines e scripts existentes que não passam este parâmetro continuam com limiar 6. Injetado no prompt e aplicado pelo gate TypeScript + Safe Outputs (mesmo valor em `cursor-sdk` e `opencode`).
+*   `--diff-max-bytes <N>` ou `--diff-max-bytes=<N>` : Limite máximo em bytes do git diff embutido no prompt do reviewer (default: `100000` / ~100 KB). Equivalente à variável `AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES`. Acima deste limite, arquivos excedentes são omitidos do prompt e inspecionados pelo agente via tools.
 *   `--auto-fix` : Modo correção automática — lê threads ativas do bot, aplica fixes via subagentes, commit/push e resolve threads (requer contexto de PR e token com escrita). Equivalente a `AGENTIC_CODE_REVIEWERS_AUTO_FIX=true`. **Mutuamente exclusivo** com o fluxo de review padrão na mesma invocação.
 
 > Engine também pode ser definida por `AGENTIC_CODE_REVIEWERS_ENGINE` no ambiente; `--engine` tem precedência. A tag nos comentários da PR é derivada automaticamente: `agentic-code-reviewers v{version} ({engine})`.

@@ -1,0 +1,19 @@
+{
+  "prNumber": 24,
+  "activeThreads": [
+    {
+      "threadId": "PRRT_kwDOTGZdV86bZrm1",
+      "filePath": "/src/provider/github.ts",
+      "lineNumber": 470
+    },
+    {
+      "threadId": "PRRT_kwDOTGZdV86bZrnG",
+      "filePath": "/test/bot-tag.test.ts",
+      "lineNumber": 39
+    }
+  ],
+  "checks": [
+    { "name": "Review (cursor-sdk)", "state": "success" },
+    { "name": "Review (opencode)", "state": "success" }
+  ]
+}
