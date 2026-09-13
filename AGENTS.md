@@ -140,7 +140,7 @@ All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except creden
 | `AGENTIC_CODE_REVIEWERS_TARGET_BRANCH` | `refs/heads/master` | Diff comparison branch |
 | `AGENTIC_CODE_REVIEWERS_REVIEW_SELF` | `false` | Include runner in diff (CI of this repo) |
 
-**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VARIANT`, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, etc.
+**Advanced** (defaults OK — see README § Advanced Configuration): OpenCode hostname/port/agent/bin/log/stream-reasoning, `VARIANT`, `VERBOSE`, `TIMEOUT_MS`, `SCORE_MIN`, `DIFF_MAX_BYTES`, `SAFE_OUTPUTS`, `PARALLEL_CHUNKS`, `MCP_ENABLED`, `MAX_ROUNDS`, `STACK`, `INCLUDE_PATTERNS`, `SANDBOX`, etc.
 
 **`run.sh` only:** `AGENTIC_CODE_REVIEWERS_REPO_URL`, `AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH`, `AGENTIC_CODE_REVIEWERS_LOCAL`, `AGENTIC_CODE_REVIEWERS_USE_TSX`.
 
@@ -148,7 +148,7 @@ All runner variables use the **`AGENTIC_CODE_REVIEWERS_`** prefix, except creden
 
 Full list: [`.env.example`](.env.example), [`README.md`](README.md), [`docs/index.md`](docs/index.md).
 
-**Precedence:** CLI flags (`--engine`, `--model`, `--variant`, `--score-min`) > canonical env > default.
+**Precedence:** CLI flags (`--engine`, `--model`, `--variant`, `--score-min`, `--diff-max-bytes`) > canonical env > default.
 
 ---
 

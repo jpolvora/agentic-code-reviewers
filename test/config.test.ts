@@ -19,6 +19,7 @@ const ISOLATED_CI_ENV: Record<string, undefined> = {
   AGENTIC_CODE_REVIEWERS_SCORE_MIN: undefined,
   AGENTIC_CODE_REVIEWERS_MODEL: undefined,
   AGENTIC_CODE_REVIEWERS_VARIANT: undefined,
+  AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: undefined,
 };
 
 function withEnv(env: Record<string, string | undefined>, action: () => void): void {
@@ -803,6 +804,101 @@ describe('loadConfig', () => {
           'low',
         ]);
         assert.equal(config.variant, 'low');
+      },
+    );
+  });
+
+  it('usa diffMaxBytes default 100000 quando não informado', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: undefined,
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.equal(config.diffMaxBytes, 100_000);
+      },
+    );
+  });
+
+  it('aceita --diff-max-bytes e --diff-max-bytes=', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+      },
+      () => {
+        const configSpace = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--diff-max-bytes',
+          '50000',
+        ]);
+        assert.equal(configSpace.diffMaxBytes, 50_000);
+
+        const configEq = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--diff-max-bytes=250000',
+        ]);
+        assert.equal(configEq.diffMaxBytes, 250_000);
+      },
+    );
+  });
+
+  it('lê diffMaxBytes via AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: '80000',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.equal(config.diffMaxBytes, 80_000);
+      },
+    );
+  });
+
+  it('CLI --diff-max-bytes tem precedência sobre AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: '80000',
+      },
+      () => {
+        const config = loadConfig([
+          '--dry-run',
+          '--source-branch',
+          'refs/heads/feature',
+          '--diff-max-bytes',
+          '120000',
+        ]);
+        assert.equal(config.diffMaxBytes, 120_000);
+      },
+    );
+  });
+
+  it('ignora macro ADO e valores inválidos em AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES e usa default', () => {
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: '$(AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES)',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.equal(config.diffMaxBytes, 100_000);
+      },
+    );
+
+    withEnv(
+      {
+        CURSOR_API_KEY: 'cursor_test',
+        AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: '-50',
+      },
+      () => {
+        const config = loadConfig(['--dry-run', '--source-branch', 'refs/heads/feature']);
+        assert.equal(config.diffMaxBytes, 100_000);
       },
     );
   });

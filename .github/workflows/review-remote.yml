@@ -38,7 +38,7 @@ on:
       model:
         description: Modelo LLM (vazio = default da engine)
         type: string
-        default: ''
+        default: composer-2.5
       runner_repository:
         description: Repositório do runner (owner/repo)
         type: string
@@ -61,6 +61,10 @@ on:
         default: ''
       score_min:
         description: Score mínimo para publicar threads (vazio = default 6)
+        type: string
+        default: ''
+      diff_max_bytes:
+        description: Limite máximo em bytes do diff embutido no prompt (vazio = default 100000)
         type: string
         default: ''
     secrets:
@@ -104,11 +108,12 @@ jobs:
             exit 1
           fi
 
-      - name: Run remote reviewer
+      - name: Run code reviewer
         env:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: ${{ inputs.engine }}
           AGENTIC_CODE_REVIEWERS_SCORE_MIN: ${{ inputs.score_min }}
+          AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: ${{ inputs.diff_max_bytes }}
           AGENTIC_CODE_REVIEWERS_REPO_URL: https://github.com/${{ inputs.runner_repository }}.git
           AGENTIC_CODE_REVIEWERS_RELEASE_BRANCH: ${{ inputs.runner_ref }}
           CURSOR_API_KEY: ${{ inputs.engine == 'cursor-sdk' && secrets.CURSOR_API_KEY || '' }}

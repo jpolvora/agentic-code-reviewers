@@ -38,6 +38,7 @@ jobs:
           AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN: ${{ secrets.AGENTIC_CODE_REVIEWERS_GITHUB_TOKEN || github.token }}
           AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
           AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
+          # AGENTIC_CODE_REVIEWERS_DIFF_MAX_BYTES: 100000 # Optional diff cap size limit in bytes (default 100000)
         run: |
           git checkout -B "${{ github.head_ref }}"
           curl -fsSL https://raw.githubusercontent.com/jpolvora/agentic-code-reviewers/release/run.sh | bash -s -- \

@@ -76,4 +76,30 @@ describe('buildDiffPromptSection', () => {
       rmSync(repo, { recursive: true, force: true });
     }
   });
+
+  it('retorna modo empty quando maxBytes <= 0', () => {
+    const repo = createTempGitRepo('zero-cap');
+    try {
+      initRepo(repo);
+      writeFileSync(resolve(repo, 'README.md'), 'base\n');
+      runGit(repo, ['add', 'README.md']);
+      runGit(repo, ['commit', '-q', '-m', 'base']);
+
+      runGit(repo, ['checkout', '-q', '-b', 'feature']);
+      writeFileSync(resolve(repo, 'Foo.cs'), 'class Foo { }\n');
+      runGit(repo, ['add', 'Foo.cs']);
+      runGit(repo, ['commit', '-q', '-m', 'feature']);
+
+      const breakdown = getDiffBreakdown(repo, 'master...HEAD', ['**/*.cs'], []);
+      const section = buildDiffPromptSection(repo, 'master...HEAD', breakdown.filteredFiles, {}, 0);
+
+      assert.equal(section.mode, 'empty');
+      assert.equal(section.totalBytes, 0);
+      assert.equal(section.includedFiles, 0);
+      assert.equal(section.omittedFiles, 1);
+      assert.ok(section.content.includes('teto de bytes'));
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
 });

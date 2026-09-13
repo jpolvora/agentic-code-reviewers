@@ -28,8 +28,17 @@ export function buildDiffPromptSection(
   options: DiffOptions = {},
   maxBytes: number = MAX_DIFF_PROMPT_BYTES,
 ): DiffPromptSection {
-  if (files.length === 0) {
-    return { mode: 'empty', content: '', totalBytes: 0, includedFiles: 0, omittedFiles: 0 };
+  if (files.length === 0 || maxBytes <= 0) {
+    return {
+      mode: 'empty',
+      content:
+        files.length === 0
+          ? ''
+          : '> Diff elegível omitido devido ao teto de bytes (0). Use `git diff` via tools nos paths listados acima.',
+      totalBytes: 0,
+      includedFiles: 0,
+      omittedFiles: files.length,
+    };
   }
 
   const scoped: DiffOptions = { ...options, files };

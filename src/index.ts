@@ -145,6 +145,7 @@ async function main(): Promise<void> {
     gitContext.diffRange,
     diffStats.filteredFiles,
     diffOptions,
+    config.diffMaxBytes,
   );
 
   const scopedDiffText = getDiffPatch(config.repoRoot, gitContext.diffRange, filteredDiffOptions);

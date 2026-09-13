@@ -10,6 +10,7 @@ import type { ReviewerEngineName } from './engine/types.js';
 import { buildBotTag } from './bot-tag.js';
 import { detectSourceBranchRef } from './git/diff.js';
 import { resolveAutoFixBuildCommand } from './git/autofix-build.js';
+import { MAX_DIFF_PROMPT_BYTES } from './git/diff-prompt.js';
 import { ENV, ENV_PREFIX, env } from './env.js';
 import {
   buildDefaultProtectedPatterns,
@@ -239,6 +240,8 @@ export interface ReviewerConfig {
   autoFix: boolean;
   /** Comando de build pós-commit no auto-fix; null = ignorar (sem script ou env vazio). */
   autoFixBuildCommand: string | null;
+  /** Limite máximo em bytes do diff embutido no prompt do reviewer. */
+  diffMaxBytes: number;
 }
 
 export interface CliArgs {
@@ -261,6 +264,7 @@ export interface CliArgs {
   customPrompt?: string;
   includePatterns?: string;
   scoreMin?: number;
+  diffMaxBytes?: number;
   engine?: string;
   variant?: string;
   generateCommitMessage?: boolean;
@@ -282,6 +286,7 @@ const DEFAULT_MAX_ROUNDS = 10;
 const DEFAULT_ENGINE: ReviewerEngineName = 'cursor-sdk';
 const DEFAULT_SCORE_MIN = 6;
 const MAX_SCORE_MIN = 10;
+export const DEFAULT_DIFF_MAX_BYTES = MAX_DIFF_PROMPT_BYTES;
 
 function parseEngine(value: string | undefined): ReviewerEngineName {
   return parseEngineName(value);
@@ -308,6 +313,22 @@ export function parseScoreMin(value: string | number | undefined, fallback: numb
   }
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= MAX_SCORE_MIN ? parsed : fallback;
+}
+
+/** Lê limite de bytes do diff de env/CLI; usa fallback se ausente, inválido ou macro ADO. */
+export function parseDiffMaxBytes(
+  value: string | number | undefined,
+  fallback: number = DEFAULT_DIFF_MAX_BYTES,
+): number {
+  if (typeof value === 'number') {
+    return Number.isInteger(value) && value >= 0 ? value : fallback;
+  }
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed || isUnexpandedPipelineMacro(trimmed)) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 /** Lê um inteiro >= 0 de env; usa fallback se ausente, inválido ou macro ADO. */
@@ -401,6 +422,10 @@ function parseArgs(argv: string[]): CliArgs {
     }
     if (arg.startsWith('--score-min=')) {
       args.scoreMin = Number(arg.slice(12));
+      continue;
+    }
+    if (arg.startsWith('--diff-max-bytes=')) {
+      args.diffMaxBytes = Number(arg.slice(17));
       continue;
     }
     if (arg.startsWith('--engine=')) {
@@ -500,6 +525,10 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case '--score-min':
         args.scoreMin = Number(next);
+        i++;
+        break;
+      case '--diff-max-bytes':
+        args.diffMaxBytes = Number(next);
         i++;
         break;
       case '--engine':
@@ -872,6 +901,12 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): ReviewerConf
         ? cli.scoreMin
         : env.scoreMin(),
     ),
+    diffMaxBytes: parseDiffMaxBytes(
+      cli.diffMaxBytes != null && Number.isFinite(cli.diffMaxBytes)
+        ? cli.diffMaxBytes
+        : env.diffMaxBytes(),
+      DEFAULT_DIFF_MAX_BYTES,
+    ),
     stack: stackConfig.name,
     stackPromptPath,
     stackSource,
@@ -924,6 +959,7 @@ Opções:
   --custom-prompt VAL    Caminho do arquivo ou string de prompt quando a stack é Custom (requerido para --stack=Custom)
   --include-patterns VAL Lista separada por vírgulas de padrões glob de inclusão (sobrescreve o default da stack)
   --score-min N          Score mínimo (inclusive) para publicar issue como thread (default: 6)
+  --diff-max-bytes BYTES Limite de bytes do diff embutido no prompt do reviewer (default: 100000)
   --generate-commit-message  Gera mensagem de commit convencional (stdout)
   --generate-pr-description  Gera descrição de PR (stdout)
   --artifacts-only       Gera artefatos sem executar review
@@ -935,7 +971,7 @@ Pré-requisitos do projeto alvo (obrigatórios — o script encerra se ausentes)
 
 Variáveis: ${ENV.CURSOR_API_KEY} (engine cursor-sdk), ${ENV.OPENCODE_API_KEY} (engine opencode); demais com prefixo ${ENV_PREFIX}: ${ENV.ENGINE} (default: cursor-sdk),
   ${ENV.TARGET_BRANCH} (default: refs/heads/master),
-  ${ENV.SCORE_MIN} (default: 6), ${ENV.INCLUDE_UNCOMMITTED}, ${ENV.SEED_TEST},
+  ${ENV.SCORE_MIN} (default: 6), ${ENV.DIFF_MAX_BYTES} (default: 100000), ${ENV.INCLUDE_UNCOMMITTED}, ${ENV.SEED_TEST},
   ${ENV.REVIEW_SELF}, ${ENV.EXTRA_EXCLUDE_PATTERNS}, ...
 
 Branches:
