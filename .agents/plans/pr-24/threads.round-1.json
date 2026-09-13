@@ -1,0 +1,14 @@
+{
+  "prNumber": 24,
+  "owner": "jpolvora",
+  "repo": "agentic-code-reviewers",
+  "cooperativeContract": ".agents/skills/ws-fix-pr/scripts/COOPERATIVE_FIX.md",
+  "activeThreads": [
+    {
+      "index": 1,
+      "threadId": "PRRT_kwDOTGZdV86bVp6C",
+      "filePath": "/.agents/skills/ws-secrets-leak-review/scripts/pre-commit.sh",
+      "lineNumber": 64
+    }
+  ]
+}

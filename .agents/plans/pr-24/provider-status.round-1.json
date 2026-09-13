@@ -1,0 +1,14 @@
+{
+  "prNumber": 24,
+  "activeThreads": [
+    {
+      "threadId": "PRRT_kwDOTGZdV86bVp6C",
+      "filePath": "/.agents/skills/ws-secrets-leak-review/scripts/pre-commit.sh",
+      "lineNumber": 64
+    }
+  ],
+  "checks": [
+    { "name": "Review (cursor-sdk)", "state": "success" },
+    { "name": "Review (opencode)", "state": "success" }
+  ]
+}

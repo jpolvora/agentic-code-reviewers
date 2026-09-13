@@ -1,0 +1,8 @@
+{
+  "prNumber": 24,
+  "activeThreads": [],
+  "checks": [
+    { "name": "Review (cursor-sdk)", "state": "pending" },
+    { "name": "Review (opencode)", "state": "pending" }
+  ]
+}
