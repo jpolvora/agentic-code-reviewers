@@ -40,18 +40,26 @@ jobs:
         id: pr-info
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME_IN: ${{ github.event_name }}
+          INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
+          INPUT_SOURCE_BRANCH: ${{ github.event.inputs.source_branch }}
+          INPUT_TARGET_BRANCH: ${{ github.event.inputs.target_branch }}
+          RUN_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
+          RUN_HEAD_REF: ${{ github.event.workflow_run.pull_requests[0].head.ref }}
+          RUN_BASE_REF: ${{ github.event.workflow_run.pull_requests[0].base.ref }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "pr_number=${{ github.event.inputs.pr_number }}" >> $GITHUB_OUTPUT
-            echo "source_branch=${{ github.event.inputs.source_branch }}" >> $GITHUB_OUTPUT
-            echo "target_branch=${{ github.event.inputs.target_branch }}" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME_IN" = "workflow_dispatch" ]; then
+            echo "pr_number=$INPUT_PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "source_branch=$INPUT_SOURCE_BRANCH" >> $GITHUB_OUTPUT
+            echo "target_branch=$INPUT_TARGET_BRANCH" >> $GITHUB_OUTPUT
           else
-            PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
-            HEAD_BRANCH="${{ github.event.workflow_run.pull_requests[0].head.ref }}"
-            BASE_BRANCH="${{ github.event.workflow_run.pull_requests[0].base.ref }}"
+            PR_NUMBER="$RUN_PR_NUMBER"
+            HEAD_BRANCH="$RUN_HEAD_REF"
+            BASE_BRANCH="$RUN_BASE_REF"
             
             if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
-              HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
+              HEAD_SHA="$RUN_HEAD_SHA"
               echo "Buscando PR para o commit $HEAD_SHA..."
               PR_DATA=$(gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/pulls" -H "Accept: application/vnd.github.groot-preview+json" --jq '.[0]')
               
@@ -108,18 +116,23 @@ jobs:
           AGENTIC_CODE_REVIEWERS_ENGINE: cursor-sdk
           AGENTIC_CODE_REVIEWERS_MODEL: composer-2.5
           CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          PR_ID_IN: ${{ steps.pr-info.outputs.pr_number }}
+          SOURCE_BRANCH: ${{ steps.pr-info.outputs.source_branch }}
+          TARGET_BRANCH: ${{ steps.pr-info.outputs.target_branch }}
         run: |
           bash run.sh --local --gh \
-            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
-            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
-            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --pr-id "$PR_ID_IN" \
+            --source-branch "$SOURCE_BRANCH" \
+            --target-branch "$TARGET_BRANCH" \
             --auto-fix
         continue-on-error: true
 
       - name: Sync Git Repository (Fetch and Hard Reset)
         if: steps.engines.outputs.cursor == 'true' && steps.engines.outputs.opencode == 'true'
+        env:
+          SOURCE_BRANCH: ${{ steps.pr-info.outputs.source_branch }}
         run: |
-          BRANCH="${{ steps.pr-info.outputs.source_branch }}"
+          BRANCH="$SOURCE_BRANCH"
           git fetch origin "$BRANCH"
           LOCAL=$(git rev-parse HEAD)
           REMOTE=$(git rev-parse "origin/$BRANCH")
@@ -142,16 +155,21 @@ jobs:
           AGENTIC_CODE_REVIEWERS_ENGINE: opencode
           AGENTIC_CODE_REVIEWERS_MODEL: opencode-go/deepseek-v4-flash
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          PR_ID_IN: ${{ steps.pr-info.outputs.pr_number }}
+          SOURCE_BRANCH: ${{ steps.pr-info.outputs.source_branch }}
+          TARGET_BRANCH: ${{ steps.pr-info.outputs.target_branch }}
         run: |
           bash run.sh --local --gh \
-            --pr-id "${{ steps.pr-info.outputs.pr_number }}" \
-            --source-branch "${{ steps.pr-info.outputs.source_branch }}" \
-            --target-branch "${{ steps.pr-info.outputs.target_branch }}" \
+            --pr-id "$PR_ID_IN" \
+            --source-branch "$SOURCE_BRANCH" \
+            --target-branch "$TARGET_BRANCH" \
             --auto-fix
         continue-on-error: true
 
       - name: Fail if all configured auto-fix engines failed
         if: always()
+        env:
+          SOURCE_BRANCH: ${{ steps.pr-info.outputs.source_branch }}
         run: |
           CURSOR_EXPECTED=false
           OPENCODE_EXPECTED=false
@@ -163,7 +181,7 @@ jobs:
             exit 0
           fi
 
-          BRANCH="${{ steps.pr-info.outputs.source_branch }}"
+          BRANCH="$SOURCE_BRANCH"
           if [ "$CURSOR_EXPECTED" = "true" ] && [ "$OPENCODE_EXPECTED" = "true" ]; then
             if [ "${{ steps.autofix-cursor.outcome }}" = "failure" ] && [ "${{ steps.autofix-opencode.outcome }}" = "success" ]; then
               git fetch origin "$BRANCH"
